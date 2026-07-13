@@ -5,7 +5,10 @@
 //   1) recent posted casts are injected into the prompt so the model writes
 //      something DIFFERENT or outputs NOTHING (silent),
 //   2) a word-overlap similarity guard skips near-duplicate drafts,
-//   3) the recall query rotates by hour so each hour pulls different material.
+//   3) the recall query rotates by hour so each hour pulls different material,
+//   4) a randomized 0-40min delay before posting, so casts don't land in a
+//      predictable :00-:02 window every hour (fixed-interval posting is one of
+//      Farcaster's own anti-spam detection signals - see research doc 1065).
 // Net: it attempts hourly but only posts genuinely fresh material - volume
 // self-limits to quality, it will NOT spam the same artist 17x/day.
 // Zaal authorized full-auto 2026-07-12 (zol-golive) + hourly cadence
@@ -19,6 +22,7 @@ const RECENT_PATH = H + '/zol/recent-casts.json';
 const RECENT_KEEP = 24; // ~ last day of hourly casts
 const DRY = process.env.ZOL_DRY === '1';
 
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 function envfile(p) { const o = {}; try { for (const l of fs.readFileSync(p, 'utf8').split('\n')) { const m = l.match(/^([A-Z_]+)=(.*)$/); if (m) o[m[1]] = m[2].trim(); } } catch (e) {} return o; }
 const tg = envfile(H + '/.zao/private/tg.env');
 const bf = envfile(H + '/.zao/private/bonfire.env');
@@ -124,6 +128,9 @@ async function logBonfire(text) {
       console.log('[DRY] would post:', text);
       return;
     }
+    const jitterMs = Math.floor(Math.random() * 40 * 60 * 1000); // 0-40min, see header note
+    console.log(`ZOL: waiting ${Math.round(jitterMs / 60000)}min before posting (anti fixed-interval jitter)`);
+    await sleep(jitterMs);
     await post(text);
     appendRecent(text);
     await logBonfire(text);
