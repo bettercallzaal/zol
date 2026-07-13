@@ -58,6 +58,7 @@ persona.md      persona seed (live copy runs from the Pi's home dir)
 */5 * * * *       zol-zabal-watch.js  - ZABAL_WATCHER_LIVE=1
 */10 * * * *      zol-win-drain.js
 */5 * * * *       zol-drain.js        - ZOL_DRAIN_LIVE=1
+0 15 * * *        zol-follow.js       - follows up to 20/day of @zaal's follows, auto
 @reboot + */15    start-fleet.sh      - self-healing supervisor, see below
 ```
 
@@ -72,16 +73,21 @@ tmux zolz  -> node scripts/zol-learn-zaal.js  (learns from Zaal's Farcaster post
 
 ## The gated-posting model
 
-Nothing posts to Farcaster without a human okaying it first, with one
-exception noted below:
+Nothing posts to Farcaster without a human okaying it first, with two
+exceptions noted below:
 
 - `zol-reply.js` and `zol-threads.js` draft replies to disk under `~/zol/drafts/`
   and ping Zaal on Telegram. Zaal reviews via `dashboard.js` (served on the Pi's
   Tailscale IP, port 8088) or runs `node scripts/post-reply.js <hash>` directly.
   Nothing posts until one of those runs.
-- `zol-daily.js` is the one exception: it auto-posts on-brand curator casts (the
+- `zol-daily.js` is one exception: it auto-posts on-brand curator casts (the
   "quiet drafts" part of the model still applies to replies and threads, not to
   this daily cast). That's intentional and should stay that way.
+- `zol-follow.js` is the other exception: it auto-follows (no cast, no content
+  risk, purely mechanical - mirrors accounts @zaal has already vetted by
+  following them himself) up to a daily cap, and sends a Telegram summary
+  after each run rather than asking for approval first. Following is
+  reversible (unfollow any time) and never touches a wallet.
 - Operator feedback from Zaal (corrections to ZOL's behavior/persona) is
   absorbed silently into the persona and confirmed privately on Telegram - ZOL
   does not post a public acknowledgment of feedback. Do not revert this.
