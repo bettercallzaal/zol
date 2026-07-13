@@ -1,0 +1,18 @@
+{
+  "name": "zol-legacy-setup",
+  "version": "1.0.0",
+  "description": "Archived one-time FID/signer bootstrap template. Not part of ZOL's live agent - see legacy-setup/README.md.",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "register": "node register-fid.js",
+    "add-signer": "node add-signer.js",
+    "cast": "node post-cast.js",
+    "swap": "node swap-to-usdc.js",
+    "profile": "node set-profile.js"
+  },
+  "dependencies": {
+    "@farcaster/hub-nodejs": "^0.15.9",
+    "ethers": "^6.16.0"
+  }
+}

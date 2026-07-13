@@ -1,0 +1,19 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+# runtime data, not code
+drafts/
+*.bak
+*.bak-*
+*.bak.*
+
+# never commit private keys or credentials
+*.key
+*.pem
+credentials.json
+farcaster-credentials.json
+.vercel
