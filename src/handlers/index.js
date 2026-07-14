@@ -515,11 +515,16 @@ if (process.env.DREAMLOOPS_ENABLED === 'true') {
   radarHandlers = radHandlers;
 }
 
+// Import Phase 7 handlers (Warper Keeper connector operations)
+// These are ALWAYS available (mode controls actual behavior)
+const { handlers: warperKeeperHandlers } = require('./warper-keeper-handlers');
+
 // Merge all handlers
 const allHandlers = {
   ...handlers,
   ...selfImprovementHandlers,
-  ...radarHandlers
+  ...radarHandlers,
+  ...warperKeeperHandlers,
 };
 
 // Export all handlers
