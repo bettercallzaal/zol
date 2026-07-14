@@ -1,7 +1,7 @@
 # ZOL Calendar-Aware Casting - Design Spec
 
 Date: 2026-07-14
-Status: Approved by Zaal, proceeding to implementation.
+Status: Implemented, PR open (https://github.com/bettercallzaal/zol/pull/11).
 
 ## Purpose
 
