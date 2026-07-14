@@ -1,0 +1,136 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "evidence-gated-self-improvement-v1",
+  "title": "Evidence-Gated Self Improvement",
+  "version": "1.0.0",
+  "status": "rehearsed",
+  "owner": "zol-curator-v1",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "weekly review or after 100 receipts accumulated",
+  "inputs": [
+    "review period (1 week)",
+    "operator override (optional)"
+  ],
+  "context_sources": [
+    "all receipts from period",
+    "error frequency from receipts",
+    "performance metrics (timing, retries)"
+  ],
+  "allowed_actions": [
+    "artifact.local.write",
+    "memory.read",
+    "memory.write",
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "receipt count >= threshold",
+    "error patterns identifiable",
+    "improvements evidence-backed"
+  ],
+  "evidence_outputs": [
+    "review-timestamp",
+    "error-count-by-type",
+    "improvement-candidates",
+    "confidence-score"
+  ],
+  "receipt_outputs": [
+    "evidence-gated-self-improvement receipt"
+  ],
+  "knowledge_state_outputs": [
+    "improvements identified",
+    "improvements staged (draft only)",
+    "operator approval needed"
+  ],
+  "execution_trace_outputs": [
+    "evidence-gated-self-improvement trace"
+  ],
+  "memory_routes": [
+    "durable: improvement patterns logged"
+  ],
+  "cooldown": "604800s (weekly)",
+  "failure_modes": [
+    "receipt query failed",
+    "error pattern detection inconclusive",
+    "operator approval denied (refinement cycle)"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-14",
+  "limits": {
+    "max_wall_time_ms": 300000,
+    "max_steps": 5,
+    "max_retries_per_step": 1
+  },
+  "steps": [
+    {
+      "id": "analyze-receipts",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {
+        "stateKey": "zol-receipt-summary"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "identify-patterns",
+      "handler": "memory.read",
+      "permission": "memory.read",
+      "with": {
+        "scope": "improvement-history"
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "stage-improvements",
+      "handler": "artifact.local.write",
+      "permission": "artifact.local.write",
+      "with": {
+        "artifactType": "improvement-proposal"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-learnings",
+      "handler": "memory.write",
+      "permission": "memory.write",
+      "with": {
+        "memoryType": "improvement-log"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-review",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {
+        "receiptType": "evidence-gated-self-improvement"
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    }
+  ]
+}

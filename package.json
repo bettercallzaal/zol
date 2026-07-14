@@ -8,12 +8,12 @@
     "check": "for f in scripts/*.js src/*.js; do node --check \"$f\" || exit 1; done && echo 'all scripts OK'",
     "daily": "node scripts/zol-daily.js",
     "dashboard": "node scripts/dashboard.js",
-    "dl:test": "node --test vendor/dreamloops/runtime/tests/*.test.js src/__tests__/*.test.js",
+    "dl:test": "node --test vendor/dreamloops/runtime/tests/*.test.js src/__tests__/*.test.js src/handlers/__tests__/*.test.js",
     "dl:validate": "node vendor/dreamloops/cli/src/cli.js validate-all capsules/ loops/",
     "dl:secret-scan": "bash scripts/secret-scan.sh",
     "dl:state-migrate": "node scripts/dl-state-migrate.js",
     "dl:state-restore": "node scripts/dl-state-restore.js",
-    "dl:dry-run": "echo 'dry-run: not yet wired (phase 4+)' && exit 0"
+    "dl:dry-run": "node scripts/dl-dry-run.js"
   },
   "dependencies": {
     "@farcaster/hub-nodejs": "^0.15.9",

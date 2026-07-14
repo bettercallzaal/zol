@@ -94,6 +94,8 @@
       "relationship.write",
       "research.synthesize",
       "source.public.read",
+      "state.local.read",
+      "state.local.write",
       "task.capture",
       "task.plan",
       "task.read"
@@ -124,6 +126,6 @@
   },
   "provenance": {
     "source": "https://github.com/bettercallzaal/zol",
-    "content_hash": "sha256:e383e6a4cc94e6e48acd77a3e476e824aacc255da247f84d2ccdfb2f9c0c7dae"
+    "content_hash": "sha256:0766c78273438e27b4de0771e1d0cf144521161373e648ba7806ffbad6381156"
   }
 }

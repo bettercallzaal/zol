@@ -1,0 +1,179 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "inbox-triage-v1",
+  "title": "Inbox Triage",
+  "version": "1.0.0",
+  "status": "rehearsed",
+  "owner": "zol-curator-v1",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "new Farcaster mention or operator request",
+  "inputs": [
+    "new mention(s) from Neynar API",
+    "timestamp"
+  ],
+  "context_sources": [
+    "mention text and author FID",
+    "author relationship state (if known)",
+    "recent ZOL posts (context)",
+    "ZOL's recent memory (tone, intent)"
+  ],
+  "allowed_actions": [
+    "farcaster.read",
+    "inbox.read",
+    "memory.read",
+    "message.classify",
+    "receipt.local.write",
+    "relationship.read",
+    "relationship.write",
+    "state.local.read",
+    "state.local.write",
+    "task.capture",
+    "task.plan"
+  ],
+  "blocked_actions": [
+    "farcaster.autoupload",
+    "fund.transfer",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "mention integrity",
+    "author not spam (PHASE 5: reputation check)",
+    "message parseable"
+  ],
+  "evidence_outputs": [
+    "inbox-triage timestamp",
+    "mention-count",
+    "action-type (respond, task, defer, ignore)"
+  ],
+  "receipt_outputs": [
+    "inbox-triage receipt"
+  ],
+  "knowledge_state_outputs": [
+    "mentions classified",
+    "tasks captured (if actionable)",
+    "relationship state updated"
+  ],
+  "execution_trace_outputs": [
+    "inbox-triage execution trace"
+  ],
+  "memory_routes": [
+    "episodic: per-mention decision log",
+    "durable: author relationship updates"
+  ],
+  "cooldown": "as-needed (triggered by new mentions)",
+  "failure_modes": [
+    "API timeout (Neynar)",
+    "message classification failed",
+    "no new mentions",
+    "spam check unavailable (PHASE 5)"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-14",
+  "limits": {
+    "max_wall_time_ms": 120000,
+    "max_steps": 8,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "read-inbox",
+      "handler": "inbox.read",
+      "permission": "inbox.read",
+      "with": {
+        "maxRecent": 10
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "classify-message",
+      "handler": "message.classify",
+      "permission": "message.classify",
+      "with": {
+        "types": [
+          "respond",
+          "task",
+          "defer",
+          "ignore"
+        ]
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "read-author-relationship",
+      "handler": "relationship.read",
+      "permission": "relationship.read",
+      "with": {
+        "fetchRelated": true
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "read-memory",
+      "handler": "memory.read",
+      "permission": "memory.read",
+      "with": {
+        "maxRecent": 3
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "capture-action-tasks",
+      "handler": "task.capture",
+      "permission": "task.capture",
+      "with": {
+        "fromSource": "inbox-triage"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "plan-response",
+      "handler": "task.plan",
+      "permission": "task.plan",
+      "with": {
+        "scope": "inbound-mention"
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "update-relationship",
+      "handler": "relationship.write",
+      "permission": "relationship.write",
+      "with": {
+        "updateType": "interaction-logged"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-triage",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {
+        "receiptType": "inbox-triage"
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    }
+  ]
+}
