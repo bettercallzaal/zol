@@ -11,7 +11,13 @@ const ZAO_CHANNEL = 'https://farcaster.xyz/~/channel/zao';
   if (!id) { console.log('usage: node post-event.js <draftId>'); process.exit(1); }
   const dp = H + '/zol/drafts/' + id + '.json';
   if (!fs.existsSync(dp)) { console.log('no staged draft for ' + id); process.exit(1); }
-  const d = JSON.parse(fs.readFileSync(dp, 'utf8'));
+  let d;
+  try {
+    d = JSON.parse(fs.readFileSync(dp, 'utf8'));
+  } catch (e) {
+    console.log('ERR draft ' + id + ' corrupted: ' + e.message);
+    process.exit(1);
+  }
   await L.post({ text: d.text, embedUrl: d.eventUrl || undefined, parentUrl: ZAO_CHANNEL });
   fs.renameSync(dp, dp + '.posted');
   console.log('POSTED event cast for ' + id);

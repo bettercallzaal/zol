@@ -95,6 +95,9 @@ async function draftCast(event, moment) {
           await ping('ZOL calendar draft (' + framing + '): ' + event.summary + '\n\n' + text
             + '\n\nApprove + post:\nssh zaal@ansuz "cd ~/zol/farcaster-agent && node scripts/post-event.js ' + id + '"');
           drafted++;
+        } else {
+          console.log('ZOL calendar: failed to draft a cast for "' + event.summary + '" (' + framing + ') - LLM returned nothing');
+          await ping('ZOL calendar: failed to draft a cast for "' + event.summary + '" (' + framing + ') - LLM returned nothing');
         }
       }
 
