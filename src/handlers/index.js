@@ -503,5 +503,24 @@ const handlers = {
   }
 };
 
+// Import Phase 6 handlers (self-improvement state machine + component radar)
+// These are behind DREAMLOOPS_ENABLED flag (see loops for actual gating)
+let selfImprovementHandlers = {};
+let radarHandlers = {};
+
+if (process.env.DREAMLOOPS_ENABLED === 'true') {
+  const { handlers: smHandlers } = require('./self-improvement-state-machine');
+  const { handlers: radHandlers } = require('./component-radar');
+  selfImprovementHandlers = smHandlers;
+  radarHandlers = radHandlers;
+}
+
+// Merge all handlers
+const allHandlers = {
+  ...handlers,
+  ...selfImprovementHandlers,
+  ...radarHandlers
+};
+
 // Export all handlers
-module.exports = handlers;
+module.exports = allHandlers;
