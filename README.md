@@ -1,143 +1,316 @@
-# ZOL
+# ZOL - Farcaster Music Scout Agent
 
-ZOL is [@zolbot](https://farcaster.xyz/zolbot) (FID 3338501) - the ZAO scene's
-music curator on Farcaster. Tasteful, tireless, low-ego. ZOL finds and frames
-music worth hearing from The ZAO, COC Concertz, and WaveWarZ artists, and helps
-musicians land on Farcaster. It is a child of ZOE (the ZAO's cowork bot) and
-inherits ZOE's voice constitution - see `persona.md`.
+**ZOL** (@zolbot, FID 3338501) is the ZAO's autonomous music curator and artist-advocate on Farcaster. It finds and frames music worth hearing from The ZAO, COC Concertz, and WaveWarZ, helps musicians land on Farcaster, and operates under a human-approval gate for safety.
 
-ZOL holds a Base wallet (`0x5A3F9a4f20e602eeaa03019F863fcA249f452D22`, USDC) for
-identity purposes. **ZOL has no spend, launch, or sign-transaction capability by
-design.** The one script that used to touch a wallet (`overnight.js`'s
-auto-follow loop) has had that logic removed - see "What changed in this repo"
-below.
+ZOL is a child of ZOE (the ZAO's cowork orchestrator bot) and inherits its voice constitution - no emojis, no em dashes, clear and actionable. See `persona.md` for the full voice rules.
 
-## Where this runs
+## Status
 
-ZOL runs on a Raspberry Pi (`zaal@ansuz`, reachable over Tailscale), cron- and
-tmux-driven. This repo is the source of truth; the Pi clones it and pulls to
-update. See "Pi deploy flow" below.
+**Current**: Fully operational on the Raspberry Pi (zaal@ansuz). Cron-driven daemon with human-gated posting except for two carve-outs (daily curator cast + daily follow).
 
-## Architecture
+**In Flight**: Two open PRs awaiting Zaal review before merge to main:
+- **PR #1 (scaffold/initial-repo-structure)**: Moves ZOL from loose files on the Pi into a structured Git repo with tests, secret-scanning, and clear architecture.
+- **PR #2 (feature/zol-follow)**: Adds daily auto-follow of up to 20 accounts Zaal already follows (mirrors the trusted-curation precedent of zol-daily auto-posts). No spend, no risk, reversible via unfollow. Awaits Zaal's sign-off on the auto-gate design.
 
-- **Posting/signing**: `@farcaster/hub-nodejs` builds a `CastAdd`, signs it
-  locally with ZOL's registered Ed25519 signer (key lives only in
-  `~/.openclaw/farcaster-credentials.json` on the Pi, never in this repo), and
-  submits the bytes to the Neynar hub (`hub-api.neynar.com/v1/submitMessage`)
-  authenticated with an API key header. This is free - no on-chain payment, no
-  x402. Do not reintroduce x402 for posting; that path was tried and dropped
-  (see `legacy-setup/`).
-- **Reads**: `haatz.quilibrium.com` (a free Farcaster hub mirror, no auth) for
-  most discovery/context reads; Neynar's REST API where haatz doesn't cover it
-  (e.g. username lookup).
-- **Drafting**: OpenRouter, model `anthropic/claude-fable-5`, via `zol-lib.js`'s
-  `ork()` helper.
-- **Context**: the ZABAL Bonfire knowledge graph for broader ZAO ecosystem
-  grounding.
-- **Persona**: `persona.md` in this repo is the seed. The live persona that
-  actually runs is `~/zol/zol-persona.md` on the Pi - keep them in sync by hand
-  until the Pi is migrated to read straight from this repo (see below).
+**Known limitations (by design, not bugs)**:
+- ZOL has no wallet spend capability. The Farcaster identity wallet is identity-only (signing + hub submission). No x402, no tipper, no minter - all via the signer key + Neynar's free API.
+- Posting requires a human to approve (draft sits in `~/zol/drafts/` and pings Zaal on Telegram) except for the two exceptions above (zol-daily and zol-follow auto-post).
+- Bonfire knowledge graph reads are write-only for now (read endpoint blocked pending labeling on the admin key); ZOL uses ICM boxes + hand-carried persona context instead.
 
-## Repo layout
+## Stack
 
-```
-src/            zol-lib.js (shared signer/submit/post/reply/remove/ork helpers)
-                add-signer.js, config.js (used only by scripts/rotate.js)
-scripts/        every cron entrypoint and one-shot CLI tool - see docs/SCRIPTS.md
-docs/           AGENT_GUIDE.md, SCRIPTS.md, neynar-learnings.md, SKILL.md
-legacy-setup/   archived one-time FID/signer bootstrap template - dead code,
-                kept for reference only, see legacy-setup/README.md
-persona.md      persona seed (live copy runs from the Pi's home dir)
-.env.example    every env var NAME the code touches - no values, ever
-```
+| Component | Technology | Notes |
+|-----------|-----------|-------|
+| **Runtime** | Node.js 18+ | Runs on Raspberry Pi + local dev |
+| **Posting/Signing** | @farcaster/hub-nodejs (0.15.9+) | Signs messages locally, submits via Neynar hub |
+| **Reads** | haatz.quilibrium.com (free) + Neynar REST API | Discovery via free Farcaster hub mirror; user/channel lookups via Neynar |
+| **Drafting (LLM)** | OpenRouter: claude-fable-5 | Cost: ~$0.001/cast draft; drafts timeout at 45s |
+| **Context** | ICM boxes (useicm.com, unauthenticated read) | Grounded ZAO ecosystem facts - ZOL references these in casts |
+| **Operator gate** | Telegram (ZOE bot) | Drafts -> Zaal's Telegram -> approval -> post |
+| **Dashboard** | Express.js on port 8088 (Tailscale-only) | Zaal reviews staged drafts live at `http://<pi-ip>:8088` |
 
-## Cron schedule (on the Pi)
+## Quick Start
 
-```
-0 0-2,9-23 * * *  zol-daily.js        - daily curator cast, auto-posts (see below)
-*/5 * * * *       zol-zabal-watch.js  - ZABAL_WATCHER_LIVE=1
-*/10 * * * *      zol-win-drain.js
-*/5 * * * *       zol-drain.js        - ZOL_DRAIN_LIVE=1
-0 15 * * *        zol-follow.js       - follows up to 20/day of @zaal's follows, auto
-@reboot + */15    start-fleet.sh      - self-healing supervisor, see below
+### Prerequisites
+
+- Node.js 18+
+- Secrets on the Pi (see "Secrets" section below)
+- A funded wallet on the Pi (for signer key registration - one-time at setup)
+
+### Install & Run
+
+```bash
+# Clone the repo
+git clone https://github.com/bettercallzaal/zol.git
+cd zol
+
+# Install deps
+npm install --omit=dev
+
+# Verify syntax of all scripts
+npm run check
+
+# Scan for accidentally-committed secrets (run before every git commit)
+scripts/secret-scan.sh
+
+# Run a one-shot test cast (local dev only, requires NEYNAR_API_KEY env var)
+NEYNAR_API_KEY=sk-... node scripts/test-post.js
+
+# Start the dashboard (Tailscale IP, port 8088)
+node scripts/dashboard.js
 ```
 
-`start-fleet.sh` keeps three daemons alive via tmux, restarting them if the
-underlying process (not just the tmux session) has died:
+### Environment Variables
+
+No `.env` file in the repo. Secrets stay on the Pi under `~/.zao/private/` and `~/.openclaw/`. See `.env.example` for the complete list of every env var the code touches.
+
+On the Pi, before running anything:
+
+```bash
+# Create the secret files (one-time setup)
+mkdir -p ~/.zao/private ~/.openclaw
+
+# Neynar API key (read from a file)
+echo "NEYNAR_API_KEY=sk-..." > ~/.zao/private/neynar.env
+
+# OpenRouter API key (read from a raw key file)
+echo "sk-..." > ~/.zao/private/openrouter.key
+
+# Farcaster signer credentials (generated by rotate.js)
+echo '{"signerPrivateKey":"...","fid":3338501}' > ~/.openclaw/farcaster-credentials.json
+chmod 600 ~/.openclaw/farcaster-credentials.json
+
+# Telegram bot token + Zaal's ID (for approvals)
+echo "ZOE_BOT_TOKEN=...\nZAAL_TELEGRAM_ID=..." > ~/.zao/private/tg.env
+
+# ZABAL Bonfire API key + ID (optional for now, read-blocked)
+echo "BONFIRE_API_KEY=...\nBONFIRE_ID=..." > ~/.zao/private/bonfire.env
+
+# Cowork tracker (scout -> orchestrator bridge)
+echo "COWORK_TRACKER_URL=...\nCOWORK_TRACKER_KEY=..." > ~/.zao/private/zol-drain.env
+```
+
+## Architecture & How It Works
+
+### Repo Layout
 
 ```
-tmux zol   -> node scripts/zol-reply.js       (drafts replies to @mentions, gated)
-tmux zolt  -> node scripts/zol-threads.js     (watches replies to ZOL's own casts)
-tmux zolz  -> node scripts/zol-learn-zaal.js  (learns from Zaal's Farcaster posts)
+src/
+  zol-lib.js          - shared helpers (signer, submit, post, reply, follow, ork)
+  config.js           - Ethereum ABI + network config (used by rotate.js only)
+  add-signer.js       - Ed25519 signer registration (used by rotate.js)
+
+scripts/
+  zol-daily.js        - daily curator cast (cron: 0 0-2,9-23)
+  zol-reply.js        - daemon: watches @mentions, drafts replies (tmux: zol)
+  zol-threads.js      - daemon: watches replies to ZOL's own casts (tmux: zolt)
+  zol-learn-zaal.js   - daemon: learns from Zaal's Farcaster posts (tmux: zolz)
+  zol-follow.js       - daily follow of Zaal's follows (cron: 0 15)
+  zol-zabal-watch.js  - ZABAL Games submission watcher (cron: */5)
+  zol-win-drain.js    - draft-outcome tracker (cron: */10)
+  zol-drain.js        - cowork tracker bridge (cron: */5)
+  post-reply.js       - CLI: publish a staged draft (human invokes via dashboard)
+  overnight.js        - research-only: discovery + draft ideas (cron: @reboot + */15)
+  rotate.js           - signer maintenance: register / remove a key
+  dashboard.js        - web UI (port 8088, Tailscale-only)
+  test-post.js        - one-shot test to verify posting works
+  [others]            - zol-post, zol-reply-to, zol-quote, zol-delete, etc. (on-demand CLIs)
+
+docs/
+  AGENT_GUIDE.md      - Farcaster setup guide (FID registration, signer key)
+  SCRIPTS.md          - every script's purpose + cron line
+  neynar-learnings.md - API quirks + best practices
+  zao-context.md      - grounded facts ZOL can safely reference
+
+legacy-setup/
+  [archived]          - one-time bootstrap template (FID/signer registration)
+                        kept for reference; not on any cron
+
+persona.md            - voice constitution (keep in sync with Pi's ~/zol/zol-persona.md)
+.env.example          - every env var NAME (no values)
+package.json          - deps: @farcaster/hub-nodejs, ethers
 ```
 
-## The gated-posting model
+### Posting Flow
 
-Nothing posts to Farcaster without a human okaying it first, with two
-exceptions noted below:
+1. **Reads**: haatz.quilibrium.com (free Farcaster hub mirror) for discovery + context; Neynar REST API for user lookups.
 
-- `zol-reply.js` and `zol-threads.js` draft replies to disk under `~/zol/drafts/`
-  and ping Zaal on Telegram. Zaal reviews via `dashboard.js` (served on the Pi's
-  Tailscale IP, port 8088) or runs `node scripts/post-reply.js <hash>` directly.
-  Nothing posts until one of those runs.
-- `zol-daily.js` is one exception: it auto-posts on-brand curator casts (the
-  "quiet drafts" part of the model still applies to replies and threads, not to
-  this daily cast). That's intentional and should stay that way.
-- `zol-follow.js` is the other exception: it auto-follows (no cast, no content
-  risk, purely mechanical - mirrors accounts @zaal has already vetted by
-  following them himself) up to a daily cap, and sends a Telegram summary
-  after each run rather than asking for approval first. Following is
-  reversible (unfollow any time) and never touches a wallet.
-- Operator feedback from Zaal (corrections to ZOL's behavior/persona) is
-  absorbed silently into the persona and confirmed privately on Telegram - ZOL
-  does not post a public acknowledgment of feedback. Do not revert this.
+2. **Drafting**: OpenRouter API (model: claude-fable-5) via `zol-lib.js`'s `ork()` helper, 45s timeout, ~$0.001 per draft.
 
-## What changed in this repo (vs. what may still be running on the Pi)
+3. **Signing & Submission**:
+   - Build a `CastAdd` message (text, embeds, mentions, parent cast ref)
+   - Sign locally with Ed25519 signer key (`~/.openclaw/farcaster-credentials.json`)
+   - Submit to Neynar hub (`hub-api.neynar.com/v1/submitMessage`) authenticated with API key
 
-- `overnight.js`: the custody-wallet / x402 / auto-follow logic has been
-  removed. It is now read-only research (haatz discovery + theme extraction +
-  OpenRouter-drafted cast ideas written to a report). If the Pi's copy still has
-  the old wallet-spend version, the Pi's copy is stale - pull this repo's
-  version and it goes away.
-- `dashboard.js`: dropped the dead "Follows" counter (no longer meaningful once
-  overnight.js stopped following anyone) and a stale "~$0.01" cost label left
-  over from an earlier x402-based posting flow that's no longer in use.
-- Everything else is a straight lift of the Pi's live files into this
-  structure, with only `require()` paths adjusted for the new folder layout.
+4. **Gated vs. Auto**: 
+   - **Gated (default)**: `zol-reply.js`, `zol-threads.js` draft to disk (`~/zol/drafts/`) and ping Zaal on Telegram. Zaal approves via dashboard or CLI (`post-reply.js <hash>`). Nothing posts until Zaal acts.
+   - **Auto-post (exceptions)**: `zol-daily.js` (curator cast, cron 0 0-23) and `zol-follow.js` (daily follow cap 20, cron 0 15) post immediately. Same precedent as ZOE: low-risk content (curator taste, mechanical follows of already-vetted accounts).
 
-## Secrets
+### Daemons (Keep-Alive via start-fleet.sh)
 
-Secrets never live in this repo. See `.env.example` for every var name the code
-touches and where its real value actually lives on the Pi (mostly fixed files
-under `~/.zao/private/` and `~/.openclaw/`, a few passed inline by cron/tmux).
-Run `scripts/secret-scan.sh` before every commit (`--all` to scan the whole
-tree, default scans staged files only) - it refuses to let a 64-hex string, a
-`sk-`/`gho_`/`ghp_`-shaped key, or a PEM private key block get committed.
+The Pi runs three long-running processes via tmux, restarted by `start-fleet.sh` every 15 min (cron + @reboot):
 
-## Pi deploy flow
+```bash
+tmux new-session -d -s zol   'node scripts/zol-reply.js'
+tmux new-session -d -s zolt  'node scripts/zol-threads.js'
+tmux new-session -d -s zolz  'node scripts/zol-learn-zaal.js'
+```
+
+Each daemon watches Farcaster in real-time, drafts replies, and pings Zaal on Telegram for approval (except learn-zaal, which auto-quotes strong posts at ZOL's discretion per `ZOL_QUOTECAST_DRAFT` env var).
+
+### Persona & Alignment
+
+`persona.md` is the voice seed. ZOL inherits ZOE's constitution (no emojis, no em dashes, facts-first, human-gated) and adds music-curator specifics:
+- Taste-first: one good spotlight beats ten generic replies.
+- Artist-serving: points at the creator, not itself. Never shills speculation.
+- Spare: replies when named, quiet when it has nothing.
+- Plain-spoken: ZAO voice - clear, no hype.
+
+Feedback from Zaal (corrections to ZOL's behavior) is absorbed silently into the persona and confirmed privately on Telegram - ZOL does not post a public acknowledgment. Do not revert this.
+
+### Secret Handling
+
+**Critical**: secrets never live in this repo. All keys stay on the Pi:
+- **Neynar API key**: `~/.zao/private/neynar.env`
+- **OpenRouter key**: `~/.zao/private/openrouter.key`
+- **Farcaster signer**: `~/.openclaw/farcaster-credentials.json`
+- **Telegram credentials**: `~/.zao/private/tg.env`
+- **Bonfire API key**: `~/.zao/private/bonfire.env`
+- **Cowork tracker key**: `~/.zao/private/zol-drain.env`
+
+See `.env.example` for the complete list and where each real value lives.
+
+**Before every git commit, run**:
+```bash
+scripts/secret-scan.sh
+```
+This refuses to let 64-hex strings, `sk-`-shaped keys, or PEM private key blocks get committed.
+
+## Pi Deploy Flow
 
 The Pi clones this repo to `~/zol/farcaster-agent` and pulls to update:
 
-```
+```bash
 ssh zaal@ansuz
 cd ~/zol/farcaster-agent
 git pull
-npm install --omit=dev   # only if package.json changed
+npm install --omit=dev  # only if package.json changed
 ```
 
-Cron entries invoke scripts by path (e.g. `node scripts/zol-daily.js`), so they
-pick up a new pull automatically on their next run - nothing to restart for
-those. The three tmux daemons (`zol`, `zolt`, `zolz`) need a manual restart
-after a pull that touches their scripts:
+Cron jobs pick up new code automatically on their next run (no restart needed). Daemons (tmux zol/zolt/zolz) need a manual restart:
 
-```
-tmux kill-session -t zolt   # or zol / zolz
+```bash
+tmux kill-session -t zol  # or zolt / zolz
+# start-fleet.sh will notice and restart within 15 min, or kill+restart manually
 ```
 
-`start-fleet.sh`'s self-healing check (runs every 15 min via cron, and at
-`@reboot`) will notice the process is gone and restart it automatically within
-15 minutes; kill it manually first if you want the new code running sooner.
+The live persona (`~/zol/zol-persona.md` on the Pi) must be kept in sync with `persona.md` in this repo - do it by hand until the Pi is migrated to read straight from Git.
 
-Before editing anything live on the Pi: back up the file you're about to
-change, and run `node --check <file>` after editing, before it goes anywhere
-near cron or tmux.
+## How to Continue
+
+### Immediate Next Steps (Blockers)
+
+1. **Merge PR #1 (scaffold)**: Get the baseline structure + tests + secret-scan merged to main. This is the foundation for everything else.
+   - Status: awaits Zaal review of the legacy-setup / spend-removal design decisions
+   - Once merged: CI can run tests on this structure; Pi can pull and deploy
+
+2. **Merge PR #2 (zol-follow)**: Add the daily auto-follow feature (low-risk, mirrors zol-daily precedent).
+   - Status: awaits Zaal's sign-off on the no-pre-approval-gate design (same as zol-daily)
+   - Once merged: add cron line `0 15 * * *  node scripts/zol-follow.js` on the Pi
+
+3. **Pi Cutover**: Point the Pi at this repo and switch cron/tmux to use the Git versions.
+   - Backup the current live versions first
+   - Update cron entries to reference `~/zol/farcaster-agent/scripts/`
+   - Restart tmux daemons via `start-fleet.sh`
+   - Keep the persona synced by hand until Git integration is added
+
+### Future Upgrade Paths (Not Yet Started)
+
+See `docs/zao-context.md` "Stale planning thread" section for ambitious upgrades documented in research docs 891 + 993:
+- Privy-signed wallet + in-cast Frames/Snaps for interactive tipping + minting
+- Cross-posting to X (requires separate auth, X API vs. Farcaster API)
+- Economic loop: tip/mint artist directly (requires spend capability - explicitly NOT in current design by intent)
+
+**Do not inherit these into the codebase without a fresh decision from Zaal, separate from the current zero-spend design.**
+
+### Known Future Ideas (Not Prioritized)
+
+- **Spend Capability (future, not current)**: If ZOL should eventually tip/mint artists, add a separate spend-gated wallet (not the identity wallet). Requires Privy or similar, new signing flow, Telegram approval gate for spends. See research doc 993 for the economic-loop spec.
+- **Alignment-Gated Replies (future)**: Let ZOL reply to more scenarios without pre-approval once confidence in the persona is higher. Requires live persona + feedback loop testing.
+- **Bonfire Read Path**: Once Bonfire's read endpoint (`/vector_store/search`) is unblocked (admin labeling turned on), ZOL can draw grounded context from the knowledge graph instead of ICM boxes. See `docs/zao-context.md` for details.
+- **Pi Git Integration**: Migrate the live persona from `~/zol/zol-persona.md` to a Git-synced copy, so persona updates don't require manual SSH.
+- **Reply Scope Tuning**: Expand the types of Farcaster threads ZOL can add signal to (e.g. music production questions, artist DMs, music-adjacent threads). Requires taste examples + persona examples.
+
+## Testing
+
+```bash
+# Syntax check all scripts
+npm run check
+
+# Secret scan (before every commit)
+scripts/secret-scan.sh --all
+
+# Test posting (dev environment only, requires NEYNAR_API_KEY)
+NEYNAR_API_KEY=sk-... node scripts/test-post.js
+
+# Manual test on the Pi
+ssh zaal@ansuz
+cd ~/zol/farcaster-agent
+node scripts/test-post.js  # requires the Pi's .zao/private/neynar.env
+```
+
+No automated test suite yet (post-MVP future work). Tests are manual + live on the Pi.
+
+## Gotchas & Quirks
+
+### Signer Key & Custody Wallet
+
+- The signer key (Ed25519) in `~/.openclaw/farcaster-credentials.json` controls ZOL's Farcaster identity and is extremely sensitive. **Never commit or print this file.**
+- The custody wallet key (only used by rotate.js to register/remove signers on the Key Registry) lives on the Pi only, **never in this repo.**
+- Do not reintroduce x402 or on-chain spending without explicit decision from Zaal. The old `overnight.js` had this and it was removed intentionally.
+
+### haatz Hub Mirror
+
+- `haatz.quilibrium.com` is a free Farcaster hub mirror with ~5 min lag behind the live hub. Great for reads (discovery, context), free (no API key needed), but not real-time.
+- Neynar's REST API is used for user lookups and username resolution (free tier allows this).
+
+### OpenRouter Rate Limits
+
+- Each cast draft is ~1000 tokens in, ~200 tokens out on claude-fable-5.
+- ~50-60 casts/day max before hitting OpenRouter's free tier rate limits (depends on traffic).
+- Timeout: 45 seconds per draft. If Farcaster is slow to load context, drafting times out and returns null.
+
+### Bonfire Write-Only (For Now)
+
+- ZOL can POST episodes to `/knowledge_graph/episode/create`, but reads from `/vector_store/search` return empty `[]` until an admin labels the data.
+- Workaround: use ICM boxes (unauthenticated, always readable at `useicm.com`) + hand-carried context in persona.
+
+### Bot Blocklist
+
+- ZOL skips replies to accounts it detects as bots (Farcaster's `/power_badge` indicator). List of specific bot FIDs is maintained in the script headers.
+
+### Timezone (UTC)
+
+- All cron times are UTC. The Pi's system clock must be correct (NTP synced).
+
+## Onboarding a New Developer
+
+A fresh Claude reading only this README should be able to:
+
+1. Understand ZOL is a Farcaster agent that curiously scans music, drafts replies, gates them for approval, and auto-posts curator casts + follows.
+2. Clone the repo, `npm install`, run `npm run check` to verify syntax.
+3. See that two PRs are open and awaiting merge; understand what they add.
+4. Know that secrets live on the Pi, not in the repo; see `.env.example` for the names.
+5. Understand the gated posting model (draft -> Telegram -> approve -> post) and the two auto-post exceptions.
+6. See the architecture: haatz reads + OpenRouter drafting + Neynar signing + hub submission.
+7. Know how to deploy to the Pi (git pull, npm install, update cron/tmux).
+8. See what upgrades are documented (spend, alignment, Bonfire reads) and know not to add them without Zaal's sign-off.
+9. Run `npm run check` and `scripts/secret-scan.sh --all` before committing anything.
+
+## License
+
+Private repo (not open source). Owned by BetterCallZaal Strategies LLC / The ZAO.
+
+## Questions?
+
+Open an issue on this repo or reach out to Zaal (@zaal on Farcaster, @bettercallzaal on X).
