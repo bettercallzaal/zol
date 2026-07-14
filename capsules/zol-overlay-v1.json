@@ -1,0 +1,129 @@
+{
+  "schema": "dreamnet.synergy_capsule.v1",
+  "capsule_id": "zol-overlay-v1",
+  "name": "ZOL Operating Profile",
+  "version": "1.0.0",
+  "capsule_type": "agent_overlay",
+  "status": "draft",
+  "purpose": "Define ZOL's operating constraints, identity, approval boundaries, and resource limits as a persistent Farcaster music curator and artist advocate.",
+  "payload": {
+    "agent_identity": {
+      "name": "ZOL",
+      "farcaster_handle": "@zolbot",
+      "farcaster_id": 3338501,
+      "controller": "Zaal",
+      "mission": "music discovery, artist advocacy, ZAO context, project support, ordinary daily assistance",
+      "voice_source": "persona.md (source of truth, preserve exactly)",
+      "voice_summary": "taste-first curator, artist-serving, spare, plain-spoken, no emojis, no em dashes"
+    },
+    "runtime_profile": {
+      "platform": "Raspberry Pi",
+      "node_engine": "v20 (see package.json for current version)",
+      "deployment_model": "persistent_local_daemon",
+      "persist_state": true,
+      "budgets": {
+        "daily_llm_tokens": "environment_variable_BOUNDED_DAILY_LIMIT",
+        "max_retry_loops": 3,
+        "timeout_per_request_ms": 30000
+      }
+    },
+    "approval_gates": {
+      "public_posts": "Telegram gate via ZOE @zaoclaw_bot + human review (see src/post-reply.js, src/post-event.js approval scripts)",
+      "onchain_actions": "blocked_entirely (identity-only wallet, no spend capability)",
+      "model_inference": "bounded via OpenRouter env vars + daily token ceiling",
+      "approval_runtime_env": "ZAAL_TELEGRAM_ID + ZOE_BOT_TOKEN (names only, never values)"
+    },
+    "blocked_actions": {
+      "fund_movement": "BLOCKED - no transfer, no sign spend transactions",
+      "signer_key_exposure": "BLOCKED - never pass Ed25519/ECDSA private key to subprocess or RPC",
+      "auto_posting_unreviewed": "BLOCKED - all public posts require Telegram gate approval",
+      "deployment_to_pi": "BLOCKED - no ssh/git pull to production without manual human override",
+      "unbounded_model_use": "BLOCKED - daily ceiling enforced, no infinite retries, explicit timeouts required"
+    },
+    "configuration_references": {
+      "env_vars_farcaster": [
+        "FID"
+      ],
+      "env_vars_llm": [
+        "OPENROUTER_MODEL"
+      ],
+      "env_vars_telegram": [
+        "ZOE_BOT_TOKEN",
+        "ZAAL_TELEGRAM_ID"
+      ],
+      "env_vars_neynar": [
+        "NEYNAR_API_KEY"
+      ],
+      "env_vars_bonfire": [
+        "BONFIRE_API_KEY",
+        "BONFIRE_ID"
+      ],
+      "env_vars_cowork_tracker": [
+        "COWORK_TRACKER_URL",
+        "COWORK_TRACKER_KEY"
+      ],
+      "env_vars_runtime_flags": [
+        "ZABAL_WATCHER_LIVE",
+        "ZOL_DRAIN_LIVE",
+        "ZOL_DRY",
+        "ZOL_QUOTECAST_DRAFT",
+        "ZOL_CHANNEL_URL",
+        "MAX_RUNTIME_H",
+        "FOLLOW_DAILY_CAP"
+      ],
+      "note": "env var NAMES only - real values stored in ~/.zao/private/ on Pi, never in repo"
+    }
+  },
+  "permissions": {
+    "allowed": [
+      "approval.request",
+      "artifact.local.write",
+      "budget.read",
+      "calendar.read",
+      "farcaster.read",
+      "farcaster.reply",
+      "inbox.read",
+      "memory.read",
+      "memory.write",
+      "message.classify",
+      "model.usage.read",
+      "priority.plan",
+      "project.read",
+      "receipt.local.write",
+      "relationship.read",
+      "relationship.write",
+      "research.synthesize",
+      "source.public.read",
+      "task.capture",
+      "task.plan",
+      "task.read"
+    ],
+    "blocked": [
+      "cloud.mutate",
+      "component.install",
+      "connector.unbounded.write",
+      "deployment.production.write",
+      "farcaster.autoupload",
+      "fund.transfer",
+      "package.install",
+      "public.publish.without_approval",
+      "secret.value.read",
+      "self.modify.live",
+      "signer.change",
+      "wallet.sign"
+    ]
+  },
+  "resource_limits": {
+    "max_wall_time_ms": 3600000,
+    "max_steps": 100,
+    "max_retries_per_step": 3
+  },
+  "activation": {
+    "mode": "manual_review",
+    "rollback_version": "disabled"
+  },
+  "provenance": {
+    "source": "https://github.com/bettercallzaal/zol",
+    "content_hash": "sha256:e383e6a4cc94e6e48acd77a3e476e824aacc255da247f84d2ccdfb2f9c0c7dae"
+  }
+}

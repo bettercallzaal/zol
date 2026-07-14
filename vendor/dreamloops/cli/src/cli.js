@@ -10,7 +10,7 @@ import {
   capsuleContentHash,
   validateCapsule,
   validateDreamLoop,
-} from "../runtime/src/index.js";
+} from "../../runtime/src/index.js";
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const repositoryRoot = path.resolve(packageRoot, "../..");
@@ -42,10 +42,10 @@ function validateKnownManifest(value) {
 async function validateFile(file, { enforceContract = true } = {}) {
   const value = await readJson(file);
   let validated = null;
-  if (enforceContract) {
-    try {
-      validated = validateKnownManifest(value);
-    } catch (error) {
+  try {
+    validated = validateKnownManifest(value);
+  } catch (error) {
+    if (enforceContract) {
       throw new Error(`${path.resolve(file)}: ${error.message}`);
     }
   }
