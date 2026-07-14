@@ -12,6 +12,7 @@ Model: anthropic/claude-fable-5 (OpenRouter). Shared helpers: zol-lib.js.
 - zol-delete.js <hash...>
 - zol-quote.js <fid> <hash> "<text>" - quote-cast a cast with ZOLs thoughts.
 - post-reply.js <hash>  (publish a staged draft from ~/zol/drafts/)
+- post-event.js <id>  (publish a staged event draft as an original cast - kind:"event" drafts from zol-calendar.js)
 
 ## Daemons (keep-alive via ~/start-fleet.sh)
 - zol-reply.js   - drafts replies to @mentions (gated)
