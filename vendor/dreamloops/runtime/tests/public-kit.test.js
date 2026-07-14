@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { DreamLoopRunner, FileStateStore, MemoryStateStore, composeCapsules, validateCapsule, validateDreamLoop } from "../src/index.js";
 
 const repositoryRoot = path.resolve(fileURLToPath(new URL("../../..", import.meta.url)));
-const kitRoot = path.join(repositoryRoot, "starter-kits", "persistent-agent");
+const kitRoot = path.join(repositoryRoot, "dreamloops", "cli", "templates", "persistent-agent");
 
 async function manifests(folder, name) {
   const results = [];
