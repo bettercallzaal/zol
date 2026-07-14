@@ -1,0 +1,16 @@
+{
+  "name": "zol",
+  "version": "1.0.0",
+  "description": "ZOL (@zolbot, FID 3338501) - the ZAO's music scout on Farcaster. Runs on a Raspberry Pi, cron-driven, human-gated posting.",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "check": "for f in scripts/*.js src/*.js; do node --check \"$f\" || exit 1; done && echo 'all scripts OK'",
+    "daily": "node scripts/zol-daily.js",
+    "dashboard": "node scripts/dashboard.js"
+  },
+  "dependencies": {
+    "@farcaster/hub-nodejs": "^0.15.9",
+    "ethers": "^6.16.0"
+  }
+}
