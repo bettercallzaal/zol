@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ork } = require('../zol-lib');
+const { getNeynarMentions, searchNeynarCasts, fetchCalendarICS, getDefaultCalendarUrl } = require('../integrations');
 
 // Validation helper
 function validateInput(input, schema) {
@@ -31,7 +32,7 @@ const handlers = {
 
     try {
       validateInput(input, {
-        required: ['stateKey'] || input.listCheckpoints ? [] : ['stateKey'],
+        required: input.listCheckpoints ? [] : ['stateKey'],
         types: { stateKey: 'string' }
       });
 
@@ -211,17 +212,50 @@ const handlers = {
   // ===== FARCASTER / SOCIAL HANDLERS =====
   'farcaster.read': async function({ input, state, signal }) {
     validateInput(input, {
-      types: { query: 'string' }
+      types: { query: 'string', limit: 'number' }
     });
 
-    // PHASE 5: wire to Neynar API via zol-lib
-    // For now, return structured mock
-    return {
-      query: input.query,
-      results: [],
-      count: 0,
-      timestamp: new Date().toISOString()
-    };
+    const query = input.query || 'mentions_24h';
+    const limit = input.limit || 10;
+
+    try {
+      // PHASE 5: wire to Neynar API
+      // Support two query types: mentions_24h (fetch mentions for ZOL) or search_casts (search by query)
+      let results = [];
+      let count = 0;
+
+      if (query === 'mentions_24h' || query.includes('mention')) {
+        // Fetch mentions for ZOL's FID (3338501)
+        const mentionResult = await getNeynarMentions(3338501, limit);
+        if (!mentionResult.error) {
+          results = mentionResult.mentions || [];
+          count = mentionResult.count || 0;
+        }
+      } else {
+        // Search casts by query
+        const searchResult = await searchNeynarCasts(query, limit);
+        if (!searchResult.error) {
+          results = searchResult.casts || [];
+          count = searchResult.count || 0;
+        }
+      }
+
+      return {
+        query,
+        results,
+        count,
+        timestamp: new Date().toISOString()
+      };
+    } catch (e) {
+      // Return structured error state
+      return {
+        query,
+        results: [],
+        count: 0,
+        error: e.message,
+        timestamp: new Date().toISOString()
+      };
+    }
   },
 
   'farcaster.reply': async function({ input, state, signal }) {
@@ -251,13 +285,38 @@ const handlers = {
       types: { maxRecent: 'number' }
     });
 
-    // PHASE 5: wire to Neynar API or local mention tracking
-    return {
-      mentions: [],
-      count: 0,
-      maxRecent: input.maxRecent || 10,
-      timestamp: new Date().toISOString()
-    };
+    const maxRecent = input.maxRecent || 10;
+
+    try {
+      // PHASE 5: wire to Neynar API
+      // inbox.read fetches recent mentions for ZOL (FID 3338501)
+      const mentionResult = await getNeynarMentions(3338501, maxRecent);
+
+      if (mentionResult.error) {
+        return {
+          mentions: [],
+          count: 0,
+          maxRecent,
+          error: mentionResult.error,
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      return {
+        mentions: mentionResult.mentions || [],
+        count: mentionResult.count || 0,
+        maxRecent,
+        timestamp: new Date().toISOString()
+      };
+    } catch (e) {
+      return {
+        mentions: [],
+        count: 0,
+        maxRecent,
+        error: e.message,
+        timestamp: new Date().toISOString()
+      };
+    }
   },
 
   // ===== CLASSIFICATION / REASONING HANDLERS =====
@@ -390,20 +449,57 @@ const handlers = {
     };
   },
 
-  // ===== CALENDAR HANDLER (PHASE 5 STUB) =====
+  // ===== CALENDAR HANDLER (PHASE 5) =====
   'calendar.read': async function({ input, state, signal }) {
     validateInput(input, {
-      types: { dayCount: 'number' }
+      types: { dayCount: 'number', calendarUrl: 'string' }
     });
 
-    // PHASE 5: wire to calendar API (ICS reader or Google Calendar)
-    return {
-      read: false,
-      reason: 'PHASE 5: calendar.read handler requires integration (ICS parser or API)',
-      dayCount: input.dayCount || 1,
-      events: [],
-      timestamp: new Date().toISOString()
-    };
+    const dayCount = input.dayCount || 1;
+    const calendarUrl = input.calendarUrl || getDefaultCalendarUrl();
+
+    try {
+      // PHASE 5: wire to ICS calendar API (Luma or other ICS feeds)
+      const result = await fetchCalendarICS(calendarUrl);
+
+      if (result.error) {
+        return {
+          read: false,
+          reason: `Calendar fetch failed: ${result.error}`,
+          dayCount,
+          events: [],
+          error: result.error,
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      // Filter events to next dayCount days (simple date-based filter)
+      const now = new Date();
+      const cutoffMs = now.getTime() + dayCount * 24 * 60 * 60 * 1000;
+      const cutoff = new Date(cutoffMs).toISOString();
+
+      const futureEvents = (result.events || []).filter(e => {
+        const eventTime = e.startTime || '';
+        return eventTime <= cutoff && eventTime >= now.toISOString();
+      });
+
+      return {
+        read: true,
+        dayCount,
+        events: futureEvents,
+        count: futureEvents.length,
+        timestamp: new Date().toISOString()
+      };
+    } catch (e) {
+      return {
+        read: false,
+        reason: `Calendar read error: ${e.message}`,
+        dayCount,
+        events: [],
+        error: e.message,
+        timestamp: new Date().toISOString()
+      };
+    }
   }
 };
 

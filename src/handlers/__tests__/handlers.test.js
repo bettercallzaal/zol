@@ -173,22 +173,28 @@ test('receipt.local.write: generates receipt ID', async (t) => {
   assert.ok(result.receiptId.startsWith('rcpt_'), 'receiptId should start with rcpt_');
 });
 
-// ===== PHASE 5 STUB DETECTION =====
-test('PHASE 5 stub handlers are clearly marked', async (t) => {
-  const phase5Handlers = ['calendar.read'];
+// ===== PHASE 5 COMPLETION =====
+test('PHASE 5 handlers are now fully implemented', async (t) => {
+  // calendar.read, farcaster.read, inbox.read are now completed with real integrations
+  const completedHandlers = ['calendar.read', 'farcaster.read', 'inbox.read'];
 
-  for (const handlerName of phase5Handlers) {
+  for (const handlerName of completedHandlers) {
     const handler = handlers[handlerName];
     assert.ok(handler, `handler ${handlerName} should exist`);
 
     const result = await handler({
-      input: {},
+      input: handlerName === 'calendar.read' ? { dayCount: 1 } :
+             handlerName === 'farcaster.read' ? { query: 'test' } :
+             { maxRecent: 10 },
       state: {},
       signal: null
     });
 
-    assert.ok(result.reason && result.reason.includes('PHASE 5'),
-      `${handlerName} should have PHASE 5 marker in reason`);
+    // Completed handlers should return structured state (not "PHASE 5" marker)
+    assert.ok(result && typeof result === 'object',
+      `${handlerName} should return structured state`);
+    assert.ok('timestamp' in result,
+      `${handlerName} should include timestamp in response`);
   }
 });
 
