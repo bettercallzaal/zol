@@ -2,7 +2,7 @@
 // reply, delete, username->fid, and the LLM call. Model: Fable 5 via OpenRouter.
 // Safety: clean() strips @ so ZOL never tags/triggers another bot from generated text.
 const fs = require('fs');
-const { makeCastAdd, makeCastRemove, NobleEd25519Signer, FarcasterNetwork, Message, CastType } = require('@farcaster/hub-nodejs');
+const { makeCastAdd, makeCastRemove, makeLinkAdd, NobleEd25519Signer, FarcasterNetwork, Message, CastType } = require('@farcaster/hub-nodejs');
 const H = process.env.HOME, FID = 3338501, HUB = 'https://hub-api.neynar.com', NEYNAR = 'https://api.neynar.com';
 const MODEL = process.env.OPENROUTER_MODEL || 'anthropic/claude-fable-5';
 function envfile(p){const o={};try{for(const l of fs.readFileSync(p,'utf8').split('\n')){const m=l.match(/^([A-Z_]+)=(.*)$/);if(m)o[m[1]]=m[2].trim();}}catch(e){}return o;}
@@ -20,6 +20,7 @@ async function post({ text, embedUrl, mentions = [], mentionsPositions = [], par
   await submit(m.value); return m.value.hash;
 }
 async function remove(hash){ const m = await makeCastRemove({ targetHash: hbuf(hash) }, ID, signer()); if (m.isErr()) throw new Error(m.error.message); await submit(m.value); }
+async function follow(targetFid){ const m = await makeLinkAdd({ type: 'follow', targetFid }, ID, signer()); if (m.isErr()) throw new Error(m.error.message); await submit(m.value); return m.value.hash; }
 async function resolveFid(username){ const r = await fetch(NEYNAR + '/v2/farcaster/user/by_username?username=' + String(username).replace(/^@/, ''), { headers: { 'x-api-key': KEY, accept: 'application/json' } }); const j = await r.json(); return j && j.user && j.user.fid; }
 async function ork(system, user, { max = 200, temp = 0.7 } = {}){
   const ORK = (() => { try { return fs.readFileSync(H + '/.zao/private/openrouter.key', 'utf8').trim(); } catch (e) { return ''; } })();
@@ -34,4 +35,4 @@ async function quoteCast({ text, quotedFid, quotedHash, embedUrl }) {
   if (m.isErr()) throw new Error(m.error.message);
   await submit(m.value); return m.value.hash;
 }
-module.exports = { H, FID, HUB, MODEL, KEY, envfile, signer, submit, post, remove, resolveFid, clean, ork, quoteCast };
+module.exports = { H, FID, HUB, MODEL, KEY, envfile, signer, submit, post, remove, follow, resolveFid, clean, ork, quoteCast };
