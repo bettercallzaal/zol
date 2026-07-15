@@ -1,0 +1,112 @@
+{
+  "schema": "dreamnet.synergy_capsule.v1",
+  "capsule_id": "sparkz-launch-readiness-v1",
+  "name": "Sparkz Launch Readiness Energy Score",
+  "version": "1.0.0",
+  "capsule_type": "decision_engine",
+  "status": "prototype",
+  "purpose": "Compute energy score (0-100) from creator Farcaster signals and decide if a token launch is ready. Energy score factors: follower growth rate, cast engagement rate, community consistency, channel activity depth. Outputs recommendation: launch now, keep building with guidance on missing signals.",
+  "author": "ZAO Assistant / Claude",
+  "created": "2026-07-14",
+  "payload": {
+    "components": [
+      "farcaster-signal-reader",
+      "energy-score-calculator",
+      "momentum-tracker",
+      "launch-readiness-recommender"
+    ],
+    "energy_formula": {
+      "follower_growth_weight": 0.25,
+      "engagement_rate_weight": 0.35,
+      "consistency_score_weight": 0.20,
+      "community_size_weight": 0.20,
+      "minimum_launch_threshold": 60,
+      "description": "Energy score weighted average of four signals, normalized 0-100"
+    },
+    "operating_modes": [
+      "disabled",
+      "dry_run",
+      "local_read",
+      "live_guarded"
+    ],
+    "memory_policy": {
+      "provenance_required": true,
+      "consolidation": "weekly",
+      "forgetting": "policy_driven",
+      "secret_values": "forbidden"
+    }
+  },
+  "handlers": [
+    "farcaster.follower-growth-read",
+    "farcaster.cast-engagement-read",
+    "farcaster.channel-activity-read",
+    "energy-score.compute",
+    "energy-score.trend-analysis",
+    "state.energy-history-write",
+    "receipt.launch-recommendation-write"
+  ],
+  "permissions": {
+    "allowed": [
+      "approval.request",
+      "budget.read",
+      "farcaster.follower-growth-read",
+      "farcaster.cast-engagement-read",
+      "farcaster.channel-activity-read",
+      "memory.read",
+      "memory.write",
+      "receipt.local.write",
+      "state.local.read",
+      "state.local.write"
+    ],
+    "blocked": [
+      "cloud.mutate",
+      "deployment.production.write",
+      "farcaster.post",
+      "farcaster.post.approval",
+      "package.install",
+      "public.publish",
+      "secret.value.read",
+      "signer.change",
+      "wallet.sign",
+      "wallet.transfer"
+    ]
+  },
+  "resource_limits": {
+    "max_wall_time_ms": 30000,
+    "max_steps": 20,
+    "max_retries_per_step": 2,
+    "max_creators_per_run": 100,
+    "cost_ceiling": {
+      "neynar_api_calls_per_day": 1000,
+      "energy_score_computations_per_day": 500
+    }
+  },
+  "activation": {
+    "mode": "manual_review",
+    "flag_gated_off": true,
+    "requires_env_check": "SPARKZ_LAUNCH_READINESS_ENABLED"
+  },
+  "provenance": {
+    "source": "https://github.com/bettercallzaal/zol",
+    "related_research": ["https://github.com/bettercallzaal/ZAOOS/tree/main/research/business/1088-zaalcaster-empire-builder-coinz-crowdfunding"],
+    "content_hash": "sha256:sparkz-v1-draft"
+  },
+  "signal_schema": {
+    "creator_fid": "required_number",
+    "follower_count": "required_number",
+    "follower_7d_growth": "required_number",
+    "avg_cast_engagement": "required_number",
+    "channel_activity_score": "required_number",
+    "days_active": "required_number",
+    "recent_cast_frequency": "required_number"
+  },
+  "output_schema": {
+    "creator_fid": "number",
+    "energy_score": "number_0_to_100",
+    "recommendation": "enum: launch_now | keep_building | insufficient_data",
+    "reasoning": "string",
+    "missing_signals": "array_of_strings",
+    "momentum_trend": "enum: accelerating | steady | declining",
+    "next_check_days": "number"
+  }
+}
