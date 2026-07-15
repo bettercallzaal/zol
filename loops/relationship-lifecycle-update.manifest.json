@@ -20,7 +20,8 @@
     "member relationship status (if known)",
     "member Farcaster activity (public data)",
     "member cowork board contributions",
-    "relationship event logs (immutable history)"
+    "relationship event logs (immutable history)",
+    "project membership and contribution status"
   ],
   "allowed_actions": [
     "circle.member-event-stream",
