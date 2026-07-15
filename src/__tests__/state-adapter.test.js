@@ -1,4 +1,4 @@
-// state-adapter.test.js - Tests for SQLite-WAL and atomic-file state adapters
+// state-adapter.test.js - Tests for SQLite-WAL, atomic-file, and Bonfire state adapters
 // Run: node --test src/__tests__/state-adapter.test.js
 
 const test = require('node:test');
@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
-const { createStateStore, AtomicFileStore, SqliteWalStore, shouldRejectValue } = require('../state-adapter');
+const { createStateStore, AtomicFileStore, SqliteWalStore, BonfireStore, shouldRejectValue } = require('../state-adapter');
 
 // Test both backends: sqlite (if available) and atomic-file
 const BACKENDS_TO_TEST = ['atomic-file'];
@@ -330,4 +330,298 @@ async function testBackend(backendName) {
     console.log(`\nTesting ${backendName} backend...`);
     await testBackend(backendName);
   }
+
+  // Test Bonfire backend with mocks
+  console.log('\nTesting Bonfire backend (with mock API)...');
+  await testBonfireBackend();
 })();
+
+// Mock Bonfire API for testing
+class MockBonfireAPI {
+  constructor() {
+    this.episodes = new Map();
+    this.nextTaskId = 1;
+  }
+
+  async handleCreateEpisode(payload) {
+    const taskId = String(this.nextTaskId++);
+    this.episodes.set(payload.name, {
+      uuid: crypto.randomUUID(),
+      name: payload.name,
+      episode_body: payload.episode_body,
+      source_description: payload.source_description,
+      created_at: new Date().toISOString(),
+      content: payload.episode_body,
+    });
+    return { success: true, task_id: taskId };
+  }
+
+  async handleDelve(payload) {
+    const episodes = Array.from(this.episodes.values()).filter((ep) => {
+      if (payload.query.includes(ep.name)) return true;
+      return payload.query.includes('zol-state');
+    });
+    return {
+      success: true,
+      query: payload.query,
+      num_results: episodes.length,
+      episodes: episodes,
+    };
+  }
+}
+
+// Override global fetch for Bonfire tests
+let mockAPI;
+const originalFetch = global.fetch;
+
+function setupMockBonfireAPI() {
+  mockAPI = new MockBonfireAPI();
+  global.fetch = async (url, options) => {
+    const body = JSON.parse(options.body);
+
+    if (url.includes('/knowledge_graph/episode/create')) {
+      const response = await mockAPI.handleCreateEpisode(body);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => response,
+        text: async () => JSON.stringify(response),
+      };
+    }
+
+    if (url.includes('/delve')) {
+      const response = await mockAPI.handleDelve(body);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => response,
+        text: async () => JSON.stringify(response),
+      };
+    }
+
+    return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
+  };
+}
+
+function teardownMockBonfireAPI() {
+  global.fetch = originalFetch;
+  mockAPI = null;
+}
+
+async function testBonfireBackend() {
+  test('bonfire: initialize with credentials', async (t) => {
+    const store = new BonfireStore({
+      apiKey: 'test-key',
+      bonfireId: 'test-id',
+    });
+    await store.initialize();
+    assert.strictEqual(store.name, 'bonfire');
+  });
+
+  test('bonfire: initialize without credentials throws', async (t) => {
+    const store = new BonfireStore({});
+    try {
+      await store.initialize();
+      assert.fail('Should have thrown');
+    } catch (e) {
+      assert.match(e.message, /BONFIRE_API_KEY.*BONFIRE_ID/);
+    }
+  });
+
+  test('bonfire: put and get round-trip', async (t) => {
+    setupMockBonfireAPI();
+    try {
+      const store = new BonfireStore({
+        apiKey: 'test-key',
+        bonfireId: 'test-id',
+      });
+
+      const testData = { foo: 'bar', num: 42 };
+      await store.put('test-key', testData);
+      const retrieved = await store.get('test-key');
+      assert.deepStrictEqual(retrieved, testData);
+    } finally {
+      teardownMockBonfireAPI();
+    }
+  });
+
+  test('bonfire: get non-existent key returns undefined', async (t) => {
+    setupMockBonfireAPI();
+    try {
+      const store = new BonfireStore({
+        apiKey: 'test-key',
+        bonfireId: 'test-id',
+      });
+
+      const retrieved = await store.get('does-not-exist');
+      assert.strictEqual(retrieved, undefined);
+    } finally {
+      teardownMockBonfireAPI();
+    }
+  });
+
+  test('bonfire: list keys', async (t) => {
+    setupMockBonfireAPI();
+    try {
+      const store = new BonfireStore({
+        apiKey: 'test-key',
+        bonfireId: 'test-id',
+      });
+
+      await store.put('key1', { val: 1 });
+      await store.put('key2', { val: 2 });
+
+      const keys = await store.list();
+      assert.ok(keys.length >= 2);
+      assert.ok(keys.includes('key1') || keys.some((k) => k.includes('key1')));
+    } finally {
+      teardownMockBonfireAPI();
+    }
+  });
+
+  test('bonfire: delete returns false (unsupported)', async (t) => {
+    setupMockBonfireAPI();
+    try {
+      const store = new BonfireStore({
+        apiKey: 'test-key',
+        bonfireId: 'test-id',
+      });
+
+      const result = await store.delete('some-key');
+      assert.strictEqual(result, false);
+    } finally {
+      teardownMockBonfireAPI();
+    }
+  });
+
+  test('bonfire: secret guard rejects 64-char hex', async (t) => {
+    setupMockBonfireAPI();
+    try {
+      const store = new BonfireStore({
+        apiKey: 'test-key',
+        bonfireId: 'test-id',
+      });
+
+      const secretKey = 'a'.repeat(64);
+      try {
+        await store.put('secret', { key: secretKey });
+        assert.fail('Should have rejected 64-char hex');
+      } catch (e) {
+        assert.match(e.message, /SECURITY.*secret pattern/);
+      }
+    } finally {
+      teardownMockBonfireAPI();
+    }
+  });
+
+  test('bonfire: secret guard rejects sk- keys', async (t) => {
+    setupMockBonfireAPI();
+    try {
+      const store = new BonfireStore({
+        apiKey: 'test-key',
+        bonfireId: 'test-id',
+      });
+
+      try {
+        await store.put('secret', { key: 'sk-1234567890abcdef' });
+        assert.fail('Should have rejected sk- key');
+      } catch (e) {
+        assert.match(e.message, /SECURITY.*secret pattern/);
+      }
+    } finally {
+      teardownMockBonfireAPI();
+    }
+  });
+
+  test('bonfire: secret guard rejects ghp_ tokens', async (t) => {
+    setupMockBonfireAPI();
+    try {
+      const store = new BonfireStore({
+        apiKey: 'test-key',
+        bonfireId: 'test-id',
+      });
+
+      try {
+        await store.put('secret', { token: 'ghp_1234567890abcdefghijklmnop' });
+        assert.fail('Should have rejected ghp_ token');
+      } catch (e) {
+        assert.match(e.message, /SECURITY.*secret pattern/);
+      }
+    } finally {
+      teardownMockBonfireAPI();
+    }
+  });
+
+  test('bonfire: allows safe data', async (t) => {
+    setupMockBonfireAPI();
+    try {
+      const store = new BonfireStore({
+        apiKey: 'test-key',
+        bonfireId: 'test-id',
+      });
+
+      const safeData = { text: 'safe content', num: 123 };
+      await store.put('safe-key', safeData);
+      const retrieved = await store.get('safe-key');
+      assert.deepStrictEqual(retrieved, safeData);
+    } finally {
+      teardownMockBonfireAPI();
+    }
+  });
+
+  test('bonfire: appendReceipt (best-effort)', async (t) => {
+    setupMockBonfireAPI();
+    try {
+      const store = new BonfireStore({
+        apiKey: 'test-key',
+        bonfireId: 'test-id',
+      });
+
+      const receipt = {
+        timestamp: new Date().toISOString(),
+        action: 'test',
+        state: { hidden: true },
+      };
+
+      // Should not throw even if mock doesn't verify receipt
+      await store.appendReceipt(receipt);
+    } finally {
+      teardownMockBonfireAPI();
+    }
+  });
+
+  test('bonfire: backend selection in createStateStore', async (t) => {
+    setupMockBonfireAPI();
+    try {
+      process.env.ZOL_STATE_BACKEND = 'bonfire';
+      process.env.BONFIRE_API_KEY = 'test-key';
+      process.env.BONFIRE_ID = 'test-id';
+
+      const store = await createStateStore();
+      assert.strictEqual(store.name, 'bonfire');
+
+      delete process.env.ZOL_STATE_BACKEND;
+      delete process.env.BONFIRE_API_KEY;
+      delete process.env.BONFIRE_ID;
+    } finally {
+      teardownMockBonfireAPI();
+    }
+  });
+
+  test('bonfire: falls back to atomic-file on missing credentials', async (t) => {
+    try {
+      process.env.ZOL_STATE_BACKEND = 'bonfire';
+      delete process.env.BONFIRE_API_KEY;
+      delete process.env.BONFIRE_ID;
+
+      const store = await createStateStore();
+      assert.strictEqual(store.name, 'atomic-file');
+
+      delete process.env.ZOL_STATE_BACKEND;
+    } finally {
+      if (fs.existsSync(path.join(process.env.HOME || '/root', 'zol', 'state'))) {
+        fs.rmSync(path.join(process.env.HOME || '/root', 'zol', 'state'), { recursive: true, force: true });
+      }
+    }
+  });
+}
