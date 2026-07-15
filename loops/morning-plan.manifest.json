@@ -1,0 +1,172 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "morning-plan-v1",
+  "title": "Morning Plan",
+  "version": "1.0.0",
+  "status": "rehearsed",
+  "owner": "zol-curator-v1",
+  "stewards": ["zaal"],
+  "permission_tier": "local_draft_write",
+  "trigger": "daily at 5:00am (Zaal's wake time per ~user_zaal_schedule.md)",
+  "inputs": [
+    "current date",
+    "operator priority",
+    "previous day's receipts summary"
+  ],
+  "context_sources": [
+    "open tasks from state",
+    "recent memories and learnings",
+    "calendar events for today (PHASE 5: read ICS/API)",
+    "Farcaster mentions from last 24h (PHASE 5: Neynar API)"
+  ],
+  "allowed_actions": [
+    "calendar.read",
+    "farcaster.read",
+    "memory.read",
+    "memory.write",
+    "priority.plan",
+    "receipt.local.write",
+    "task.capture",
+    "task.plan",
+    "task.read"
+  ],
+  "blocked_actions": [
+    "farcaster.autoupload",
+    "fund.transfer",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "date boundary enforced",
+    "operator available",
+    "calendar parseable (PHASE 5)"
+  ],
+  "evidence_outputs": [
+    "morning-plan timestamp",
+    "open-task-count",
+    "scheduled-events-count",
+    "priority-ranking-method"
+  ],
+  "receipt_outputs": [
+    "morning-plan receipt"
+  ],
+  "knowledge_state_outputs": [
+    "daily plan synthesized",
+    "priorities ranked",
+    "calendar loaded (PHASE 5)"
+  ],
+  "execution_trace_outputs": [
+    "morning-plan execution trace"
+  ],
+  "memory_routes": [
+    "episodic: today's plan",
+    "durable: priority patterns"
+  ],
+  "cooldown": "86400s (daily)",
+  "failure_modes": [
+    "calendar unavailable (PHASE 5)",
+    "no open tasks",
+    "memory write failed",
+    "timeout"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-14",
+  "limits": {
+    "max_wall_time_ms": 180000,
+    "max_steps": 8,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "read-open-tasks",
+      "handler": "task.read",
+      "permission": "task.read",
+      "with": {
+        "filter": "open"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "recall-recent-memories",
+      "handler": "memory.read",
+      "permission": "memory.read",
+      "with": {
+        "maxRecent": 10
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "read-calendar",
+      "handler": "calendar.read",
+      "permission": "calendar.read",
+      "with": {
+        "dayCount": 1
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "read-farcaster-mentions",
+      "handler": "farcaster.read",
+      "permission": "farcaster.read",
+      "with": {
+        "query": "mentions_24h"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "synthesize-plan",
+      "handler": "priority.plan",
+      "permission": "priority.plan",
+      "with": {
+        "methode": "task-age + farcaster-volume + operator-hint"
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "write-daily-memory",
+      "handler": "memory.write",
+      "permission": "memory.write",
+      "with": {
+        "memoryType": "daily-plan"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "capture-new-tasks",
+      "handler": "task.capture",
+      "permission": "task.capture",
+      "with": {
+        "fromSources": ["calendar", "farcaster_mentions"]
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-plan",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {
+        "receiptType": "morning-plan"
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    }
+  ]
+}

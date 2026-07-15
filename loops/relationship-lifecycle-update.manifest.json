@@ -1,0 +1,252 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "relationship-lifecycle-update-v1",
+  "title": "Relationship Lifecycle Update",
+  "version": "1.0.0",
+  "status": "draft",
+  "owner": "community-crm-v1",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "circle.relationship-state-change or scheduled daily audit",
+  "inputs": [
+    "member ID and profile data",
+    "activity history (Farcaster posts, project contributions)",
+    "current relationship stage",
+    "timestamp"
+  ],
+  "context_sources": [
+    "member relationship status (if known)",
+    "member Farcaster activity (public data)",
+    "member cowork board contributions",
+    "relationship event logs (immutable history)"
+  ],
+  "allowed_actions": [
+    "circle.member-event-stream",
+    "circle.relationship-status-read",
+    "circle.relationship-status-write",
+    "cowork.fetch-projects",
+    "farcaster.activity-read",
+    "farcaster.dm-send",
+    "log.relationship-events-write",
+    "message.classify",
+    "priority.plan",
+    "state.local.read",
+    "state.local.write"
+  ],
+  "blocked_actions": [
+    "circle.member-remove",
+    "circle.role-grant",
+    "farcaster.autoupload",
+    "fund.transfer",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "member data integrity",
+    "relationship stage criteria met",
+    "action is not spam or duplicate",
+    "DM approval gate (if bulk send)",
+    "rate limits not exceeded"
+  ],
+  "evidence_outputs": [
+    "relationship-update timestamp",
+    "stage-classification result",
+    "action-proposed",
+    "dm-send-status (if applicable)"
+  ],
+  "receipt_outputs": [
+    "relationship-lifecycle-update receipt"
+  ],
+  "knowledge_state_outputs": [
+    "relationship stage updated",
+    "member classified",
+    "action logged"
+  ],
+  "execution_trace_outputs": [
+    "relationship-lifecycle-update execution trace"
+  ],
+  "memory_routes": [
+    "episodic: per-member lifecycle decision log",
+    "durable: member relationship status updates"
+  ],
+  "cooldown": "on-demand (triggered by circle events or daily timer)",
+  "failure_modes": [
+    "member data fetch failed",
+    "stage classification failed",
+    "DM send API error",
+    "approval gate rejection",
+    "rate limit exceeded"
+  ],
+  "promotion_path": "draft -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-14",
+  "limits": {
+    "max_wall_time_ms": 30000,
+    "max_steps": 15,
+    "max_retries_per_step": 2
+  },
+  "approval_gates": {
+    "bulk_dm_send": {
+      "description": "Bulk DM sends (>10 at once) require human approval",
+      "approval_required": true,
+      "max_per_batch": 10,
+      "threshold": 10
+    }
+  },
+  "rate_limits": {
+    "dms_per_day": 500,
+    "relationship_updates_per_day": 100,
+    "bulk_send_max_per_batch": 10
+  },
+  "steps": [
+    {
+      "id": "log-state-change-event",
+      "handler": "log.relationship-events-write",
+      "permission": "log.relationship-events-write",
+      "with": {
+        "eventType": "relationship-state-change",
+        "includeTimestamp": true
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "read-member-profile",
+      "handler": "circle.relationship-status-read",
+      "permission": "circle.relationship-status-read",
+      "with": {
+        "fetchRelated": true,
+        "includeHistory": true
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "read-activity-history",
+      "handler": "farcaster.activity-read",
+      "permission": "farcaster.activity-read",
+      "with": {
+        "maxRecent": 50,
+        "includeProjectData": true
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "fetch-project-contributions",
+      "handler": "cowork.fetch-projects",
+      "permission": "cowork.fetch-projects",
+      "with": {
+        "fetchMemberProjects": true
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "classify-relationship-stage",
+      "handler": "message.classify",
+      "permission": "message.classify",
+      "with": {
+        "types": [
+          "discover",
+          "engage",
+          "coordinate",
+          "escalate",
+          "nurture"
+        ],
+        "contextKey": "relationship-lifecycle-stages"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "propose-nurture-action",
+      "handler": "priority.plan",
+      "permission": "priority.plan",
+      "with": {
+        "scope": "relationship-lifecycle-action",
+        "stageAware": true
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "compose-action-message",
+      "handler": "message.classify",
+      "permission": "message.classify",
+      "with": {
+        "types": [
+          "welcome",
+          "invite",
+          "project-suggestion",
+          "escalation-flag",
+          "reengagement"
+        ],
+        "draftOnly": true
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "determine-approval-gate",
+      "handler": "priority.plan",
+      "permission": "priority.plan",
+      "with": {
+        "scope": "approval-decision",
+        "gateType": "bulk-send",
+        "threshold": 10
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "send-action-or-stage",
+      "handler": "farcaster.dm-send",
+      "permission": "farcaster.dm-send",
+      "with": {
+        "draftOnly": true,
+        "requireApprovalIfBulk": true,
+        "maxPerBatch": 10
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "update-relationship-status",
+      "handler": "circle.relationship-status-write",
+      "permission": "circle.relationship-status-write",
+      "with": {
+        "updateType": "stage-updated",
+        "immutableLog": true
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "record-completion",
+      "handler": "log.relationship-events-write",
+      "permission": "log.relationship-events-write",
+      "with": {
+        "eventType": "lifecycle-update-complete",
+        "includeResult": true
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    }
+  ]
+}
