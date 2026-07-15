@@ -6,6 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "check": "for f in scripts/*.js src/*.js; do node --check \"$f\" || exit 1; done && echo 'all scripts OK'",
+    "test": "node --test test/",
     "daily": "node scripts/zol-daily.js",
     "dashboard": "node scripts/dashboard.js"
   },
