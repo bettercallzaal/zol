@@ -1,0 +1,136 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "relationship-memory-sync-v1",
+  "title": "Relationship Memory Sync",
+  "version": "1.0.0",
+  "status": "rehearsed",
+  "owner": "zol-curator-v1",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "after inbox-triage or operator request",
+  "inputs": [
+    "relationship events (new mention, follow, etc.)",
+    "timestamp"
+  ],
+  "context_sources": [
+    "relationship state from previous interactions",
+    "memory of this FID (if known)",
+    "recent ZOL activity (voice consistency)"
+  ],
+  "allowed_actions": [
+    "memory.read",
+    "memory.write",
+    "receipt.local.write",
+    "relationship.read",
+    "relationship.write",
+    "state.local.read",
+    "state.local.write"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "farcaster.autoupload",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "relationship data valid",
+    "memory key unique",
+    "no duplicate entries"
+  ],
+  "evidence_outputs": [
+    "relationship-sync timestamp",
+    "relationship-count",
+    "memory-write-count"
+  ],
+  "receipt_outputs": [
+    "relationship-memory-sync receipt"
+  ],
+  "knowledge_state_outputs": [
+    "relationships indexed",
+    "memory updated"
+  ],
+  "execution_trace_outputs": [
+    "relationship-memory-sync trace"
+  ],
+  "memory_routes": [
+    "durable: per-FID relationship profile",
+    "episodic: interaction log"
+  ],
+  "cooldown": "300s (5min)",
+  "failure_modes": [
+    "relationship data stale",
+    "memory write failed"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-14",
+  "limits": {
+    "max_wall_time_ms": 90000,
+    "max_steps": 5,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "read-relationships",
+      "handler": "relationship.read",
+      "permission": "relationship.read",
+      "with": {
+        "full": true
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "read-memory",
+      "handler": "memory.read",
+      "permission": "memory.read",
+      "with": {
+        "scope": "relationships"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "reconcile-and-sync",
+      "handler": "memory.write",
+      "permission": "memory.write",
+      "with": {
+        "memoryType": "relationship-profile",
+        "mergeStrategy": "timestamp-latest"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "update-relationship-state",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {
+        "stateKey": "zol-relationship-index"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-sync",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {
+        "receiptType": "relationship-memory-sync"
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    }
+  ]
+}

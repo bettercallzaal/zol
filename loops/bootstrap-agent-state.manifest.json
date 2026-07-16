@@ -1,0 +1,127 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "bootstrap-agent-state-v1",
+  "title": "Bootstrap Agent State",
+  "version": "1.0.0",
+  "status": "rehearsed",
+  "owner": "zol-curator-v1",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "process start or operator request",
+  "inputs": [
+    "agent identity (ZOL)",
+    "current objective from memory",
+    "current time (ISO)",
+    "operator policy"
+  ],
+  "context_sources": [
+    "identity profile (Farcaster FID 3338501)",
+    "latest checkpoint from state-adapter",
+    "open tasks from state",
+    "recent memories from state"
+  ],
+  "allowed_actions": [
+    "memory.read",
+    "receipt.local.write",
+    "state.local.read",
+    "task.read"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "component.install",
+    "connector.unbounded.write",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "permissions granted",
+    "resource ceilings intact",
+    "receipt produced",
+    "signer never loaded"
+  ],
+  "evidence_outputs": [
+    "bootstrap-agent-state evidence"
+  ],
+  "receipt_outputs": [
+    "bootstrap-agent-state receipt"
+  ],
+  "knowledge_state_outputs": [
+    "bootstrap-agent-state identity loaded",
+    "bootstrap-agent-state checkpoint restored",
+    "bootstrap-agent-state tasks queued"
+  ],
+  "execution_trace_outputs": [
+    "bootstrap-agent-state bounded execution trace"
+  ],
+  "memory_routes": [
+    "local episodic memory",
+    "promote only verified durable facts"
+  ],
+  "cooldown": "host policy",
+  "failure_modes": [
+    "permission denied",
+    "unregistered handler",
+    "timeout",
+    "invalid state",
+    "dependency unavailable"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-14",
+  "limits": {
+    "max_wall_time_ms": 120000,
+    "max_steps": 5,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "load-state",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {
+        "stateKey": "zol-agent-state"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "recall-memory",
+      "handler": "memory.read",
+      "permission": "memory.read",
+      "with": {
+        "maxRecent": 5
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "load-tasks",
+      "handler": "task.read",
+      "permission": "task.read",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-bootstrap",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {
+        "receiptType": "bootstrap"
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    }
+  ]
+}

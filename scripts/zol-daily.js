@@ -116,8 +116,14 @@ async function logBonfire(text) {
     const recent = recentCasts();
     const ctx = await recall(query);
     const text = await draft(ctx, recent);
-    if (!text || /^nothing\b/i.test(text.trim())) {
-      console.log('ZOL: nothing fresh to post this hour (stayed silent)');
+    const draftText = (text || '').trim();
+    // Skip if the model signalled no-post (ANY "noth..." variant, incl the
+    // mangled "NOTH" that leaked live 2026-07-14) OR the draft is too short /
+    // garbled to be a real cast. A real ZOL cast names a specific artist or
+    // track and is a full sentence - a 4-char token is never a valid cast.
+    const alpha = draftText.replace(/[^a-z]/gi, '');
+    if (!draftText || /^noth/i.test(draftText) || alpha.length < 15 || draftText.split(/\s+/).filter(Boolean).length < 3) {
+      console.log('ZOL: nothing fresh / draft too short to post this hour (stayed silent):', JSON.stringify(draftText.slice(0, 40)));
       return;
     }
     if (tooSimilar(text, recent)) {
