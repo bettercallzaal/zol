@@ -1,0 +1,23 @@
+[Unit]
+Description=ZOL Daily Curator Cast (hourly)
+Documentation=https://github.com/bettercallzaal/zol
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=zaal
+Group=zaal
+WorkingDirectory=/home/zaal/zol
+EnvironmentFile=/home/zaal/.zao/private/zol.env
+Environment="HOME=/home/zaal"
+Environment="NODE_ENV=production"
+
+ExecStart=/usr/bin/node scripts/zol-daily.js
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zol-daily
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=ZOL Calendar Poll Timer (every 15 minutes)
+Documentation=https://github.com/bettercallzaal/zol
+Requires=zol-calendar.service
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=15min
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
