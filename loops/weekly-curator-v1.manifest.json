@@ -1,0 +1,213 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "weekly-curator-v1",
+  "title": "Weekly Curator Recap",
+  "version": "1.0.0",
+  "status": "draft",
+  "owner": "zol-weekly-curator-v1",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "scheduled weekly (Monday 6am UTC)",
+  "inputs": [
+    "ZOL's last 7 days of posted casts (from ~/zol/recent-casts.json)",
+    "Bonfire recall context for the week",
+    "timestamp"
+  ],
+  "context_sources": [
+    "recent-casts.json (ZOL's hourly posts from the past 7 days)",
+    "Bonfire recall (ZAO ecosystem context, weekly queries)",
+    "state store (already-summarized weeks, to avoid repeats)"
+  ],
+  "allowed_actions": [
+    "state.local.read",
+    "state.local.write",
+    "farcaster.activity-read",
+    "message.classify",
+    "priority.plan",
+    "log.zol-events-write"
+  ],
+  "blocked_actions": [
+    "farcaster.cast-send",
+    "farcaster.dm-send",
+    "farcaster.autoupload",
+    "fund.transfer",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "recent-casts.json exists and is parseable",
+    "Bonfire recall succeeded or falls back gracefully",
+    "week has not been previously summarized",
+    "highlight text is not empty and meets minimum length",
+    "draft is not too similar to previous recaps"
+  ],
+  "evidence_outputs": [
+    "weekly-recap timestamp",
+    "highlight text selected",
+    "cast count processed"
+  ],
+  "receipt_outputs": [
+    "weekly-curator receipt"
+  ],
+  "knowledge_state_outputs": [
+    "recap drafted",
+    "week recorded (state carryover)"
+  ],
+  "execution_trace_outputs": [
+    "weekly-curator execution trace"
+  ],
+  "memory_routes": [
+    "episodic: weekly-recap decisions and highlights picked",
+    "durable: summarized weeks (to prevent repeats)"
+  ],
+  "cooldown": "weekly (every Monday 6am UTC); no re-run same calendar week",
+  "failure_modes": [
+    "recent-casts.json not found or corrupted",
+    "Bonfire recall API timeout or error",
+    "highlight selection fails",
+    "draft composition fails",
+    "state write fails"
+  ],
+  "promotion_path": "draft -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-16",
+  "limits": {
+    "max_wall_time_ms": 60000,
+    "max_steps": 12,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "read-state",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {
+        "key": "weekly-curator-state",
+        "includeHistory": false
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "check-week-already-done",
+      "handler": "priority.plan",
+      "permission": "priority.plan",
+      "with": {
+        "scope": "weekly-recap-check",
+        "checkForDuplicateWeek": true
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "read-recent-casts",
+      "handler": "farcaster.activity-read",
+      "permission": "farcaster.activity-read",
+      "with": {
+        "source": "recent-casts-file",
+        "timeWindowDays": 7
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "recall-bonfire-context",
+      "handler": "farcaster.activity-read",
+      "permission": "farcaster.activity-read",
+      "with": {
+        "source": "bonfire-recall",
+        "query": "ZAO music curators, standout tracks, and artist wins this week"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "select-highlight",
+      "handler": "message.classify",
+      "permission": "message.classify",
+      "with": {
+        "types": [
+          "best-find-of-week",
+          "artist-spotlight",
+          "track-recommendation"
+        ],
+        "contextKey": "weekly-curator-highlight"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "compose-recap-text",
+      "handler": "priority.plan",
+      "permission": "priority.plan",
+      "with": {
+        "scope": "weekly-recap-composition",
+        "draftOnly": true,
+        "maxLength": 280
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "check-similarity",
+      "handler": "message.classify",
+      "permission": "message.classify",
+      "with": {
+        "types": [
+          "duplicate-check"
+        ],
+        "contextKey": "weekly-recap-similarity"
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "stage-draft",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {
+        "key": "weekly-curator-draft",
+        "draftOnly": true,
+        "kind": "weekly-recap"
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "update-state-carryover",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {
+        "key": "weekly-curator-state",
+        "updateType": "week-summarized",
+        "immutableLog": true
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    },
+    {
+      "id": "log-completion",
+      "handler": "log.zol-events-write",
+      "permission": "log.zol-events-write",
+      "with": {
+        "eventType": "weekly-recap-drafted",
+        "includeResult": true
+      },
+      "retry": {
+        "max_attempts": 1
+      }
+    }
+  ]
+}
