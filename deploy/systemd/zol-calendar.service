@@ -1,0 +1,23 @@
+[Unit]
+Description=ZOL Calendar Poll (event detection and drafting)
+Documentation=https://github.com/bettercallzaal/zol
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=zaal
+Group=zaal
+WorkingDirectory=/home/zaal/zol
+EnvironmentFile=/home/zaal/.zao/private/zol.env
+Environment="HOME=/home/zaal"
+Environment="NODE_ENV=production"
+
+ExecStart=/usr/bin/node scripts/zol-calendar.js
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zol-calendar
+
+[Install]
+WantedBy=multi-user.target
