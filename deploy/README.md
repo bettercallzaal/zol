@@ -1,6 +1,6 @@
 # ZOL Pi Modernization Kit
 
-This directory contains a systemd-based modernization kit for running ZOL's three long-running services on your Raspberry Pi via systemd instead of cron or manual invocation.
+This directory contains a systemd-based modernization kit for running ZOL's long-running services on your Raspberry Pi via systemd instead of cron or manual invocation.
 
 ## What This Is
 
@@ -14,9 +14,13 @@ Today, ZOL runs three long-running processes on `ansuz` (the Pi):
 2. **zol-reply.js** - Always-on mention polling daemon  
 3. **zol-calendar.js** - 15-minute calendar event detector
 
-These have historically been started manually or via cron. This kit provides:
+These have historically been started manually or via cron. This kit also adds a fourth, currently-dormant unit:
+
+4. **dl-run-weekly.js** - weekly-cadence DreamLoops entry point (weekly-curator, artist-spotlight). Both loops are flag-gated OFF (`DREAMLOOPS_ENABLED` + their own per-loop flag) - installing/enabling this timer has no effect until you explicitly turn those flags on in `zol.env`. See `docs/WEEKLY_CURATOR_LOOP.md` and `docs/ARTIST_SPOTLIGHT_LOOP.md` for what each loop does.
+
+This kit provides:
 - **systemd service files** for each script
-- **systemd timers** for the periodic ones (daily, calendar)
+- **systemd timers** for the periodic ones (daily, calendar, weekly loops)
 - **migrate.sh** - a guided migration script you run on the Pi
 - **README** - this file, documenting what needs review before migration
 
@@ -25,6 +29,7 @@ These have historically been started manually or via cron. This kit provides:
 - `zol-daily.service` + `zol-daily.timer` - hourly curator cast service
 - `zol-reply.service` - reply daemon (persistent, restart-on-failure)
 - `zol-calendar.service` + `zol-calendar.timer` - 15-minute calendar poller
+- `zol-weekly-loops.service` + `zol-weekly-loops.timer` - weekly DreamLoops entry point (Mondays 6am UTC), dormant until flags are set
 - `migrate.sh` - the migration script (copy to Pi, read, run as root)
 - `README.md` - this file
 
@@ -76,6 +81,7 @@ The script checks for this directory and will exit if not found.
 This kit boots with all feature flags OFF to maintain parity with your current setup:
 
 - `DREAMLOOPS_ENABLED=0` - no DreamLoops automation
+- `WEEKLY_CURATOR_ENABLED=0`, `ARTIST_SPOTLIGHT_ENABLED=0` - the two weekly loops stay off even if `DREAMLOOPS_ENABLED` is later turned on; both flags must be set to activate a given loop
 - Per-loop feature flags remain OFF
 
 You can enable features later by updating `~/.zao/private/zol.env` on the Pi and reloading systemd:
@@ -127,6 +133,7 @@ systemctl list-timers --all
 journalctl -u zol-reply -f
 journalctl -u zol-daily -f
 journalctl -u zol-calendar -f
+journalctl -u zol-weekly-loops -f   # will just log "DREAMLOOPS_ENABLED is off" until you flip the flags
 
 # Manually trigger a service (for testing)
 sudo systemctl start zol-daily.service
@@ -141,12 +148,12 @@ If you need to rollback to your previous setup:
 
 1. **Stop the services**:
    ```bash
-   sudo systemctl stop zol-daily.timer zol-calendar.timer zol-reply.service
+   sudo systemctl stop zol-daily.timer zol-calendar.timer zol-weekly-loops.timer zol-reply.service
    ```
 
 2. **Disable the services**:
    ```bash
-   sudo systemctl disable zol-daily.timer zol-calendar.timer zol-reply.service
+   sudo systemctl disable zol-daily.timer zol-calendar.timer zol-weekly-loops.timer zol-reply.service
    ```
 
 3. **Re-enable your old cron entries** or manually start the scripts as you did before.
@@ -174,6 +181,14 @@ If you need to rollback to your previous setup:
 - **First run**: 30 seconds after boot
 - **Subsequent runs**: Every 15 minutes
 - **Type**: oneshot (runs once, exits)
+
+### zol-weekly-loops (weekly-curator, artist-spotlight - dormant by default)
+
+- **Timer**: OnCalendar=Mon *-*-* 06:00:00 UTC (matches weekly-curator-v1's declared trigger)
+- **Type**: oneshot (runs once, exits)
+- **Self-gating**: exits immediately with no side effects unless `DREAMLOOPS_ENABLED=1` AND the loop's own flag (`WEEKLY_CURATOR_ENABLED` / `ARTIST_SPOTLIGHT_ENABLED`) are set in `zol.env` - safe to enable this unit before deciding whether to turn the loops on
+- **Output when enabled**: both loops only ever stage a draft into `~/zol/drafts/`, same as `zol-calendar` - nothing auto-posts
+- **Logs**: `journalctl -u zol-weekly-loops`
 - **Logs**: `journalctl -u zol-calendar`
 
 ## Important Notes
