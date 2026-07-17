@@ -1,0 +1,162 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/bettercallzaal/zol/docs/fleet-standard/schemas/task-lease.schema.json",
+  "title": "WorkRouter Task Lease (Work Packet)",
+  "description": "JSON Schema for a WorkRouter work packet with task leasing fields. DRAFT — Fleet Standard v0.1. Enforces the compare-and-set lease protocol described in Section 6 of the Fleet Standard.",
+  "version": "0.1.0",
+  "type": "object",
+  "required": [
+    "packetId",
+    "title",
+    "type",
+    "status",
+    "owner",
+    "attemptId",
+    "fencingEpoch",
+    "leaseExpiry",
+    "sideEffectKey"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "packetId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique, stable task identifier. Format: UUID v4 or '<type>-<hash>'. NOT a secret."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable description of the task."
+    },
+    "type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Task classification (e.g., 'pr_review', 'artifact_build', 'research', 'loop_run')."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "leased",
+        "awaiting_approval",
+        "blocked",
+        "completed",
+        "failed",
+        "dead"
+      ],
+      "description": "Current lifecycle status of this task. Only one agent may hold 'leased' status at a time."
+    },
+    "owner": {
+      "type": ["string", "null"],
+      "description": "Agent or loop ID currently holding the lease, or null if the task is pending. Set atomically via compare-and-set — never write directly without a CAS."
+    },
+    "attemptId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for the current execution attempt. A new UUID is generated on each fresh lease acquisition. Used to bind receipts to the specific attempt that produced them."
+    },
+    "fencingEpoch": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonically increasing supervisor epoch at the time the lease was acquired. An agent must verify that this epoch still matches the supervisor's current epoch before each step. Mismatch means the lease is stale and the agent must abort."
+    },
+    "leaseExpiry": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp after which the lease is considered expired. The owning agent must renew before this time or the supervisor may reclaim the task."
+    },
+    "sideEffectKey": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable idempotency key for this task's irreversible side effects. Computed as SHA-256(task_type + normalized_inputs) or equivalent. Before executing any irreversible step, check whether a completion receipt for this key already exists. If so, skip the action and return the existing receipt."
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["p0", "p1", "p2", "p3"],
+      "description": "Task priority. p0 = critical/blocking, p1 = high, p2 = normal, p3 = low."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of task creation."
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the last status change."
+    },
+    "leaseAcquiredAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the current lease was acquired, or null if the task is pending."
+    },
+    "leaseRenewedAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the most recent lease renewal, or null if never renewed."
+    },
+    "leaseTtlMs": {
+      "type": "integer",
+      "minimum": 1000,
+      "description": "Duration in milliseconds for which a lease is valid. The agent must renew before this elapses."
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Normalized task inputs. Used to compute sideEffectKey. Must not contain secret values.",
+      "additionalProperties": true
+    },
+    "inputsDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "SHA-256 of the canonical JSON-serialized inputs. NOT a secret."
+    },
+    "evidence": {
+      "type": "object",
+      "description": "Evidence accumulated during task execution. Linked to receipts.",
+      "additionalProperties": true
+    },
+    "receiptIds": {
+      "type": "array",
+      "description": "Ordered list of receipt IDs produced during this task's execution.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "approvalId": {
+      "type": ["string", "null"],
+      "description": "ApprovalBridge capability ID consumed to authorize the task's consequential action, or null if not yet approved."
+    },
+    "blockedReason": {
+      "type": ["string", "null"],
+      "description": "Human-readable reason the task is in 'blocked' status, or null if not blocked."
+    },
+    "failureReason": {
+      "type": ["string", "null"],
+      "description": "Human-readable reason the task is in 'failed' status, or null if not failed."
+    },
+    "retryCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of times this task has been retried (after failure or stale-lease recovery)."
+    },
+    "maxRetries": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Maximum allowed retry count before the task is transitioned to 'dead'."
+    },
+    "capsuleId": {
+      "type": "string",
+      "description": "Capsule ID that scoped the permissions for this task."
+    },
+    "loopId": {
+      "type": "string",
+      "description": "DreamLoop ID that owns this task."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Optimistic lock version. Incremented on every write. Used for compare-and-set lease operations."
+    }
+  }
+}

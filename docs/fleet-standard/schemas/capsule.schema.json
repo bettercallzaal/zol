@@ -1,0 +1,168 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/bettercallzaal/zol/docs/fleet-standard/schemas/capsule.schema.json",
+  "title": "DreamNet Synergy Capsule Manifest",
+  "description": "JSON Schema for a dreamnet.synergy_capsule.v1 manifest. DRAFT — Fleet Standard v0.1. Derived from validateCapsule() in vendor/dreamloops/runtime/src/validate.js.",
+  "version": "0.1.0",
+  "type": "object",
+  "required": [
+    "schema",
+    "capsule_id",
+    "name",
+    "version",
+    "capsule_type",
+    "status",
+    "purpose",
+    "payload",
+    "permissions",
+    "resource_limits",
+    "activation",
+    "provenance"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "dreamnet.synergy_capsule.v1",
+      "description": "Schema identifier — must be exactly 'dreamnet.synergy_capsule.v1'."
+    },
+    "capsule_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique, stable identifier for this capsule (e.g., 'zol-overlay-v1')."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable capsule name."
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Semantic version string (e.g., '1.0.0')."
+    },
+    "capsule_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Capsule classification (e.g., 'agent_overlay', 'tool_kit', 'memory_module')."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "active", "disabled", "deprecated"],
+      "description": "Lifecycle status of this capsule."
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Plain-language description of what this capsule does and why."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Capsule-type-specific configuration data. Structure varies by capsule_type.",
+      "additionalProperties": true
+    },
+    "permissions": {
+      "type": "object",
+      "required": ["allowed", "blocked"],
+      "description": "Explicit permission declarations for this capsule.",
+      "properties": {
+        "allowed": {
+          "type": "array",
+          "description": "Exhaustive list of action strings this capsule may perform.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "blocked": {
+          "type": "array",
+          "description": "List of permanently blocked action strings. Must include at minimum: wallet.sign, deployment.production.write, signer.change.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "contains": {
+            "enum": ["wallet.sign", "deployment.production.write", "signer.change"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "resource_limits": {
+      "type": "object",
+      "required": ["max_wall_time_ms", "max_steps", "max_retries_per_step"],
+      "description": "Hard resource ceilings for this capsule's execution.",
+      "properties": {
+        "max_wall_time_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400000,
+          "description": "Maximum wall-clock time in milliseconds (max 24h = 86,400,000)."
+        },
+        "max_steps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "Maximum number of execution steps."
+        },
+        "max_retries_per_step": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Maximum retries per step."
+        }
+      },
+      "additionalProperties": false
+    },
+    "activation": {
+      "type": "object",
+      "required": ["mode", "rollback_version"],
+      "description": "Activation and rollback configuration.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["manual_review", "auto", "disabled"],
+          "description": "How this capsule is activated."
+        },
+        "rollback_version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Version to roll back to on failure, or 'disabled' if rollback is not configured."
+        }
+      },
+      "additionalProperties": true
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["content_hash"],
+      "description": "Integrity and source metadata for this capsule.",
+      "properties": {
+        "content_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "SHA-256 hash of the canonical capsule content (sha256:<64-hex>). This is NOT a secret — it is an integrity check value."
+        },
+        "source": {
+          "type": "string",
+          "description": "URL or identifier for the source repository."
+        },
+        "pinned_commit": {
+          "type": "string",
+          "description": "Git commit SHA at which this capsule was authored."
+        },
+        "authored_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of capsule authorship."
+        },
+        "author": {
+          "type": "string",
+          "description": "Author identifier (username or agent ID)."
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}
