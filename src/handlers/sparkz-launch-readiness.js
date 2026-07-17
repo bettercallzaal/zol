@@ -316,6 +316,15 @@ const handlers = {
         constraints.push('Clanker v4: cannot adjust percentages after deploy');
       }
 
+      // Legal guardrail (doc 1108): 0xSplits routes to CONTRIBUTORS (the workers doing the
+      // work), never to token HOLDERS as a "hold-and-earn" reward. A split that pays creators
+      // for participation is NOT the same as promising holders price appreciation or revenue.
+      // Never add "hold $TOKEN and earn fees" mechanics — that reintroduces Howey prongs 3-4.
+      // Confirm with counsel before any live launch. (ref: doc 1108, research only — not legal advice)
+      const legalNote = rail === 'zero_x_splits'
+        ? 'DESIGN GUARDRAIL (doc 1108): 0xSplits must route fees to contributors/collaborators (the workers), NOT to token holders. Never promise holders they will receive revenue or treasury yield — "hold and earn" mechanics reintroduce Howey prongs 3-4. Keep rewards participation/energy-based, not holding-based. Confirm framing with counsel before live launch.'
+        : 'DESIGN GUARDRAIL (doc 1108): Clanker native recipients = collaborators who contributed work, not token holders earning passive yield. Keep reward mechanics participation/energy-based. Confirm with counsel before live launch.';
+
       return {
         creatorFid,
         rail,
@@ -323,6 +332,7 @@ const handlers = {
         constraints,
         inputs: { collaboratorCount, splitIsFixed, recipientsMayChange, rebalanceExpected },
         clankerNativeEligible: !needsDynamic && collaboratorCount <= CLANKER_MAX_RECIPIENTS,
+        legalNote,
         timestamp: new Date().toISOString(),
         source: 'clanker-v4-mechanics-doc-1094b',
       };

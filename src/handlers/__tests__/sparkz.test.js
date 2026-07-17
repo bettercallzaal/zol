@@ -226,4 +226,15 @@ describe('launch-rail.decision handler', () => {
     assert.equal(r.inputs.splitIsFixed, true);
     assert.ok(r.timestamp);
   });
+
+  test('legalNote is always present in output (doc 1108 design guardrail)', async () => {
+    const native = await handler({ input: { creatorFid: 1, collaboratorCount: 2 } });
+    assert.ok(typeof native.legalNote === 'string' && native.legalNote.length > 0, 'legalNote must be present for clanker_native');
+    assert.ok(native.legalNote.includes('doc 1108'));
+
+    const splits = await handler({ input: { creatorFid: 2, collaboratorCount: 9 } });
+    assert.ok(typeof splits.legalNote === 'string' && splits.legalNote.length > 0, 'legalNote must be present for zero_x_splits');
+    assert.ok(splits.legalNote.includes('doc 1108'));
+    assert.ok(splits.legalNote.includes('hold and earn') || splits.legalNote.includes('Howey'));
+  });
 });
