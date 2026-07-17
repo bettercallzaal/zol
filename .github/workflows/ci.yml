@@ -31,7 +31,7 @@ jobs:
       - name: Syntax check (v2 source files)
         run: npm run v2:check
 
-      - name: Unit + integration tests (dl:test, 508 assertions)
+      - name: Unit + integration tests (dl:test, 518 assertions)
         run: npm run dl:test
 
       - name: Validate 23 capsules and 72 DreamLoop manifests
