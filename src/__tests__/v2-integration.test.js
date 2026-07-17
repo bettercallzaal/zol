@@ -32,6 +32,8 @@ const { createWarperKeeperAdapter } = require('../adapters/warper-keeper-adapter
 const { ProofDropAdapter } = require('../adapters/proof-drop-adapter');
 const { ApprovalBridge } = require('../approval-bridge');
 const { AgentGateway } = require('../agent-gateway');
+const { Zictionary } = require('../zictionary');
+const { Zocuments } = require('../zocuments');
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -1175,7 +1177,96 @@ describe('AgentGateway Route Validation (safeParse HTTP-level)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 15. One-Reply-Per-Social-Thread
+// 15. Source Citations
+// ---------------------------------------------------------------------------
+
+describe('Source Citations', () => {
+  test('Zictionary: entry with sourced citations is stored and retrievable', async () => {
+    const store = makeMockStore();
+    const zic = new Zictionary(store);
+
+    const citations = [
+      'ZAOOS research corpus doc 1094 — Clanker v4 token launch guide',
+      'BrandonDucar/dreamloops README — Capsule schema specification',
+    ];
+
+    const entry = await zic.add({
+      term: 'Capsule',
+      definition: 'A governed permission bundle for a ZOL agent loop',
+      citations,
+    });
+
+    assert.ok(Array.isArray(entry.citations), 'citations must be an array');
+    assert.equal(entry.citations.length, 2, 'both citations must be stored');
+    assert.deepEqual(entry.citations, citations, 'citation content must be preserved');
+
+    const found = await zic.findByTerm('Capsule');
+    assert.ok(found, 'entry must be findable by term after storage');
+    assert.deepEqual(found.citations, citations, 'citations must survive the store round-trip');
+  });
+
+  test('Zictionary: citations are immutable after creation — edit() silently preserves original', async () => {
+    const store = makeMockStore();
+    const zic = new Zictionary(store);
+
+    const original = ['doc 1094 — authoritative source'];
+    const entry = await zic.add({
+      term: 'LaunchRail',
+      definition: 'Clanker vs 0xSplits decision router',
+      citations: original,
+    });
+
+    const updated = await zic.edit(entry.entryId, {
+      definition: 'Updated definition only',
+      citations: ['attempted overwrite — must not land'],
+    });
+
+    assert.equal(updated.definition, 'Updated definition only', 'definition should update normally');
+    assert.deepEqual(updated.citations, original, 'citations must not change via edit()');
+  });
+
+  test('Zictionary: credentials in citation strings are redacted before storage', async () => {
+    const store = makeMockStore();
+    const zic = new Zictionary(store);
+
+    const entry = await zic.add({
+      term: 'RedactedCite',
+      definition: 'A safe definition',
+      citations: ['Source: sk-supersecretkey123 must be stripped'],
+    });
+
+    assert.ok(!entry.citations[0].includes('sk-supersecretkey123'), 'sk- secret must be redacted');
+    assert.ok(entry.citations[0].includes('[REDACTED]'), 'redacted placeholder must appear');
+  });
+
+  test('Zocuments: source metadata (sourceUrl, sourceName) is stored and survives export', async () => {
+    const store = makeMockStore();
+    const docs = new Zocuments(store);
+
+    const doc = await docs.add({
+      type: 'transcript',
+      title: 'ZAO Fractal Session',
+      content: 'Session recording transcript',
+      sourceUrl: 'https://thezao.com/fractal/session',
+      sourceName: 'ZAO Fractal Meeting W28 2026',
+      permissions: 'public',
+    });
+
+    assert.equal(doc.sourceUrl, 'https://thezao.com/fractal/session', 'sourceUrl must be stored');
+    assert.equal(doc.sourceName, 'ZAO Fractal Meeting W28 2026', 'sourceName must be stored');
+
+    await docs.approve(doc.docId);
+    const exported = await docs.export({ permissions: 'public' });
+    const found = exported.find(d => d.docId === doc.docId);
+
+    assert.ok(found, 'doc must appear in export after approval');
+    assert.equal(found.sourceUrl, 'https://thezao.com/fractal/session', 'sourceUrl must survive export');
+    assert.equal(found.sourceName, 'ZAO Fractal Meeting W28 2026', 'sourceName must survive export');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 16. One-Reply-Per-Social-Thread
 // ---------------------------------------------------------------------------
 
 describe('One-Reply-Per-Social-Thread', () => {

@@ -118,4 +118,66 @@ describe('Zictionary', () => {
     assert.ok(terms.includes('Exported'), 'approved entry should be exported');
     assert.ok(!terms.includes('Draft'), 'draft entry should not be exported');
   });
+
+  test('add() stores citations and they survive findByTerm()', async () => {
+    const zic = new Zictionary(makeMockStore());
+
+    const citations = [
+      'ZAOOS research corpus doc 1001',
+      'BrandonDucar/dreamloops README commit abc1234',
+    ];
+    const entry = await zic.add({
+      term: 'Capsule',
+      definition: 'A governed permission bundle for a ZOL agent',
+      citations,
+    });
+
+    assert.ok(Array.isArray(entry.citations), 'citations should be an array');
+    assert.equal(entry.citations.length, 2, 'both citations should be stored');
+
+    const found = await zic.findByTerm('Capsule');
+    assert.ok(found, 'entry should be findable');
+    assert.deepEqual(found.citations, citations, 'citations should survive round-trip');
+  });
+
+  test('add() scrubs credential secrets from citation strings', async () => {
+    const zic = new Zictionary(makeMockStore());
+
+    const entry = await zic.add({
+      term: 'SecretCitation',
+      definition: 'A definition that is fine',
+      citations: [
+        'Source: sk-abc123secretkey should be stripped',
+        'Safe citation with no secrets',
+      ],
+    });
+
+    assert.ok(
+      !entry.citations[0].includes('sk-abc123secretkey'),
+      'sk- prefixed secret should be redacted from citation'
+    );
+    assert.ok(
+      entry.citations[0].includes('[REDACTED]'),
+      'redacted placeholder should appear in citation'
+    );
+    assert.equal(entry.citations[1], 'Safe citation with no secrets', 'safe citation should be unchanged');
+  });
+
+  test('edit() cannot overwrite citations (citations are immutable after creation)', async () => {
+    const zic = new Zictionary(makeMockStore());
+
+    const entry = await zic.add({
+      term: 'Immutable',
+      definition: 'Should not allow citation edit',
+      citations: ['original citation'],
+    });
+
+    const updated = await zic.edit(entry.entryId, {
+      definition: 'Updated definition',
+      citations: ['attempted overwrite'],
+    });
+
+    assert.equal(updated.definition, 'Updated definition', 'definition should be updateable');
+    assert.deepEqual(updated.citations, ['original citation'], 'citations must remain immutable');
+  });
 });
