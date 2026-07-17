@@ -119,11 +119,13 @@
   "watch_targets": [
     {
       "id": "clanker-v5-release",
-      "url": "https://github.com/clanker-devco/clanker",
-      "check": "new release tag or changelog entry mentioning B20/droid mechanics",
+      "url": "https://github.com/clanker-devco/clanker-sdk/releases",
+      "check": "new release tag v5.x or changelog entry mentioning B20/droid mechanics",
       "on_detect": "open improvement-proposal to revisit launch-rail.decision for v5 split mechanics",
       "priority": "high",
-      "source_doc": "1094b"
+      "source_doc": "1094b",
+      "last_checked": "2026-07-17",
+      "last_checked_result": "NOT triggered — latest is clanker-sdk v4.2.18 (2026-07-08). No v5, no B20/droid mechanics. clanker-devco/clanker repo has no public releases; watch SDK repo instead."
     },
     {
       "id": "fractally-community-directory",
@@ -131,15 +133,19 @@
       "check": "community directory or DAO listing feature appears",
       "on_detect": "surface to Zaal to submit ZAO listing (only active fractal DAO on Optimism)",
       "priority": "medium",
-      "source_doc": "1208"
+      "source_doc": "1208",
+      "last_checked": "2026-07-17",
+      "last_checked_result": "NOT triggered — site has educational content and blog only. No DAO directory or listing feature found."
     },
     {
       "id": "optimism-atlas-retro-funding",
-      "url": "https://atlas.optimism.io",
-      "check": "new Retro Funding round open for applications",
-      "on_detect": "surface to Zaal with reference to docs/1209 application draft (copy-paste-ready)",
+      "url": "https://atlas.optimism.io/missions",
+      "check": "new Season 9+ Retro Funding round open for applications (Season 7 and Season 8 Onchain Builders both closed July 2025)",
+      "on_detect": "surface to Zaal with reference to docs/zol-bankr-risk-model-v1.md and draft new application based on doc 1209 template",
       "priority": "high",
-      "source_doc": "1209"
+      "source_doc": "1209",
+      "last_checked": "2026-07-17",
+      "last_checked_result": "NOT triggered — S7 Onchain Builders closed July 31 2025; S8 Onchain Builders closed July 30 2025. No Season 9 round announced as of 2026-07-17. Watch gov.optimism.io for S9 announcement."
     }
   ],
   "checks": [
