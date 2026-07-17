@@ -3,6 +3,7 @@
   "loop_id": "task-capture-and-plan-v1",
   "title": "Task Capture and Plan",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"

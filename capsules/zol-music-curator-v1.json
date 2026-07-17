@@ -56,8 +56,12 @@
       "farcaster.public",
       "artifact.local"
     ],
-    "disallowed_wallets": ["*"],
-    "disallowed_signers": ["*"],
+    "disallowed_wallets": [
+      "*"
+    ],
+    "disallowed_signers": [
+      "*"
+    ],
     "disallowed_environments": []
   },
   "resource_limits": {
@@ -71,6 +75,6 @@
   },
   "provenance": {
     "source": "https://github.com/BrandonDucar/dreamloops",
-    "content_hash": "sha256:pending"
+    "content_hash": "sha256:0252336e9011f2496424d163503b0fd9efebcfba616d41729162a86321c2c40e"
   }
 }

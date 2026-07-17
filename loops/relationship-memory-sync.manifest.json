@@ -3,6 +3,7 @@
   "loop_id": "relationship-memory-sync-v1",
   "title": "Relationship Memory Sync",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"

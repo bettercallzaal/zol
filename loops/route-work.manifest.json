@@ -3,6 +3,7 @@
   "loop_id": "route-work-v1",
   "title": "Route Work",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

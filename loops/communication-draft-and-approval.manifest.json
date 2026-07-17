@@ -3,6 +3,7 @@
   "loop_id": "communication-draft-and-approval-v1",
   "title": "Communication Draft and Approval",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"

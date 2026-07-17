@@ -55,9 +55,15 @@
       "artifact.local",
       "warper.assignment"
     ],
-    "disallowed_wallets": ["*"],
-    "disallowed_signers": ["*"],
-    "disallowed_environments": ["production"]
+    "disallowed_wallets": [
+      "*"
+    ],
+    "disallowed_signers": [
+      "*"
+    ],
+    "disallowed_environments": [
+      "production"
+    ]
   },
   "resource_limits": {
     "max_wall_time_ms": 600000,
@@ -70,6 +76,6 @@
   },
   "provenance": {
     "source": "https://github.com/BrandonDucar/dreamloops",
-    "content_hash": "sha256:pending"
+    "content_hash": "sha256:02371f0e987cf55a212a345742445244959c1a4d33adea8124f88d43e89114de"
   }
 }

@@ -3,6 +3,7 @@
   "loop_id": "component-radar-v1",
   "title": "Component Radar",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"

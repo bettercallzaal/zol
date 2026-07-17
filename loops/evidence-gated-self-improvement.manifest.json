@@ -3,6 +3,7 @@
   "loop_id": "evidence-gated-self-improvement-v1",
   "title": "Evidence-Gated Self Improvement",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"

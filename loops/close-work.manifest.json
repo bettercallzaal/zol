@@ -3,6 +3,7 @@
   "loop_id": "close-work-v1",
   "title": "Close Work",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

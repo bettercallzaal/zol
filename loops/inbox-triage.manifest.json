@@ -3,6 +3,7 @@
   "loop_id": "inbox-triage-v1",
   "title": "Inbox Triage",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"

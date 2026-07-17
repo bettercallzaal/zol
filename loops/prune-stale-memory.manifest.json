@@ -3,6 +3,7 @@
   "loop_id": "prune-stale-memory-v1",
   "title": "Prune Stale Memory",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

@@ -75,6 +75,31 @@ const MCP_TOOLS = [
       required: ['artifactId'],
     },
   },
+  {
+    name: 'run_loop',
+    description: 'Run an approved DreamLoop by loop_id in mock/dry-run mode',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        loopId: { type: 'string' },
+        executionMode: { type: 'string', enum: ['mock', 'dry-run'] },
+        input: { type: 'object' },
+      },
+      required: ['loopId'],
+    },
+  },
+  {
+    name: 'export_trapper',
+    description: 'Export a delivered artifact as a Trapper bundle',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        artifactId: { type: 'string' },
+        receiptIds: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['artifactId'],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -406,6 +431,10 @@ class AgentGateway {
         return this._handleTrappersImport(req, res);
       }
 
+      if (pathname === '/trappers/export' && method === 'GET') {
+        return this._handleTrappersExportList(req, res);
+      }
+
       if (pathname.startsWith('/trappers/export/') && method === 'GET') {
         const id = pathname.slice('/trappers/export/'.length);
         return this._handleTrappersExport(req, res, id);
@@ -551,6 +580,11 @@ class AgentGateway {
     sendJson(res, 200, { artifactId, imported: true });
   }
 
+  async _handleTrappersExportList(_req, res) {
+    const artifacts = await this._artifactPipeline.list({ status: 'delivered', limit: 50 });
+    sendJson(res, 200, { artifacts, total: artifacts.length });
+  }
+
   async _handleTrappersExport(_req, res, id) {
     if (!id) {
       return sendError(res, 400, 'Bad Request');
@@ -641,6 +675,33 @@ class AgentGateway {
           return sendError(res, 404, 'not found');
         }
         result = exported;
+        break;
+      }
+
+      case 'run_loop': {
+        const { loopId, executionMode = 'mock', input: loopInput = {} } = input;
+        if (!loopId) {
+          return sendError(res, 400, 'Bad Request: loopId is required');
+        }
+        const loop = this._dreamloopRegistry ? this._dreamloopRegistry.get(loopId) : null;
+        result = {
+          loopId,
+          executionMode,
+          status: loop ? 'queued' : 'unknown-loop',
+          loop: loop ? { loop_id: loop.loop_id, title: loop.title } : null,
+          input: loopInput,
+          note: 'DreamLoop execution requires the runtime; this confirms the loop is registered.',
+        };
+        break;
+      }
+
+      case 'export_trapper': {
+        const { artifactId, receiptIds = [] } = input;
+        if (!artifactId) {
+          return sendError(res, 400, 'Bad Request: artifactId is required');
+        }
+        const bundle = await this._artifactPipeline.createTrapperBundle(artifactId, receiptIds);
+        result = bundle;
         break;
       }
 

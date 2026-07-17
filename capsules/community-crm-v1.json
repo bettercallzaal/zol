@@ -120,8 +120,12 @@
       "farcaster.public",
       "circle.member"
     ],
-    "disallowed_wallets": ["*"],
-    "disallowed_signers": ["*"],
+    "disallowed_wallets": [
+      "*"
+    ],
+    "disallowed_signers": [
+      "*"
+    ],
     "disallowed_environments": []
   },
   "resource_limits": {
@@ -139,6 +143,6 @@
   },
   "provenance": {
     "source": "https://github.com/bettercallzaal/zol",
-    "content_hash": "sha256:draft-community-crm-v1"
+    "content_hash": "sha256:4db0f914aec90a58e7f5c346a8dc32a9a41d789afa33225501fdaa485677c987"
   }
 }

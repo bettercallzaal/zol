@@ -3,6 +3,7 @@
   "loop_id": "legacy-capsule-v1",
   "title": "Legacy Capsule Migration",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

@@ -3,6 +3,7 @@
   "loop_id": "field-test-v1",
   "title": "Field Test",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

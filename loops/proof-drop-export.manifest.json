@@ -3,6 +3,7 @@
   "loop_id": "proof-drop-export-v1",
   "title": "Proof Drop Export",
   "version": "1.0.0",
+  "status": "draft",
   "owner": "zolbot",
   "stewards": [
     "zaal"

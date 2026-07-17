@@ -3,6 +3,7 @@
   "loop_id": "conversation-follow-up-v1",
   "title": "Conversation Follow-Up",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

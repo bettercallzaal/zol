@@ -3,6 +3,7 @@
   "loop_id": "budget-and-model-review-v1",
   "title": "Budget and Model Review",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"
