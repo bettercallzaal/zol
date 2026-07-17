@@ -191,7 +191,7 @@ source ~/.zao/private/.env   # DREAMLOOPS_ENABLED=1
 node scripts/dl-dry-run.js
 ```
 
-Expected: 69 loops complete dry-run with no errors.
+Expected: 72 loops complete dry-run with no errors.
 
 ---
 
@@ -219,7 +219,7 @@ ls -lt ~/.zao/private/zol-state/ | head -5
 
 # Check agent gateway (if running)
 curl http://localhost:8089/health
-# Expected: {"status":"ok","capsules":21,"loops":66}
+# Expected: {"status":"ok","capsules":23,"loops":72}
 
 # Check secret scan (should always be clean)
 cd ~/zol-git && npm run dl:secret-scan
@@ -262,8 +262,8 @@ sed -i 's/DREAMLOOPS_ENABLED=1/DREAMLOOPS_ENABLED=0/' ~/.zao/private/.env
 
 | Command | Purpose |
 |---------|---------|
-| `npm run dl:test` | Run all 381 tests |
-| `npm run dl:validate` | Validate 21 capsules + 69 loops |
+| `npm run dl:test` | Run all 442 tests |
+| `npm run dl:validate` | Validate 23 capsules + 72 loops |
 | `npm run dl:secret-scan` | Secret scan (must be clean) |
 | `npm run dl:dry-run` | Dry-run all loops (no state changes) |
 | `npm run dl:dry-run:board` | Dry-run board-triage handlers |

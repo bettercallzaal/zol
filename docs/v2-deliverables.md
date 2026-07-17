@@ -562,7 +562,7 @@ without operator approval.
 
 ## Architecture
 
-ZOL v2 is built on the DreamLoops Engine with 21 capsules, 52 loops, and a layered
+ZOL v2 is built on the DreamLoops Engine with 23 capsules, 72 loops, and a layered
 gateway stack (Agent Gateway on localhost:8089, Model Gateway to OpenRouter/Ollama,
 Tool Gateway with handler registry). See the architecture diagram in v2-deliverables.md.
 
@@ -990,7 +990,7 @@ Verification: `grep DREAMLOOPS_ENABLED ~/.zao/private/.env` returns `DREAMLOOPS_
 source ~/.zao/private/.env
 node scripts/dl-dry-run.js
 ```
-Verification: all 69 loops complete dry-run with no errors. No state changes written.
+Verification: all 72 loops complete dry-run with no errors. No state changes written.
 
 **Step 10 — Run full test suite on Pi**
 ```bash
