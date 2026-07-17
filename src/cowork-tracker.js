@@ -30,6 +30,47 @@ class CoworkTracker {
     return { ok: true, row: resp.data[0] || null };
   }
 
+  // Fetch all open (non-done) tasks, ordered by priority then creation date.
+  // Returns up to `limit` rows (default 100).
+  async listOpen({ limit = 100 } = {}) {
+    const resp = await this._req(
+      'GET',
+      `/rest/v1/tasks?select=id,title,status,priority,category,notes,created_at&status=neq.done&order=priority.asc,created_at.asc&limit=${limit}`
+    );
+    if (!resp.ok) return { ok: false, error: resp.error, rows: [] };
+    return { ok: true, rows: Array.isArray(resp.data) ? resp.data : [] };
+  }
+
+  // Run a lightweight triage pass: return the top-10 unblocked open tasks and
+  // a list of likely-duplicate title pairs (same first 40 chars, different IDs).
+  // Pure analysis — no writes. Caller decides which updates to make.
+  async triage({ topN = 10 } = {}) {
+    const open = await this.listOpen({ limit: 200 });
+    if (!open.ok) return { ok: false, error: open.error };
+
+    const rows = open.rows;
+
+    // Dedup detection: group by normalized title prefix (first 40 chars, lowercase)
+    const byPrefix = {};
+    for (const r of rows) {
+      const key = (r.title || '').toLowerCase().slice(0, 40).trim();
+      if (!byPrefix[key]) byPrefix[key] = [];
+      byPrefix[key].push(r);
+    }
+    const duplicateGroups = Object.values(byPrefix).filter(g => g.length > 1);
+
+    // Top-N: exclude blocked, take first topN by priority order
+    const unblocked = rows.filter(r => r.status !== 'blocked').slice(0, topN);
+
+    return {
+      ok: true,
+      total: rows.length,
+      top: unblocked,
+      duplicateGroups,
+      duplicateCount: duplicateGroups.reduce((n, g) => n + g.length - 1, 0),
+    };
+  }
+
   // ---- write ---------------------------------------------------------------
 
   // Create a new task row and immediately mark it in_progress.

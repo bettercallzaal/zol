@@ -58,6 +58,23 @@ const handlers = {
     if (!fields || typeof fields !== 'object') return { ok: false, error: 'board.task.update: fields object required' };
     return getTracker().updateTask(id, fields);
   },
+
+  // Fetch all open tasks (non-done), ordered by priority.
+  // input: { limit? }
+  // output: { ok, rows, total? }
+  'board.task.list-open': async function({ input }) {
+    const { limit } = input || {};
+    return getTracker().listOpen({ limit });
+  },
+
+  // Run the lightweight triage pass: top-10 unblocked open tasks + duplicate pairs.
+  // Pure analysis — no writes made.
+  // input: { topN? }
+  // output: { ok, total, top, duplicateGroups, duplicateCount }
+  'board.triage.run': async function({ input }) {
+    const { topN } = input || {};
+    return getTracker().triage({ topN });
+  },
 };
 
 module.exports = { handlers };

@@ -14,8 +14,10 @@
   "description": "Nightly cowork-board hygiene: scan all open rows, close shipped items, dedup title-matches, surface the unblocked top-10 by priority, and emit a receipt so Zaal sees an honest board at morning review.",
   "allowed_actions": [
     "board.task.find",
+    "board.task.list-open",
     "board.task.update",
     "board.task.finish",
+    "board.triage.run",
     "receipt.local.write",
     "state.local.read",
     "state.local.write"
@@ -47,21 +49,14 @@
   },
   "steps": [
     {
-      "id": "read-open-rows",
-      "handler": "board.task.find",
-      "permission": "board.task.find",
-      "with": { "title": "" },
+      "id": "run-triage-analysis",
+      "handler": "board.triage.run",
+      "permission": "board.triage.run",
+      "with": { "topN": 10 },
       "retry": { "max_attempts": 2 }
     },
     {
-      "id": "close-shipped-items",
-      "handler": "board.task.finish",
-      "permission": "board.task.finish",
-      "with": {},
-      "retry": { "max_attempts": 2 }
-    },
-    {
-      "id": "dedup-title-matches",
+      "id": "update-duplicate-notes",
       "handler": "board.task.update",
       "permission": "board.task.update",
       "with": {},

@@ -122,7 +122,7 @@ test('CoworkTracker._req: non-200 HTTP status returns ok:false', async () => {
 
 // ---- board handlers --------------------------------------------------------
 
-test('board.task handlers: all six handlers are registered', async () => {
+test('board.task handlers: all eight handlers are registered', async () => {
   const handlers = require('../handlers/index.js');
   const expected = [
     'board.task.create',
@@ -131,6 +131,8 @@ test('board.task handlers: all six handlers are registered', async () => {
     'board.task.block',
     'board.task.find',
     'board.task.update',
+    'board.task.list-open',
+    'board.triage.run',
   ];
   for (const key of expected) {
     assert.ok(typeof handlers[key] === 'function', `${key} must be registered`);
@@ -170,4 +172,77 @@ test('board.task.update handler: missing fields returns ok:false', async () => {
   const result = await handlers['board.task.update']({ input: { id: 'x' } });
   assert.strictEqual(result.ok, false);
   assert.ok(result.error.includes('fields object required'));
+});
+
+// ---- listOpen / triage --------------------------------------------------------
+
+test('CoworkTracker.listOpen: returns ok+rows on success', async () => {
+  const tracker = new CoworkTracker({ baseUrl: 'https://example.supabase.co', apiKey: 'key' });
+  tracker._req = async () => ({
+    ok: true,
+    data: [
+      { id: '1', title: 'Task A', status: 'todo', priority: 'P1' },
+      { id: '2', title: 'Task B', status: 'in_progress', priority: 'P2' },
+    ],
+  });
+
+  const result = await tracker.listOpen();
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.rows.length, 2);
+});
+
+test('CoworkTracker.listOpen: API error returns ok:false with empty rows', async () => {
+  const tracker = new CoworkTracker({ baseUrl: 'https://example.supabase.co', apiKey: 'key' });
+  tracker._req = async () => ({ ok: false, error: 'network error' });
+
+  const result = await tracker.listOpen();
+  assert.strictEqual(result.ok, false);
+  assert.deepStrictEqual(result.rows, []);
+});
+
+test('CoworkTracker.triage: surfaces top-N and detects duplicate titles', async () => {
+  const tracker = new CoworkTracker({ baseUrl: 'https://example.supabase.co', apiKey: 'key' });
+  // Two tasks share the same normalized title prefix → detected as duplicates.
+  // Use a title short enough that both entries map to the same key after slice(0,40).
+  const sharedTitle = 'Fix login bug';
+  const rows = [
+    { id: '1', title: sharedTitle, status: 'todo', priority: 'P1' },
+    { id: '2', title: sharedTitle, status: 'todo', priority: 'P1' },
+    { id: '3', title: 'Upgrade database migration scripts', status: 'todo', priority: 'P2' },
+    { id: '4', title: 'Write unit tests for auth module', status: 'blocked', priority: 'P1' },
+  ];
+  tracker._req = async () => ({ ok: true, data: rows });
+
+  const result = await tracker.triage({ topN: 10 });
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.total, 4);
+  // blocked task excluded from top
+  assert.ok(!result.top.some(r => r.status === 'blocked'), 'blocked tasks should not appear in top');
+  // duplicate detected: first 40 chars of "Fix the login bug on mobile app" match
+  assert.ok(result.duplicateCount > 0, 'should detect at least 1 duplicate pair');
+});
+
+test('CoworkTracker.triage: API error propagates ok:false', async () => {
+  const tracker = new CoworkTracker({ baseUrl: 'https://example.supabase.co', apiKey: 'key' });
+  tracker._req = async () => ({ ok: false, error: 'board down' });
+
+  const result = await tracker.triage();
+  assert.strictEqual(result.ok, false);
+  assert.ok(result.error.includes('board down'));
+});
+
+test('board.triage.run handler: is registered and callable', async () => {
+  const handlers = require('../handlers/index.js');
+  assert.ok(typeof handlers['board.triage.run'] === 'function');
+  // With missing config (no real URL), should return ok:false without throwing
+  const result = await handlers['board.triage.run']({ input: {} });
+  // Either ok:false (no config) or ok:true (if env vars happen to be set)
+  assert.ok(typeof result.ok === 'boolean');
+});
+
+test('board.task.list-open handler: is registered and callable', async () => {
+  const handlers = require('../handlers/index.js');
+  assert.ok(typeof handlers['board.task.list-open'] === 'function');
+  const result = await handlers['board.task.list-open']({ input: {} });
+  assert.ok(typeof result.ok === 'boolean');
 });
