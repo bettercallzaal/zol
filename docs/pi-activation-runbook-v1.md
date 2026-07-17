@@ -55,9 +55,9 @@ npm run dl:test 2>&1 | tail -12
 
 Expected output (last lines):
 ```
-# tests 452
-# suites 52
-# pass 452
+# tests 478
+# suites 69
+# pass 478
 # fail 0
 # duration_ms ...
 ```
@@ -65,7 +65,7 @@ Expected output (last lines):
 If any tests fail:
 - Check `node -v` matches what CI uses (v20.x)
 - Check that `~/.zao/private/` is readable by the running user
-- Do NOT proceed to Phase 3 until all 452 pass
+- Do NOT proceed to Phase 3 until all 478 pass
 
 ---
 
@@ -262,7 +262,7 @@ sed -i 's/DREAMLOOPS_ENABLED=1/DREAMLOOPS_ENABLED=0/' ~/.zao/private/.env
 
 | Command | Purpose |
 |---------|---------|
-| `npm run dl:test` | Run all 452 tests |
+| `npm run dl:test` | Run all 478 tests |
 | `npm run dl:validate` | Validate 23 capsules + 72 loops |
 | `npm run dl:secret-scan` | Secret scan (must be clean) |
 | `npm run dl:dry-run` | Dry-run all loops (no state changes) |

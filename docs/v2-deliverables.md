@@ -1,7 +1,7 @@
 # ZOL Persistent Agent Upgrade v2 — Full Deliverables
 
 **Date:** 2026-07-16 (updated 2026-07-17)
-**Status:** COMPLETE — awaiting operator review and Pi activation (452 tests green, verification gate items 1-10 proven)
+**Status:** COMPLETE — awaiting operator review and Pi activation (478 tests green, verification gate items 1-10 proven)
 **Version:** zol@1.0.0 (package.json)
 
 ---
@@ -22,7 +22,7 @@ PRs in the v2 stack (merge in order):
 - **PR #33** (`ws/v2-route-validation`) — Native `safeParse(jsonSchema, input)` validator (zero deps, mirrors Zod safeParse contract); applied to all body-receiving routes + per-tool MCP inputSchema lookup. 14 unit tests + 4 HTTP-level integration tests. Also: `farcaster.connectivity.check` handler, `cast-readiness-check-v1` loop, `zabal-channel-watch-v1`, `zabal-submissions-watch-v1` DreamLoops.
 - **PR #34** (`ws/v2-sparkz-wins`) — Ports unique content from stale PRs #17 (Sparkz launch-readiness) and #18 (Community Wins Spotter). 8 Sparkz energy-score handlers (read-only Farcaster signals, 0-100 score, launch_now/keep_building/insufficient_data output), community wins spotter handler (draft-only celebration casts, Bonfire deferred). 2 new capsules + 2 new loops. 30 new tests (14 Sparkz + 16 wins spotter).
 - **PR #35** (`ws/v2-durable-execution`) — Fleet durable-execution hardening. `IdempotencyStore` (in-memory + atomic-file, 24h TTL default); ToolGateway `idempotencyKey` option (consequential write-tool dedup without re-executing handler); WorkRouter auto-generated `sideEffectKey` on every packet; `CoworkTracker.claimTask()` + `board.task.claim` handler with conditional Supabase PATCH (`?status=eq.todo`) to prevent shared-clone collisions. 20 new tests. Subtotal: 23 capsules, 72 loops, 442 tests.
-- **PR #36** (`ws/v2-sparkz-launch-rail`) — `launch-rail.decision` handler + legal guardrail. Clanker v4 decision tree: `clanker_native` for fixed ≤7-way splits, `zero_x_splits` for >7 recipients / adjustable / growing splits. `legalNote` field in every response flags 0xSplits-to-contributors vs. "hold-and-earn" Howey risk. Capsule re-sealed after permission update. 10 new tests. **Total: 23 capsules, 72 loops, 452 tests.**
+- **PR #36** (`ws/v2-sparkz-launch-rail`) — `launch-rail.decision` handler + legal guardrail + 27 stub handlers closing the handler/loop manifest gap + handler smoke tests. Clanker v4 decision tree: `clanker_native` for fixed ≤7-way splits, `zero_x_splits` for >7 recipients / adjustable / growing splits. `legalNote` field in every response flags 0xSplits-to-contributors vs. "hold-and-earn" Howey risk. Capsule re-sealed after permission update. 36 new tests total. **Total: 23 capsules, 72 loops, 478 tests. Handler registry: 80 handlers (all 72 loop steps satisfied).**
 
 Supplementary PRs (no merge dependency on main stack):
 - **PR #29** (`ws/v2-runner-gateway-design`) — Heterogeneous Runner Gateway design doc (design-only, no code)
@@ -346,10 +346,10 @@ Coverage:
 ```
 npm run dl:test
 
-tests:  452
-pass:   452
+tests:  478
+pass:   478
 fail:   0
-duration: ~7400 ms
+duration: ~6000 ms
 ```
 
 ---
@@ -997,7 +997,7 @@ Verification: all 72 loops complete dry-run with no errors. No state changes wri
 ```bash
 npm run dl:test
 ```
-Verification: `pass: 452  fail: 0`.
+Verification: `pass: 478  fail: 0`.
 
 **Step 11 — (Optional) Start Agent Gateway**
 ```bash
