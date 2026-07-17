@@ -397,7 +397,7 @@ test('unauthenticated remote gateway request returns 401', async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 8: Trapper export/import round trip preserves allowed data and provenance
+// Test 8: CapsuleRegistry data round trip preserves capsule_id and provenance
 // ---------------------------------------------------------------------------
 
 test('CapsuleRegistry install → get round trip preserves capsule_id and provenance', async () => {
@@ -601,5 +601,91 @@ test('stale lease auto-expiry: expired lease allows a new worker to acquire', as
     );
   } finally {
     rmDir(dir);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Test 12: Trapper export/import round trip preserves bundleType, targetArtifactId,
+//          and sanitized content across a clean store (hardening-pass requirement).
+// ---------------------------------------------------------------------------
+
+test('Trapper export/import round trip preserves bundleType, targetArtifactId, and sanitized content', async () => {
+  const dir1 = makeTmpDir('t12-src');
+  const dir2 = makeTmpDir('t12-import');
+  try {
+    // ── Stage 1: build a source artifact, then bundle it ────────────────────
+    const store1 = await freshStore(dir1);
+    const pipeline1 = new ArtifactPipeline(store1, null);
+
+    const source = await pipeline1.plan({
+      type: 'brief',
+      title: 'Trapper Round-Trip Source',
+      description: 'Real-backend fixture for Trapper export/import round trip',
+      permissions: 'shared',
+    });
+    await pipeline1.build(source.artifactId, { body: 'round-trip fixture', notes: 'test' });
+
+    const bundle = await pipeline1.createTrapperBundle(source.artifactId);
+    assert.equal(bundle.type, 'trapper', 'bundle type must be "trapper"');
+
+    // ── Stage 2: export the bundle ──────────────────────────────────────────
+    const exported = await pipeline1.export(bundle.artifactId);
+    assert.ok(exported, 'export() must return the bundle artifact');
+    assert.ok(exported.content, 'exported bundle must have content');
+    assert.equal(exported.content.bundleType, 'trapper', 'bundleType must be "trapper"');
+    assert.equal(exported.content.targetArtifactId, source.artifactId, 'targetArtifactId must match source');
+
+    // ── Stage 3: import into a fresh environment via HTTP ────────────────────
+    const store2 = await freshStore(dir2);
+    const pipeline2 = new ArtifactPipeline(store2, null);
+    const router2 = new WorkRouter(store2);
+    const journal2 = new ReceiptJournal(store2);
+
+    const gw = new AgentGateway({
+      artifactPipeline: pipeline2,
+      workRouter: router2,
+      receiptJournal: journal2,
+      port: 0,
+      bindAddress: '127.0.0.1',
+    });
+
+    const { port } = await gw.start();
+    try {
+      const resp = await fetch(`http://127.0.0.1:${port}/trappers/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bundle: exported }),
+      });
+
+      assert.equal(resp.status, 200, 'import must return 200');
+      const result = await resp.json();
+      assert.equal(result.ok, true, 'result.ok must be true');
+      assert.ok(result.artifactId, 'result must include artifactId');
+      assert.equal(result.imported, true, 'result.imported must be true');
+
+      // ── Stage 4: verify the imported artifact preserves provenance data ────
+      const imported = await pipeline2.get(result.artifactId);
+      assert.ok(imported, 'imported artifact must be retrievable from the fresh store');
+      assert.equal(imported.type, 'trapper', 'type must be preserved through import');
+      assert.ok(
+        typeof imported.content === 'object' && imported.content !== null,
+        'content must be an object (not a string)'
+      );
+      assert.equal(
+        imported.content.targetArtifactId,
+        source.artifactId,
+        'targetArtifactId must be preserved through the export → import round trip'
+      );
+      assert.equal(
+        imported.content.bundleType,
+        'trapper',
+        'bundleType must be preserved through the export → import round trip'
+      );
+    } finally {
+      await gw.stop();
+    }
+  } finally {
+    rmDir(dir1);
+    rmDir(dir2);
   }
 });
