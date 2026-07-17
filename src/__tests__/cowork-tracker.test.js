@@ -122,11 +122,12 @@ test('CoworkTracker._req: non-200 HTTP status returns ok:false', async () => {
 
 // ---- board handlers --------------------------------------------------------
 
-test('board.task handlers: all eight handlers are registered', async () => {
+test('board.task handlers: all nine handlers are registered', async () => {
   const handlers = require('../handlers/index.js');
   const expected = [
     'board.task.create',
     'board.task.start',
+    'board.task.claim',
     'board.task.finish',
     'board.task.block',
     'board.task.find',
@@ -245,6 +246,57 @@ test('board.task.list-open handler: is registered and callable', async () => {
   assert.ok(typeof handlers['board.task.list-open'] === 'function');
   const result = await handlers['board.task.list-open']({ input: {} });
   assert.ok(typeof result.ok === 'boolean');
+});
+
+// ---- claimWithLease (board task 1163: TTL-based lease + reclaim) -----------------
+
+test('CoworkTracker.claimWithLease: sets leased_until in PATCH body on success', async () => {
+  const tracker = new CoworkTracker({ baseUrl: 'https://example.supabase.co', apiKey: 'key' });
+  let capturedBody;
+  let capturedPath;
+  tracker._req = async (_m, path, body) => {
+    capturedBody = body;
+    capturedPath = path;
+    return { ok: true, data: [{ id: 'task-1', status: 'in_progress', leased_until: body.leased_until }] };
+  };
+  const result = await tracker.claimWithLease('task-1', 'starting', { ttlMs: 60000 });
+  assert.strictEqual(result.ok, true);
+  assert.ok(capturedBody.leased_until, 'leased_until must be set in body');
+  assert.ok(capturedPath.includes('status=eq.todo'), 'primary claim must filter on todo status');
+  const lease = new Date(capturedBody.leased_until).getTime();
+  assert.ok(lease > Date.now(), 'leased_until must be in the future');
+});
+
+test('CoworkTracker.claimWithLease: reclaims expired lease on primary collision', async () => {
+  const tracker = new CoworkTracker({ baseUrl: 'https://example.supabase.co', apiKey: 'key' });
+  let callCount = 0;
+  tracker._req = async (_m, path, _body) => {
+    callCount++;
+    if (callCount === 1) return { ok: true, data: [] };   // primary: collision
+    // second call: reclaim expired lease succeeds
+    assert.ok(path.includes('leased_until=lt.'), 'reclaim must filter on expired lease');
+    return { ok: true, data: [{ id: 'task-1', status: 'in_progress' }] };
+  };
+  const result = await tracker.claimWithLease('task-1', 'reclaiming');
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.reclaimed, true);
+  assert.strictEqual(callCount, 2);
+});
+
+test('CoworkTracker.claimWithLease: returns collision when both primary and reclaim fail', async () => {
+  const tracker = new CoworkTracker({ baseUrl: 'https://example.supabase.co', apiKey: 'key' });
+  tracker._req = async () => ({ ok: true, data: [] }); // both PATCHes return empty → active lease
+  const result = await tracker.claimWithLease('task-1');
+  assert.strictEqual(result.ok, false);
+  assert.strictEqual(result.collision, true);
+});
+
+test('CoworkTracker.claimWithLease: API error on primary returns ok:false without throwing', async () => {
+  const tracker = new CoworkTracker({ baseUrl: 'https://example.supabase.co', apiKey: 'key' });
+  tracker._req = async () => ({ ok: false, error: 'HTTP 400: column leased_until does not exist' });
+  const result = await tracker.claimWithLease('task-1');
+  assert.strictEqual(result.ok, false);
+  assert.ok(result.error.includes('leased_until'), 'error message must be propagated');
 });
 
 // ---- normalizeTask / COWORK_TASK_SCHEMA ----------------------------------------
