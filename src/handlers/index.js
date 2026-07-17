@@ -802,12 +802,14 @@ const handlers = {
 
   'model.completion': async function({ input, state, signal }) {
     validateInput(input, {
-      types: { prompt: 'string', model: 'string', maxTokens: 'number' }
+      types: { prompt: 'string', model: 'string', tier: 'string', maxTokens: 'number' }
     });
-    // PHASE 5: wire to ork() or external LLM API
+    // PHASE 5: wire to ModelGateway.complete(prompt, { tier, model })
+    // tier: 'cheap' (classify/route), 'standard' (default), 'frontier' (build/reason)
     return {
       completed: true,
       text: '',
+      tier: input.tier || 'standard',
       model: input.model || 'stub',
       tokens: 0,
       timestamp: new Date().toISOString()
