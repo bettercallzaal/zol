@@ -44,7 +44,7 @@ If `@farcaster/hub-nodejs` warns about build: that's expected; it's lazy-loaded 
 
 ## Phase 2 — Run the Test Suite on the Pi (15 minutes)
 
-**Goal:** Prove the 497-test suite passes on actual Pi hardware before touching crons.
+**Goal:** Prove the 501-test suite passes on actual Pi hardware before touching crons.
 
 ```bash
 cd ~/zol-git
@@ -55,9 +55,9 @@ npm run dl:test 2>&1 | tail -12
 
 Expected output (last lines):
 ```
-# tests 497
+# tests 501
 # suites 71
-# pass 497
+# pass 501
 # fail 0
 # duration_ms ...
 ```
@@ -65,7 +65,7 @@ Expected output (last lines):
 If any tests fail:
 - Check `node -v` matches what CI uses (v20.x)
 - Check that `~/.zao/private/` is readable by the running user
-- Do NOT proceed to Phase 3 until all 497 pass
+- Do NOT proceed to Phase 3 until all 501 pass
 
 ---
 
@@ -262,7 +262,7 @@ sed -i 's/DREAMLOOPS_ENABLED=1/DREAMLOOPS_ENABLED=0/' ~/.zao/private/.env
 
 | Command | Purpose |
 |---------|---------|
-| `npm run dl:test` | Run all 497 tests |
+| `npm run dl:test` | Run all 501 tests |
 | `npm run dl:validate` | Validate 23 capsules + 72 loops |
 | `npm run dl:secret-scan` | Secret scan (must be clean) |
 | `npm run dl:dry-run` | Dry-run all loops (no state changes) |
