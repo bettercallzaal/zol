@@ -4,7 +4,7 @@
 
 const test  = require('node:test');
 const assert = require('node:assert');
-const { CoworkTracker } = require('../cowork-tracker');
+const { CoworkTracker, normalizeTask, COWORK_TASK_SCHEMA } = require('../cowork-tracker');
 
 // Minimal fetch stub — returns JSON with status 200 by default.
 function makeFetch(response = {}, status = 200) {
@@ -245,4 +245,84 @@ test('board.task.list-open handler: is registered and callable', async () => {
   assert.ok(typeof handlers['board.task.list-open'] === 'function');
   const result = await handlers['board.task.list-open']({ input: {} });
   assert.ok(typeof result.ok === 'boolean');
+});
+
+// ---- normalizeTask / COWORK_TASK_SCHEMA ----------------------------------------
+
+test('COWORK_TASK_SCHEMA: has required fields and vocab entries', () => {
+  assert.ok(Array.isArray(COWORK_TASK_SCHEMA.fields));
+  const required = ['id', 'title', 'owner', 'status', 'priority', 'dueDate', 'brand', 'source', 'notes', 'ts'];
+  for (const f of required) {
+    assert.ok(COWORK_TASK_SCHEMA.fields.includes(f), `schema.fields must include ${f}`);
+  }
+  assert.strictEqual(COWORK_TASK_SCHEMA.statusVocab['todo'], 'open');
+  assert.strictEqual(COWORK_TASK_SCHEMA.statusVocab['in_progress'], 'in-progress');
+  assert.strictEqual(COWORK_TASK_SCHEMA.statusVocab['done'], 'done');
+  assert.strictEqual(COWORK_TASK_SCHEMA.statusVocab['blocked'], 'blocked');
+  assert.strictEqual(COWORK_TASK_SCHEMA.priorityVocab['P1'], 'high');
+  assert.strictEqual(COWORK_TASK_SCHEMA.priorityVocab['P2'], 'med');
+  assert.strictEqual(COWORK_TASK_SCHEMA.priorityVocab['P3'], 'low');
+});
+
+test('normalizeTask: maps Supabase row to standard CoworkTask shape', () => {
+  const row = {
+    id: 'abc-123',
+    title: 'Fix the login bug',
+    owner_id: 'user-456',
+    status: 'in_progress',
+    priority: 'P1',
+    due: '2026-08-01',
+    brands: ['zao'],
+    source: 'human-web',
+    notes: 'See doc 1140',
+    updated_at: '2026-07-17T00:00:00Z',
+    created_at: '2026-07-16T00:00:00Z',
+    category: 'ZAO Devz',
+  };
+
+  const task = normalizeTask(row);
+
+  assert.strictEqual(task.id, 'abc-123');
+  assert.strictEqual(task.title, 'Fix the login bug');
+  assert.strictEqual(task.owner, 'user-456');
+  assert.strictEqual(task.status, 'in-progress');
+  assert.strictEqual(task.priority, 'high');
+  assert.strictEqual(task.dueDate, '2026-08-01');
+  assert.strictEqual(task.brand, 'zao');
+  assert.strictEqual(task.source, 'human-web');
+  assert.strictEqual(task.notes, 'See doc 1140');
+  assert.strictEqual(task.ts, '2026-07-17T00:00:00Z');
+  assert.deepStrictEqual(task._raw, row, '_raw must preserve original row');
+});
+
+test('normalizeTask: handles missing optional fields gracefully', () => {
+  const task = normalizeTask({ id: 'x', title: 'Minimal', status: 'todo', priority: 'P2' });
+  assert.strictEqual(task.status, 'open');
+  assert.strictEqual(task.priority, 'med');
+  assert.strictEqual(task.owner, null);
+  assert.strictEqual(task.dueDate, null);
+  assert.strictEqual(task.brand, null);
+  assert.strictEqual(task.ts, null);
+});
+
+test('normalizeTask: returns null for null/undefined input', () => {
+  assert.strictEqual(normalizeTask(null), null);
+  assert.strictEqual(normalizeTask(undefined), null);
+});
+
+test('CoworkTracker.listOpen: normalize:true returns CoworkTask-shaped rows', async () => {
+  const tracker = new CoworkTracker({ baseUrl: 'https://example.supabase.co', apiKey: 'key' });
+  tracker._req = async () => ({
+    ok: true,
+    data: [
+      { id: '1', title: 'Task A', status: 'todo', priority: 'P1', owner_id: null, due: null, brands: [], source: 'human-web', notes: null, created_at: '2026-07-01', updated_at: null },
+    ],
+  });
+
+  const result = await tracker.listOpen({ normalize: true });
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.rows.length, 1);
+  assert.strictEqual(result.rows[0].status, 'open');
+  assert.strictEqual(result.rows[0].priority, 'high');
+  assert.ok('_raw' in result.rows[0], 'normalized row must have _raw');
 });

@@ -7,6 +7,39 @@
 
 'use strict';
 
+// ---------------------------------------------------------------------------
+// COWORK CONSISTENCY standard: unified CoworkTask shape (Doc 1140 spec).
+// All repos that write to the cowork board use these field names and vocab.
+// ---------------------------------------------------------------------------
+
+const COWORK_TASK_SCHEMA = {
+  // Standard fields (id is the Supabase UUID primary key)
+  fields: ['id', 'title', 'owner', 'status', 'priority', 'dueDate', 'brand', 'source', 'notes', 'ts'],
+  // Normalized status vocab (maps from Supabase column values)
+  statusVocab: { todo: 'open', in_progress: 'in-progress', done: 'done', blocked: 'blocked' },
+  // Normalized priority vocab (maps from P1/P2/P3 to high/med/low)
+  priorityVocab: { P1: 'high', P2: 'med', P3: 'low', P4: 'low' },
+};
+
+// Map a raw Supabase task row to the standard CoworkTask shape.
+// Extra Supabase columns (category, legacy_id, etc.) are preserved in `_raw`.
+function normalizeTask(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    id:       row.id,
+    title:    row.title || '',
+    owner:    row.owner_id || null,
+    status:   COWORK_TASK_SCHEMA.statusVocab[row.status] || row.status || 'open',
+    priority: COWORK_TASK_SCHEMA.priorityVocab[row.priority] || row.priority || null,
+    dueDate:  row.due || row.milestone_date || null,
+    brand:    Array.isArray(row.brands) && row.brands.length ? row.brands[0] : null,
+    source:   row.source || row.legacy_source || null,
+    notes:    row.notes || null,
+    ts:       row.updated_at || row.created_at || null,
+    _raw:     row,
+  };
+}
+
 const DEFAULT_BASE_URL = process.env.COWORK_TRACKER_URL || '';
 const DEFAULT_KEY      = process.env.COWORK_TRACKER_KEY  || '';
 
@@ -32,13 +65,15 @@ class CoworkTracker {
 
   // Fetch all open (non-done) tasks, ordered by priority then creation date.
   // Returns up to `limit` rows (default 100).
-  async listOpen({ limit = 100 } = {}) {
+  // When normalize:true, rows are mapped to the standard CoworkTask shape.
+  async listOpen({ limit = 100, normalize = false } = {}) {
     const resp = await this._req(
       'GET',
-      `/rest/v1/tasks?select=id,title,status,priority,category,notes,created_at&status=neq.done&order=priority.asc,created_at.asc&limit=${limit}`
+      `/rest/v1/tasks?select=id,title,status,priority,category,notes,owner_id,due,brands,source,legacy_source,created_at,updated_at&status=neq.done&order=priority.asc,created_at.asc&limit=${limit}`
     );
     if (!resp.ok) return { ok: false, error: resp.error, rows: [] };
-    return { ok: true, rows: Array.isArray(resp.data) ? resp.data : [] };
+    const raw = Array.isArray(resp.data) ? resp.data : [];
+    return { ok: true, rows: normalize ? raw.map(normalizeTask) : raw };
   }
 
   // Run a lightweight triage pass: return the top-10 unblocked open tasks and
@@ -166,4 +201,4 @@ function getTracker(opts) {
   return _instance;
 }
 
-module.exports = { CoworkTracker, getTracker };
+module.exports = { CoworkTracker, getTracker, normalizeTask, COWORK_TASK_SCHEMA };
