@@ -633,10 +633,11 @@ class AgentGateway {
 
     const { bundle } = parsed.data;
     const plan = await this._artifactPipeline.plan(bundle);
-    const artifact = await this._artifactPipeline.build(plan);
-    const artifactId = artifact.artifactId || artifact.id || crypto.randomUUID();
+    // plan() returns the full artifact object; build() needs the string ID and content.
+    const content = bundle.content !== undefined ? bundle.content : bundle;
+    const artifact = await this._artifactPipeline.build(plan.artifactId, content);
 
-    sendJson(res, 200, { ok: true, artifactId, imported: true });
+    sendJson(res, 200, { ok: true, artifactId: artifact.artifactId, imported: true });
   }
 
   async _handleTrappersExportList(_req, res) {

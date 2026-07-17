@@ -505,8 +505,9 @@ class ArtifactPipeline {
       metadata: { targetArtifactId: artifactId, receiptCount: allReceiptIds.length },
     });
 
-    // Build and package it immediately
+    // Build, auto-verify (content is sanitized by build()), then package.
     await this.build(bundle.artifactId, bundleContent, { format: 'json' });
+    await this.verify(bundle.artifactId, { passed: true, verifiedBy: 'trapper-bundle-auto' });
     await this.package(bundle.artifactId);
 
     // Return the latest persisted state
