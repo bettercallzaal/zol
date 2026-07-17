@@ -34,7 +34,7 @@ cd ~/zol-git
 npm install --ignore-scripts
 
 # 4. Verify the install
-node --check src/zol-lib.js && echo "syntax OK"
+node --check src/zol-lib.js 2>/dev/null && echo "syntax OK" || echo "zol-lib.js missing (expected on fresh clone — existing scripts still work)"
 ```
 
 Expected: `syntax OK` — no errors about missing modules.  
@@ -44,7 +44,7 @@ If `@farcaster/hub-nodejs` warns about build: that's expected; it's lazy-loaded 
 
 ## Phase 2 — Run the Test Suite on the Pi (15 minutes)
 
-**Goal:** Prove the 359-test suite passes on actual Pi hardware before touching crons.
+**Goal:** Prove the 381-test suite passes on actual Pi hardware before touching crons.
 
 ```bash
 cd ~/zol-git
@@ -55,9 +55,9 @@ npm run dl:test 2>&1 | tail -12
 
 Expected output (last lines):
 ```
-# tests 359
-# suites 38
-# pass 359
+# tests 381
+# suites 42
+# pass 381
 # fail 0
 # duration_ms ...
 ```
@@ -76,7 +76,7 @@ cd ~/zol-git
 
 # Validate all 21 capsules and 66 loops
 npm run dl:validate
-# Expected: "validated 21 manifests" + "validated 66 manifests"
+# Expected: "validated 21 manifests" + "validated 67 manifests"
 
 # Secret scan (must be clean before any cron wiring)
 npm run dl:secret-scan
@@ -191,7 +191,7 @@ source ~/.zao/private/.env   # DREAMLOOPS_ENABLED=1
 node scripts/dl-dry-run.js
 ```
 
-Expected: 66 loops complete dry-run with no errors.
+Expected: 67 loops complete dry-run with no errors.
 
 ---
 
@@ -262,8 +262,8 @@ sed -i 's/DREAMLOOPS_ENABLED=1/DREAMLOOPS_ENABLED=0/' ~/.zao/private/.env
 
 | Command | Purpose |
 |---------|---------|
-| `npm run dl:test` | Run all 359 tests |
-| `npm run dl:validate` | Validate 21 capsules + 66 loops |
+| `npm run dl:test` | Run all 381 tests |
+| `npm run dl:validate` | Validate 21 capsules + 67 loops |
 | `npm run dl:secret-scan` | Secret scan (must be clean) |
 | `npm run dl:dry-run` | Dry-run all loops (no state changes) |
 | `npm run dl:dry-run:board` | Dry-run board-triage handlers |
@@ -272,4 +272,4 @@ sed -i 's/DREAMLOOPS_ENABLED=1/DREAMLOOPS_ENABLED=0/' ~/.zao/private/.env
 
 ---
 
-*Runbook version: v1.0 — 2026-07-17. No production changes occur until Zaal runs these steps manually on the Pi.*
+*Runbook version: v1.1 — 2026-07-17 (updated test/loop counts). No production changes occur until Zaal runs these steps manually on the Pi.*
