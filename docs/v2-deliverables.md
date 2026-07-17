@@ -22,7 +22,8 @@ PRs in the v2 stack (merge in order):
 - **PR #33** (`ws/v2-route-validation`) — Native `safeParse(jsonSchema, input)` validator (zero deps, mirrors Zod safeParse contract); applied to all body-receiving routes + per-tool MCP inputSchema lookup. 14 unit tests + 4 HTTP-level integration tests. Also: `farcaster.connectivity.check` handler, `cast-readiness-check-v1` loop, `zabal-channel-watch-v1`, `zabal-submissions-watch-v1` DreamLoops.
 - **PR #34** (`ws/v2-sparkz-wins`) — Ports unique content from stale PRs #17 (Sparkz launch-readiness) and #18 (Community Wins Spotter). 8 Sparkz energy-score handlers (read-only Farcaster signals, 0-100 score, launch_now/keep_building/insufficient_data output), community wins spotter handler (draft-only celebration casts, Bonfire deferred). 2 new capsules + 2 new loops. 30 new tests (14 Sparkz + 16 wins spotter).
 - **PR #35** (`ws/v2-durable-execution`) — Fleet durable-execution hardening. `IdempotencyStore` (in-memory + atomic-file, 24h TTL default); ToolGateway `idempotencyKey` option (consequential write-tool dedup without re-executing handler); WorkRouter auto-generated `sideEffectKey` on every packet; `CoworkTracker.claimTask()` + `board.task.claim` handler with conditional Supabase PATCH (`?status=eq.todo`) to prevent shared-clone collisions. 20 new tests. Subtotal: 23 capsules, 72 loops, 442 tests.
-- **PR #36** (`ws/v2-sparkz-launch-rail`) — `launch-rail.decision` handler (0xSplits-first default per doc 1098) + legal guardrail + 27 stub handlers closing loop manifest gap + model-gateway cheap-model tier routing (doc 1111) + Neynar/Supabase API field-drift guides. Handler smoke tests. 41 new tests total. **Total: 23 capsules, 72 loops, 483 tests. Handler registry: 80 handlers (all 72 loop steps satisfied).**
+- **PR #36** (`ws/v2-sparkz-launch-rail`) — `launch-rail.decision` handler (0xSplits-first default per doc 1098) + legal guardrail + 27 stub handlers closing loop manifest gap + model-gateway cheap-model tier routing (doc 1111) + Neynar/Supabase API field-drift guides. Handler smoke tests. 41 new tests total. Subtotal: 23 capsules, 72 loops, 483 tests. Handler registry: 80 handlers (all 72 loop steps satisfied).
+- **PR #37** (`ws/v2-weekly-scheduler`) — Ports weekly-cadence scheduler (originally PR #24, pre-v2 branch) into the v2 stack. `scripts/dl-run-weekly.js`: weekly counterpart to `dl-run.js`; double-flag-gated (`DREAMLOOPS_ENABLED` + per-loop flag); each loop gets its own dedicated `DreamLoopRunner` instance (no merged handler maps — avoids silent shadowing of identically-named handlers across weekly-curator/artist-spotlight). `deploy/systemd/zol-weekly-loops.service` + `.timer` (Monday 6am UTC). `deploy/migrate.sh` updated. **Total: 23 capsules, 72 loops, 483 tests. PR #24 to be closed after this merges.**
 
 Supplementary PRs (no merge dependency on main stack):
 - **PR #29** (`ws/v2-runner-gateway-design`) — Heterogeneous Runner Gateway design doc (design-only, no code)
@@ -260,10 +261,17 @@ zol-upgrade/
 │   ├── dl-dry-run-board-triage.js            [NEW — PR #31]
 │   ├── dl-dry-run-weekly-curator.js          [NEW — PR #21]
 │   ├── dl-dry-run-artist-spotlight.js        [NEW — PR #22]
+│   ├── dl-run-weekly.js                      [NEW — PR #37, weekly-cadence DreamLoops entry point]
 │   ├── dl-state-migrate.js
 │   ├── dl-state-restore.js
 │   ├── secret-scan.sh
 │   └── (existing scripts unchanged)
+├── deploy/
+│   ├── README.md                             [UPDATED — PR #37, documents dormant weekly unit]
+│   ├── migrate.sh                            [UPDATED — PR #37, adds zol-weekly-loops to enable/start/status/rollback]
+│   └── systemd/
+│       ├── zol-weekly-loops.service          [NEW — PR #37]
+│       └── zol-weekly-loops.timer            [NEW — PR #37, Monday 6am UTC]
 └── docs/
     ├── persistent-agent-delivery.md          (Phase 8 delivery, unchanged)
     ├── pi-activation-runbook-v1.md           [NEW — PR #31]
