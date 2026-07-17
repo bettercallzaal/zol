@@ -7,35 +7,40 @@ const path = require('path');
 const { ork } = require('../zol-lib');
 const { getNeynarMentions, searchNeynarCasts, fetchCalendarICS, getDefaultCalendarUrl, fetchNeynarWithTimeout, getNeynarKey } = require('../integrations');
 
-// Lazy-initialized singletons (created on first real handler call)
-let _stateStore = null;
-let _memoryWeaver = null;
-let _receiptJournal = null;
+// Lazy-initialized singleton Promises — createStateStore is async, so we cache the Promise
+// and let callers await it. This prevents storing an unresolved Promise as the live store.
+let _stateStorePromise = null;
+let _memoryWeaverPromise = null;
+let _receiptJournalPromise = null;
 
 function getStateStore() {
-  if (!_stateStore) {
+  if (!_stateStorePromise) {
     const { createStateStore } = require('../state-adapter');
     const os = require('os');
     const dir = process.env.ZOL_STATE_DIR || (os.homedir() + '/.zao/private/zol-state');
-    _stateStore = createStateStore({ backend: process.env.ZOL_STATE_BACKEND || 'atomic-file', directory: dir });
+    _stateStorePromise = createStateStore({ backend: process.env.ZOL_STATE_BACKEND || 'atomic-file', directory: dir });
   }
-  return _stateStore;
+  return _stateStorePromise; // callers must await
 }
 
 function getMemoryWeaver() {
-  if (!_memoryWeaver) {
-    const { MemoryWeaver } = require('../memory-weaver');
-    _memoryWeaver = new MemoryWeaver(getStateStore());
+  if (!_memoryWeaverPromise) {
+    _memoryWeaverPromise = getStateStore().then(store => {
+      const { MemoryWeaver } = require('../memory-weaver');
+      return new MemoryWeaver(store);
+    });
   }
-  return _memoryWeaver;
+  return _memoryWeaverPromise; // callers must await
 }
 
 function getReceiptJournal() {
-  if (!_receiptJournal) {
-    const { ReceiptJournal } = require('../receipt-journal');
-    _receiptJournal = new ReceiptJournal(getStateStore(), { agentId: 'zolbot' });
+  if (!_receiptJournalPromise) {
+    _receiptJournalPromise = getStateStore().then(store => {
+      const { ReceiptJournal } = require('../receipt-journal');
+      return new ReceiptJournal(store, { agentId: 'zolbot' });
+    });
   }
-  return _receiptJournal;
+  return _receiptJournalPromise; // callers must await
 }
 
 // ModelGateway uses a noop store — getStateStore() is async-initialized (returns a Promise)
@@ -73,10 +78,17 @@ function validateInput(input, schema) {
 const handlers = {
   // ===== STATE HANDLERS =====
   'state.local.read': async function({ input, state, executionMode, signal }) {
-    const timeoutHandle = signal ? () => {
-      throw new Error('state.local.read timed out');
-    } : null;
-    signal?.addEventListener('abort', timeoutHandle, { once: true });
+    // Build an abort-race promise: throwing inside an EventTarget listener becomes an
+    // uncaughtException, so we communicate abort via Promise.race instead.
+    let _removeAbort = () => {};
+    const _abortP = signal
+      ? new Promise((_, rej) => {
+          const h = () => rej(new Error('state.local.read timed out'));
+          if (signal.aborted) { h(); return; }
+          signal.addEventListener('abort', h, { once: true });
+          _removeAbort = () => signal.removeEventListener('abort', h);
+        })
+      : null;
 
     try {
       validateInput(input, {
@@ -84,11 +96,10 @@ const handlers = {
         types: { stateKey: 'string' }
       });
 
-      // PHASE 5: wire to actual state-adapter once integrated
       if (executionMode !== 'mock') {
         try {
-          const store = getStateStore();
-          await store.initialize();
+          const storeP = getStateStore();
+          const store = _abortP ? await Promise.race([storeP, _abortP]) : await storeP;
           if (input.listCheckpoints) {
             const checkpoints = (await store.get('zol-checkpoints')) || [];
             return { checkpoints };
@@ -96,7 +107,7 @@ const handlers = {
           const value = await store.get(input.stateKey);
           return { loaded: true, key: input.stateKey, value, timestamp: new Date().toISOString() };
         } catch (err) {
-          // fall through to mock on error
+          // fall through to mock on error (includes abort)
         }
       }
 
@@ -115,7 +126,7 @@ const handlers = {
         timestamp: new Date().toISOString()
       };
     } finally {
-      if (timeoutHandle && signal) signal.removeEventListener('abort', timeoutHandle);
+      _removeAbort();
     }
   },
 
@@ -135,15 +146,21 @@ const handlers = {
 
     if (executionMode !== 'mock') {
       try {
-        const store = getStateStore();
-        await store.initialize();
+        const store = await getStateStore();
         await store.put(input.stateKey, state);
+        return {
+          written: true,
+          key: input.stateKey,
+          timestamp: new Date().toISOString(),
+          operation: input.operation || 'write'
+        };
       } catch (err) {
-        // fall through to mock return on error
+        // Fail closed — never silently fall through to mock in live mode
+        return { written: false, key: input.stateKey, error: err.message };
       }
     }
 
-    // Mock / fallback return
+    // Mock return
     return {
       written: true,
       key: input.stateKey,
@@ -160,9 +177,9 @@ const handlers = {
 
     if (executionMode !== 'mock') {
       try {
-        const mw = getMemoryWeaver();
+        const mw = await getMemoryWeaver();
         const memories = await mw.read({ type: input.memoryType, tags: input.tags, limit: input.limit });
-        return { memories, count: memories.length };
+        return { memories, count: memories.length, timestamp: new Date().toISOString() };
       } catch (err) {
         // fall through to mock
       }
@@ -193,7 +210,7 @@ const handlers = {
 
     if (executionMode !== 'mock') {
       try {
-        const mw = getMemoryWeaver();
+        const mw = await getMemoryWeaver();
         const entry = await mw.write({
           type: input.memoryType || 'working',
           subtype: input.subtype || null,
@@ -220,7 +237,7 @@ const handlers = {
   'memory.consolidate': async function({ input, state, executionMode, signal }) {
     if (executionMode !== 'mock') {
       try {
-        const mw = getMemoryWeaver();
+        const mw = await getMemoryWeaver();
         const result = await mw.consolidate();
         return { consolidated: true, ...result };
       } catch (err) {
@@ -238,7 +255,7 @@ const handlers = {
   'memory.expire': async function({ input, state, executionMode, signal }) {
     if (executionMode !== 'mock') {
       try {
-        const mw = getMemoryWeaver();
+        const mw = await getMemoryWeaver();
         const result = await mw.expire({ type: input.memoryType });
         return { expired: true, ...result };
       } catch (err) {
@@ -314,7 +331,7 @@ const handlers = {
 
     if (executionMode !== 'mock') {
       try {
-        const journal = getReceiptJournal();
+        const journal = await getReceiptJournal();
         const receipt = await journal.append({
           loopId: input.loopId || 'unknown',
           runId: input.runId || 'unknown',
@@ -344,7 +361,7 @@ const handlers = {
     });
     if (executionMode !== 'mock') {
       try {
-        const journal = getReceiptJournal();
+        const journal = await getReceiptJournal();
         const receipts = await journal.list({
           loopId: input.loopId || undefined,
           limit: typeof input.limit === 'number' ? input.limit : 20,
