@@ -126,15 +126,28 @@ describe('cast.read', () => {
 });
 
 describe('model.completion', () => {
-  test('returns stub completion with empty text', async () => {
+  test('returns completed:true with non-empty text from wired ModelGateway (mock provider)', async () => {
     const result = await handlers['model.completion']({
-      input: { prompt: 'summarize this', model: 'stub' },
+      input: { prompt: 'summarize this', tier: 'standard' },
       state: {},
       signal: null
     });
     assert.ok(result.completed === true);
     assert.strictEqual(typeof result.text, 'string');
+    assert.ok(result.text.length > 0, 'mock provider must return non-empty text');
     assert.ok(result.timestamp);
+    assert.ok(typeof result.provider === 'string', 'provider must be present');
+  });
+
+  test('tier:cheap echoed back in result', async () => {
+    const result = await handlers['model.completion']({
+      input: { prompt: 'classify: music cast?', tier: 'cheap' },
+      state: {},
+      signal: null
+    });
+    assert.ok(result.completed === true);
+    assert.strictEqual(result.tier, 'cheap');
+    assert.ok(typeof result.text === 'string');
   });
 });
 
