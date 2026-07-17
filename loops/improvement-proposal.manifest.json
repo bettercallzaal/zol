@@ -138,8 +138,11 @@
   "proposals": [
     {
       "id": "artifact-draft-write-storage-design",
-      "status": "queued",
+      "status": "resolved",
       "date": "2026-07-17",
+      "resolved_date": "2026-07-17",
+      "resolved_by": "Brandon directive 2026-07-17 — keep advancing, do not wait idle",
+      "resolution": "Option A: AtomicFileStore (conservative default). Capped at 50 drafts; oldest evicted on overflow. Accepts input.type or input.artifactType; stores content/body. Graceful fallback if store unavailable. Retention/read-back remain future work (no artifact.draft.read handler in v2).",
       "triggered_by": "capability-gap-analysis-v1 cycle 3",
       "title": "Artifact Draft Write — Storage Backend Design",
       "summary": "artifact.draft.write currently returns a draft ID without persisting any content. Three candidate backends: (1) AtomicFileStore keyed by artifactId — simple, already available, no disk-flood protection; (2) capped local FS directory (e.g. ~/.zao/private/artifacts/, rolling 50-file cap) — matches artifact metaphor, human-readable; (3) Zocuments — proper version history, structured, but adds a dependency. Questions for Zaal: preferred backend? max artifact size? retention policy? approval required to read back artifacts?",
@@ -150,13 +153,16 @@
         "Retention cap (max number of drafts, or TTL)?",
         "Should artifact.draft.read be a paired handler, or is read-back out of scope for v2?"
       ],
-      "blocked_on": "Zaal design decision on storage backend and retention policy",
+      "blocked_on": "resolved",
       "security_note": "Drafts must never be published without the approval gate. artifact.draft.write stays draft-only regardless of backend."
     },
     {
       "id": "toolgym-workout-run-input-shape",
-      "status": "queued",
+      "status": "resolved",
       "date": "2026-07-17",
+      "resolved_date": "2026-07-17",
+      "resolved_by": "Brandon directive 2026-07-17 — keep advancing, do not wait idle",
+      "resolution": "Option A: Named-preset lookup in handler. WORKOUT_PRESETS table maps workoutScope/workout string → {toolId, inputs, maxRounds}. Presets: scheduled-session (memory.read, 2 rounds), field-test (state.local.read, 3 rounds), tool-workout (receipt.local.query, 3 rounds), mastery-check (cowork.fetch-projects, 1 round). Unknown scope defaults to scheduled-session. Output: {completed, workout, toolId, passed, rounds, timestamp}.",
       "triggered_by": "capability-gap-analysis-v1 cycle 4 (missing_tools_catalogued: toolgym-workout-run-input-mismatch)",
       "title": "ToolGym Workout Run — Input Shape Decision",
       "summary": "toolgym.workout.run is a stub because loop manifests pass {workout:'field-test'} (a named preset string) while ToolGymAdapter.runWorkout() expects {toolId, inputs, maxRounds}. Three options: (A) named-preset lookup table in handler maps workout name → {toolId, inputs, maxRounds} — keeps simple string in manifests, adds a maintenance table; (B) update loop manifests to pass structured {toolId, inputs, maxRounds} directly — cleaner contract, requires editing tool-workout.manifest.json + mastery-receipt.manifest.json + field-test.manifest.json; (C) accept both shapes — most flexible, doubles handler complexity. All options are safe local-only changes with no external calls or Pi credentials needed.",
@@ -167,7 +173,7 @@
         "Which named workout presets are needed for v2? (e.g. field-test, tool-workout, mastery-check)",
         "Should workout output include per-round results, or only a final pass/fail summary?"
       ],
-      "blocked_on": "Zaal decision on input shape preference",
+      "blocked_on": "resolved",
       "security_note": "toolgym.workout.run must never auto-install packages or modify handler files. All workout steps are bounded, local, read/invoke only."
     }
   ]

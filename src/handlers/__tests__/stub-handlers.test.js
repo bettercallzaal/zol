@@ -463,3 +463,121 @@ describe('receipt.local.query', () => {
     assert.ok(typeof result.count === 'number');
   });
 });
+
+describe('cast.draft', () => {
+  test('returns drafted:true with draftId when text provided', async () => {
+    const result = await handlers['cast.draft']({
+      input: { text: 'Celebrating new music from @zaal', channel: 'zabal' },
+      state: {},
+      signal: null
+    });
+    assert.strictEqual(result.drafted, true);
+    assert.ok(result.draftId, 'draftId must be present');
+    assert.ok(result.draftId.startsWith('draft_'), 'draftId must start with draft_');
+    assert.strictEqual(result.text, 'Celebrating new music from @zaal');
+    assert.strictEqual(result.channel, 'zabal');
+    assert.strictEqual(result.status, 'staged');
+    assert.ok(result.timestamp);
+  });
+
+  test('falls back to state.draft when no input.text', async () => {
+    const result = await handlers['cast.draft']({
+      input: {},
+      state: { draft: 'Draft from prior step' },
+      signal: null
+    });
+    assert.strictEqual(result.drafted, true);
+    assert.strictEqual(result.text, 'Draft from prior step');
+    assert.ok(result.draftId);
+  });
+
+  test('returns persisted boolean regardless of store outcome', async () => {
+    const result = await handlers['cast.draft']({
+      input: { text: 'test cast draft' },
+      state: {},
+      signal: null
+    });
+    assert.ok(typeof result.persisted === 'boolean', 'persisted must be boolean');
+  });
+});
+
+describe('artifact.draft.write', () => {
+  test('returns artifactId and draft status for typed artifact', async () => {
+    const result = await handlers['artifact.draft.write']({
+      input: { type: 'celebration_cast', title: 'Weekly wins', content: 'ZAO wins this week' },
+      state: {},
+      signal: null
+    });
+    assert.ok(result.artifactId, 'artifactId must be present');
+    assert.ok(result.artifactId.startsWith('art_'), 'artifactId must start with art_');
+    assert.strictEqual(result.artifactType, 'celebration_cast');
+    assert.strictEqual(result.status, 'draft');
+    assert.strictEqual(result.staged, true);
+    assert.ok(result.timestamp);
+  });
+
+  test('accepts artifactType field (legacy key)', async () => {
+    const result = await handlers['artifact.draft.write']({
+      input: { artifactType: 'research_brief' },
+      state: {},
+      signal: null
+    });
+    assert.strictEqual(result.artifactType, 'research_brief');
+    assert.strictEqual(result.status, 'draft');
+  });
+
+  test('returns persisted boolean regardless of store outcome', async () => {
+    const result = await handlers['artifact.draft.write']({
+      input: { type: 'celebration_cast' },
+      state: {},
+      signal: null
+    });
+    assert.ok(typeof result.persisted === 'boolean', 'persisted must be boolean');
+  });
+});
+
+describe('toolgym.workout.run', () => {
+  test('returns completed workout result for scheduled-session scope', async () => {
+    const result = await handlers['toolgym.workout.run']({
+      input: { workoutScope: 'scheduled-session' },
+      state: {},
+      signal: null
+    });
+    assert.strictEqual(result.completed, true);
+    assert.strictEqual(result.workout, 'scheduled-session');
+    assert.ok(result.toolId, 'toolId must be set from preset');
+    assert.ok(typeof result.passed === 'boolean', 'passed must be boolean');
+    assert.ok(result.timestamp);
+  });
+
+  test('maps field-test scope to correct preset toolId', async () => {
+    const result = await handlers['toolgym.workout.run']({
+      input: { workoutScope: 'field-test' },
+      state: {},
+      signal: null
+    });
+    assert.strictEqual(result.completed, true);
+    assert.strictEqual(result.workout, 'field-test');
+    assert.strictEqual(result.toolId, 'state.local.read');
+  });
+
+  test('falls back to scheduled-session for unknown scope', async () => {
+    const result = await handlers['toolgym.workout.run']({
+      input: { workoutScope: 'unknown-scope' },
+      state: {},
+      signal: null
+    });
+    assert.strictEqual(result.completed, true);
+    assert.strictEqual(result.toolId, 'memory.read');
+  });
+
+  test('result is not stub string', async () => {
+    const result = await handlers['toolgym.workout.run']({
+      input: { workout: 'tool-workout' },
+      state: {},
+      signal: null
+    });
+    assert.notStrictEqual(result.toolId, undefined, 'toolId must be present (not a stub)');
+    assert.ok(typeof result.passed === 'boolean', 'passed must be boolean (not stub string)');
+  });
+});
