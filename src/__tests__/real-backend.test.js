@@ -689,3 +689,63 @@ test('Trapper export/import round trip preserves bundleType, targetArtifactId, a
     rmDir(dir2);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Test 13: run_loop MCP tool returns 'validated' not 'queued' (hardening-pass rule)
+// ---------------------------------------------------------------------------
+
+test('run_loop MCP tool returns status=validated for known loop, unknown-loop for missing', async () => {
+  const dir = makeTmpDir('t13-runloop');
+  try {
+    const store = await freshStore(dir);
+    const pipeline = new ArtifactPipeline(store, null);
+    const router = new WorkRouter(store);
+    const journal = new ReceiptJournal(store, { agentId: 'test-agent' });
+
+    // Stub DreamLoopRegistry with one known loop
+    const stubLoopRegistry = {
+      get: (loopId) => loopId === 'heartbeat'
+        ? { loop_id: 'heartbeat', title: 'Heartbeat' }
+        : null,
+    };
+
+    const gw = new AgentGateway({
+      artifactPipeline: pipeline, workRouter: router, receiptJournal: journal,
+      dreamloopRegistry: stubLoopRegistry,
+      port: 0, bindAddress: '127.0.0.1',
+    });
+    const { port } = await gw.start();
+    try {
+      // Known loop: must return validated, not queued
+      const r1 = await fetch(`http://127.0.0.1:${port}/mcp/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool: 'run_loop', input: { loopId: 'heartbeat' } }),
+      });
+      assert.equal(r1.status, 200);
+      const b1 = await r1.json();
+      assert.equal(b1.ok, true);
+      assert.equal(b1.result.status, 'validated',
+        'run_loop must return validated, not queued — hardening-pass rule');
+      assert.notEqual(b1.result.status, 'queued',
+        'queued is forbidden: nothing was actually enqueued');
+      assert.equal(b1.result.loop.loop_id, 'heartbeat');
+
+      // Unknown loop: must return unknown-loop
+      const r2 = await fetch(`http://127.0.0.1:${port}/mcp/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool: 'run_loop', input: { loopId: 'does-not-exist' } }),
+      });
+      assert.equal(r2.status, 200);
+      const b2 = await r2.json();
+      assert.equal(b2.ok, true);
+      assert.equal(b2.result.status, 'unknown-loop');
+      assert.equal(b2.result.loop, null);
+    } finally {
+      await gw.stop();
+    }
+  } finally {
+    rmDir(dir);
+  }
+});
