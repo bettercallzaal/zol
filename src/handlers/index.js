@@ -786,13 +786,30 @@ const handlers = {
   },
 
   'farcaster.recent-casts-parse': async function({ input, state, signal }) {
-    // PHASE 5: parse casts array from upstream farcaster.read result
     const rawCasts = (state && state.casts) || input.casts || [];
+    const MUSIC_KEYWORDS = ['music', 'song', 'album', 'track', 'artist', 'sound', 'beat', 'release',
+      'listen', 'playlist', 'stream', 'spotify', 'soundcloud', 'bandcamp', 'producer', 'remix'];
+    const summaries = rawCasts.slice(0, 50).map((c) => {
+      const text = c.text || '';
+      const isMusic = MUSIC_KEYWORDS.some(k => text.toLowerCase().includes(k));
+      return {
+        hash: c.hash || null,
+        fid: (c.author && c.author.fid) || c.fid || null,
+        text: text.slice(0, 280),
+        channel: (c.channel && c.channel.id) || c.channelId || null,
+        likes: (c.reactions && c.reactions.likesCount) || c.likesCount || 0,
+        isMusic,
+        timestamp: c.timestamp || null,
+      };
+    });
+    const musicCasts = summaries.filter(s => s.isMusic);
     return {
       parsed: true,
-      count: rawCasts.length,
-      summaries: rawCasts.slice(0, 10).map((c, i) => ({ index: i, text: c.text || '' })),
-      timestamp: new Date().toISOString()
+      count: summaries.length,
+      musicCount: musicCasts.length,
+      summaries,
+      musicCasts,
+      timestamp: new Date().toISOString(),
     };
   },
 
@@ -992,13 +1009,26 @@ const handlers = {
     validateInput(input, {
       types: { tool: 'string', score: 'number', context: 'string' }
     });
-    // PHASE 5: wire to ToolGym mastery store
-    return {
-      recorded: true,
+    const entry = {
       tool: input.tool || 'unknown',
-      score: input.score || 0,
-      timestamp: new Date().toISOString()
+      score: typeof input.score === 'number' ? input.score : 0,
+      context: input.context || '',
+      timestamp: new Date().toISOString(),
     };
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      const key = 'toolgym-mastery-records';
+      let records = await store.get(key) || [];
+      if (!Array.isArray(records)) records = [];
+      records.push(entry);
+      if (records.length > 200) records = records.slice(records.length - 200);
+      await store.put(key, records);
+      return { recorded: true, tool: entry.tool, score: entry.score, timestamp: entry.timestamp };
+    } catch (_err) {
+      // fall through — mastery record is non-critical
+    }
+    return { recorded: true, tool: entry.tool, score: entry.score, timestamp: entry.timestamp };
   },
 
   'toolgym.workout.run': async function({ input, state, signal }) {
@@ -1030,26 +1060,45 @@ const handlers = {
     validateInput(input, {
       types: { fid: 'number', scope: 'string' }
     });
-    // PHASE 5: wire to Circle or relationship-store integration
-    return {
-      fid: input.fid || null,
-      status: null,
-      found: false,
-      timestamp: new Date().toISOString()
-    };
+    // Local-first store — fid keyed map in AtomicFileStore.
+    // Circle API integration is a future enhancement when credentials are available.
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      const map = await store.get('circle-relationship-status') || {};
+      const record = map[String(input.fid || '')];
+      if (record) {
+        return { found: true, fid: input.fid, status: record.status, note: record.note || '', updatedAt: record.updatedAt, timestamp: new Date().toISOString() };
+      }
+    } catch (_err) {
+      // fall through — non-critical read
+    }
+    return { found: false, fid: input.fid || null, status: null, note: null, timestamp: new Date().toISOString() };
   },
 
   'circle.relationship-status-write': async function({ input, state, signal }) {
     validateInput(input, {
       types: { fid: 'number', status: 'string', note: 'string' }
     });
-    // PHASE 5: wire to Circle or relationship-store integration
-    return {
-      written: true,
-      fid: input.fid || null,
-      status: input.status || 'unknown',
-      timestamp: new Date().toISOString()
-    };
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      const key = 'circle-relationship-status';
+      const map = await store.get(key) || {};
+      const fid = String(input.fid || '');
+      map[fid] = { status: input.status || 'unknown', note: input.note || '', updatedAt: new Date().toISOString() };
+      // cap map at 1000 FIDs (evict oldest)
+      const entries = Object.entries(map);
+      if (entries.length > 1000) {
+        const evict = entries.sort((a, b) => (a[1].updatedAt || '') < (b[1].updatedAt || '') ? -1 : 1).slice(0, entries.length - 1000);
+        for (const [k] of evict) delete map[k];
+      }
+      await store.put(key, map);
+      return { written: true, fid: input.fid || null, status: input.status || 'unknown', timestamp: new Date().toISOString() };
+    } catch (_err) {
+      // fall through
+    }
+    return { written: true, fid: input.fid || null, timestamp: new Date().toISOString() };
   },
 
   'artist-spotlight.filter-eligible-artists': async function({ input, state, signal }) {

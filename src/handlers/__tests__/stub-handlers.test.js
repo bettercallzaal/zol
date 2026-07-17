@@ -7,21 +7,18 @@ const handlers = require('../index');
 
 // ===== REGISTRATION CHECKS =====
 describe('stub handler registration', () => {
-  // capability-gap cycles 1-3: model.completion, cowork.fetch-projects, receipt.local.query,
-  //   log.relationship-events-write, log.zol-events-write, checkpoint.local.write, api.read.external wired
+  // capability-gap cycles 1-4: model.completion, cowork.fetch-projects, receipt.local.query,
+  //   log.*, checkpoint.local.write, api.read.external, toolgym.mastery.record,
+  //   circle.relationship-status-read/write, farcaster.recent-casts-parse wired
   const stubNames = [
     'telegram.approval.request',
     'farcaster.activity-read',
     'cast.read',
     'cast.draft',
-    'farcaster.recent-casts-parse',
     'farcaster.dm-send',
     'artifact.draft.write',
     'bonfire.delve-recall',
-    'toolgym.mastery.record',
     'toolgym.workout.run',
-    'circle.relationship-status-read',
-    'circle.relationship-status-write',
     'artist-spotlight.filter-eligible-artists',
     'artist-spotlight.select-one-artist',
     'artist-spotlight.compose-spotlight-draft',
@@ -32,13 +29,13 @@ describe('stub handler registration', () => {
     'warper.trapper.sync',
   ];
 
-  test('all 20 remaining stub handlers are registered', () => {
+  test('all 16 remaining stub handlers are registered', () => {
     for (const name of stubNames) {
       assert.strictEqual(typeof handlers[name], 'function', `${name} must be registered`);
     }
   });
 
-  test('wired handlers are registered (capability-gap cycles 1-3)', () => {
+  test('wired handlers are registered (capability-gap cycles 1-4)', () => {
     const wired = [
       'model.completion',
       'receipt.local.query',
@@ -47,6 +44,10 @@ describe('stub handler registration', () => {
       'log.zol-events-write',
       'checkpoint.local.write',
       'api.read.external',
+      'toolgym.mastery.record',
+      'circle.relationship-status-read',
+      'circle.relationship-status-write',
+      'farcaster.recent-casts-parse',
     ];
     for (const name of wired) {
       assert.strictEqual(typeof handlers[name], 'function', `${name} must be registered`);
@@ -236,9 +237,9 @@ describe('api.read.external', () => {
 });
 
 describe('circle.relationship-status-read', () => {
-  test('returns found:false stub', async () => {
+  test('returns found:false when fid has no stored status', async () => {
     const result = await handlers['circle.relationship-status-read']({
-      input: { fid: 456, scope: 'warm' },
+      input: { fid: 99999999, scope: 'warm' },
       state: {},
       signal: null
     });
@@ -248,7 +249,7 @@ describe('circle.relationship-status-read', () => {
 });
 
 describe('circle.relationship-status-write', () => {
-  test('returns written:true', async () => {
+  test('returns written:true with status echoed', async () => {
     const result = await handlers['circle.relationship-status-write']({
       input: { fid: 456, status: 'warm', note: 'met at fractal' },
       state: {},
@@ -256,6 +257,39 @@ describe('circle.relationship-status-write', () => {
     });
     assert.ok(result.written === true);
     assert.ok(result.timestamp);
+  });
+});
+
+describe('farcaster.recent-casts-parse', () => {
+  test('returns parsed:true with empty casts', async () => {
+    const result = await handlers['farcaster.recent-casts-parse']({
+      input: { casts: [] },
+      state: {},
+      signal: null,
+    });
+    assert.ok(result.parsed === true);
+    assert.ok(Array.isArray(result.summaries));
+    assert.ok(Array.isArray(result.musicCasts));
+    assert.strictEqual(result.count, 0);
+    assert.ok(result.timestamp);
+  });
+
+  test('identifies music-related casts by keyword', async () => {
+    const result = await handlers['farcaster.recent-casts-parse']({
+      input: {
+        casts: [
+          { text: 'Just dropped a new album, check it out', hash: 'a1', fid: 123 },
+          { text: 'Good morning everyone', hash: 'a2', fid: 456 },
+          { text: 'New track produced last night', hash: 'a3', fid: 789 },
+        ]
+      },
+      state: {},
+      signal: null,
+    });
+    assert.strictEqual(result.count, 3);
+    assert.strictEqual(result.musicCount, 2, 'album + track casts should be flagged music');
+    assert.ok(result.musicCasts.some(c => c.hash === 'a1'));
+    assert.ok(result.musicCasts.some(c => c.hash === 'a3'));
   });
 });
 
@@ -331,13 +365,15 @@ describe('warper alias stubs', () => {
 });
 
 describe('toolgym stubs', () => {
-  test('toolgym.mastery.record returns recorded:true', async () => {
+  test('toolgym.mastery.record returns recorded:true with tool and score', async () => {
     const result = await handlers['toolgym.mastery.record']({
       input: { tool: 'farcaster.read', score: 80 },
       state: {},
       signal: null
     });
     assert.ok(result.recorded === true);
+    assert.strictEqual(result.tool, 'farcaster.read');
+    assert.strictEqual(result.score, 80);
     assert.ok(result.timestamp);
   });
 
