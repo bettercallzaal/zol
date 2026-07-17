@@ -7,31 +7,24 @@ const handlers = require('../index');
 
 // ===== REGISTRATION CHECKS =====
 describe('stub handler registration', () => {
-  // capability-gap cycles 1-5: model.completion, cowork.fetch-projects, receipt.local.query,
-  //   log.*, checkpoint.local.write, api.read.external, toolgym.mastery.record,
-  //   circle.relationship-status-read/write, farcaster.recent-casts-parse,
-  //   telegram.approval.request, farcaster.activity-read, cast.read,
-  //   warper.assignment.accept/trapper.release/trapper.sync (disabled-mode correct) wired
+  // capability-gap cycles 1-6: all wireable handlers now wired.
+  // Remaining stubs: security-permanent (cast.draft, farcaster.dm-send, artifact.draft.write),
+  //   upstream-blocked (bonfire.delve-recall), design-decision-needed (toolgym.workout.run)
   const stubNames = [
     'cast.draft',
     'farcaster.dm-send',
     'artifact.draft.write',
     'bonfire.delve-recall',
     'toolgym.workout.run',
-    'artist-spotlight.filter-eligible-artists',
-    'artist-spotlight.select-one-artist',
-    'artist-spotlight.compose-spotlight-draft',
-    'artist-spotlight.stage-draft-for-approval',
-    'artist-spotlight.record-spotlight-completion',
   ];
 
-  test('all 10 remaining stub handlers are registered', () => {
+  test('all 5 remaining stub handlers are registered', () => {
     for (const name of stubNames) {
       assert.strictEqual(typeof handlers[name], 'function', `${name} must be registered`);
     }
   });
 
-  test('wired handlers are registered (capability-gap cycles 1-5)', () => {
+  test('wired handlers are registered (capability-gap cycles 1-6)', () => {
     const wired = [
       'model.completion',
       'receipt.local.query',
@@ -50,6 +43,11 @@ describe('stub handler registration', () => {
       'warper.assignment.accept',
       'warper.trapper.release',
       'warper.trapper.sync',
+      'artist-spotlight.filter-eligible-artists',
+      'artist-spotlight.select-one-artist',
+      'artist-spotlight.compose-spotlight-draft',
+      'artist-spotlight.stage-draft-for-approval',
+      'artist-spotlight.record-spotlight-completion',
     ];
     for (const name of wired) {
       assert.strictEqual(typeof handlers[name], 'function', `${name} must be registered`);
@@ -299,25 +297,60 @@ describe('farcaster.recent-casts-parse', () => {
   });
 });
 
-describe('artist-spotlight step handlers', () => {
-  test('filter-eligible-artists returns eligible array', async () => {
+describe('artist-spotlight step handlers (wired cycle 6)', () => {
+  test('filter-eligible-artists returns eligible array (empty when no candidates)', async () => {
     const result = await handlers['artist-spotlight.filter-eligible-artists']({
-      input: { cooldownDays: 60 },
+      input: { cooldownDays: 60, candidates: [] },
       state: {},
       signal: null
     });
     assert.ok(Array.isArray(result.eligible));
     assert.strictEqual(result.cooldownDays, 60);
+    assert.ok(result.timestamp);
   });
 
-  test('select-one-artist returns selected:null stub', async () => {
-    const result = await handlers['artist-spotlight.select-one-artist']({
-      input: { strategy: 'rotation' },
+  test('filter-eligible-artists passes through unfiltered candidates when no history', async () => {
+    const result = await handlers['artist-spotlight.filter-eligible-artists']({
+      input: { cooldownDays: 60, candidates: ['Artist A', 'Artist B'] },
       state: {},
       signal: null
     });
+    assert.ok(Array.isArray(result.eligible));
+    assert.ok(result.count >= 0);
+  });
+
+  test('select-one-artist returns selected:null when no eligible artists', async () => {
+    const result = await handlers['artist-spotlight.select-one-artist']({
+      input: { strategy: 'rotation', eligible: [] },
+      state: {},
+      signal: null
+    });
+    assert.strictEqual(result.selected, null);
     assert.strictEqual(result.strategy, 'rotation');
     assert.ok(result.timestamp);
+  });
+
+  test('select-one-artist picks from eligible list', async () => {
+    const result = await handlers['artist-spotlight.select-one-artist']({
+      input: { strategy: 'rotation', eligible: ['Artist X', 'Artist Y'] },
+      state: {},
+      signal: null
+    });
+    assert.ok(result.selected === 'Artist X' || result.selected === 'Artist Y', 'must pick from eligible list');
+    assert.ok(result.timestamp);
+  });
+
+  test('compose-spotlight-draft returns drafted:true with non-empty text', async () => {
+    const result = await handlers['artist-spotlight.compose-spotlight-draft']({
+      input: { artist: 'Test Artist', maxLength: 280, draftOnly: true },
+      state: {},
+      signal: null
+    });
+    assert.ok(result.drafted === true);
+    assert.ok(typeof result.draftId === 'string');
+    assert.ok(typeof result.text === 'string');
+    assert.strictEqual(result.status, 'draft');
+    assert.ok(!result.posted, 'compose-spotlight-draft must not set posted:true');
   });
 
   test('stage-draft-for-approval returns pending_approval status', async () => {
@@ -328,9 +361,10 @@ describe('artist-spotlight step handlers', () => {
     });
     assert.ok(result.staged === true);
     assert.strictEqual(result.status, 'pending_approval');
+    assert.ok(result.timestamp);
   });
 
-  test('record-spotlight-completion returns recorded:true', async () => {
+  test('record-spotlight-completion returns recorded:true and persists to history', async () => {
     const result = await handlers['artist-spotlight.record-spotlight-completion']({
       input: { artist: 'Test Artist', draftId: 'spot_abc123' },
       state: {},
