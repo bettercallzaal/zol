@@ -1,7 +1,7 @@
 # ZOL Persistent Agent Upgrade v2 — Full Deliverables
 
 **Date:** 2026-07-16 (updated 2026-07-17)
-**Status:** COMPLETE — awaiting operator review and Pi activation (497 tests green, verification gate items 1-10 proven)
+**Status:** COMPLETE — awaiting operator review and Pi activation (501 tests green, verification gate items 1-10 proven)
 **Version:** zol@1.0.0 (package.json)
 
 ---
@@ -25,7 +25,9 @@ PRs in the v2 stack (merge in order):
 - **PR #36** (`ws/v2-sparkz-launch-rail`) — `launch-rail.decision` handler (0xSplits-first default per doc 1098) + legal guardrail + 27 stub handlers closing loop manifest gap + model-gateway cheap-model tier routing (doc 1111) + Neynar/Supabase API field-drift guides. Handler smoke tests. 41 new tests total. Subtotal: 23 capsules, 72 loops, 483 tests. Handler registry: 80 handlers (all 72 loop steps satisfied).
 - **PR #37** (`ws/v2-weekly-scheduler`) — Ports weekly-cadence scheduler (originally PR #24, pre-v2 branch) into the v2 stack. `scripts/dl-run-weekly.js`: weekly counterpart to `dl-run.js`; double-flag-gated (`DREAMLOOPS_ENABLED` + per-loop flag); each loop gets its own dedicated `DreamLoopRunner` instance (no merged handler maps — avoids silent shadowing of identically-named handlers across weekly-curator/artist-spotlight). `deploy/systemd/zol-weekly-loops.service` + `.timer` (Monday 6am UTC). `deploy/migrate.sh` updated. Subtotal: 23 capsules, 72 loops, 483 tests. PR #24 to be closed after this merges.
 - **PR #38** (`ws/v2-source-citations-test`) — Closes spec coverage gap: "Test … source citations" was listed in the integration test header but never exercised. 9 new tests: Zictionary `citations` field round-trip + immutability + secret redaction (3 in zictionary.test.js); Zocuments `sourceUrl`/`sourceName` storage + secret redaction (2 in zocuments.test.js); new "Source Citations" integration section #15 with 4 end-to-end tests (v2-integration.test.js). Subtotal: 23 capsules, 72 loops, 492 tests (70 suites).
-- **PR #39** (`ws/v2-migrations-test`) — Closes spec coverage gap: "Test … migrations" was claimed in the integration test header but had zero coverage. 4 new tests in new "Migrations" section #17 of v2-integration.test.js: (1) WorkRouter work packet survives to a fresh AtomicFileStore instance (cross-instance durability); (2) MemoryWeaver entry survives to a fresh AtomicFileStore instance; (3) fresh store returns `undefined` for unknown keys without throwing (fresh Pi / nothing-to-migrate scenario); (4) calling `initialize()` twice preserves existing state (idempotent re-initialization). Adds `os`, `path`, `AtomicFileStore` imports. **Total: 23 capsules, 72 loops, 497 tests (71 suites).**
+- **PR #39** (`ws/v2-migrations-test`) — Closes spec coverage gap: "Test … migrations" was claimed in the integration test header but had zero coverage. 4 new tests in new "Migrations" section #17 of v2-integration.test.js: (1) WorkRouter work packet survives to a fresh AtomicFileStore instance (cross-instance durability); (2) MemoryWeaver entry survives to a fresh AtomicFileStore instance; (3) fresh store returns `undefined` for unknown keys without throwing (fresh Pi / nothing-to-migrate scenario); (4) calling `initialize()` twice preserves existing state (idempotent re-initialization). Adds `os`, `path`, `AtomicFileStore` imports. Subtotal: 23 capsules, 72 loops, 496 tests (71 suites).
+- **PR #43** (`ws/v2-trapper-roundtrip-fix`) — Fixes 2 bugs in POST /trappers/import + createTrapperBundle lifecycle; adds Trapper round-trip real-backend test. Bug 1: `_handleTrappersImport` passed artifact object to `build()` instead of string ID (→ "artifact not found: [object Object]"). Bug 2: `createTrapperBundle` called `package()` directly after `build()` bypassing the `built→verified→packaged` lifecycle (→ invalid transition error). Fix: add `verify({passed:true, verifiedBy:'trapper-bundle-auto'})` before `package()`. New test 12 in real-backend.test.js: full export/import round trip on live AgentGateway (port 0) + fresh AtomicFileStore. Also corrects misleading test 8 comment (was "Trapper round trip", is CapsuleRegistry round trip). **Total: 23 capsules, 72 loops, 497 tests (71 suites).**
+- **PR #44** (`ws/v2-task-lease-ttl`) — Implements TTL-based board task lease (board task 1163). `CoworkTracker.claimWithLease()`: sets `leased_until = now + TTL` on claim; on primary collision, retries against tasks where `leased_until < now` (expired lease reclaim). `board.task.claim` handler uses `claimWithLease` when `COWORK_LEASE_ENABLED=1`, falls back to existing conditional-PATCH when disabled. Adds migration note for `leased_until timestamptz` column. Fixes handler count test (8→9, adds `board.task.claim`). 4 new tests. **Total: 23 capsules, 72 loops, 501 tests (71 suites).**
 
 Supplementary PRs (no merge dependency on main stack):
 - **PR #29** (`ws/v2-runner-gateway-design`) — Heterogeneous Runner Gateway design doc (design-only, no code)
@@ -447,8 +449,8 @@ Coverage (src/handlers/__tests__/):
 ```
 npm run dl:test
 
-tests:  497
-pass:   497
+tests:  501
+pass:   501
 fail:   0
 duration: ~6000 ms
 ```
@@ -1098,7 +1100,7 @@ Verification: all 72 loops complete dry-run with no errors. No state changes wri
 ```bash
 npm run dl:test
 ```
-Verification: `pass: 497  fail: 0`.
+Verification: `pass: 501  fail: 0`.
 
 **Step 11 — (Optional) Start Agent Gateway**
 ```bash

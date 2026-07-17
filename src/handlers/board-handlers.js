@@ -12,6 +12,10 @@
 //   completed_at (timestamptz), owner_id (text)
 //   NO 'assignee' column — use owner_id instead.
 //
+// OPTIONAL (TTL lease, board task 1163): add leased_until column to enable
+//   atomic lease-based reclaim (COWORK_LEASE_ENABLED=1 in env):
+//   ALTER TABLE tasks ADD COLUMN leased_until timestamptz;
+//
 // Status vocab: 'todo' | 'in_progress' | 'done' | 'blocked'
 // Priority vocab: 'high' | 'med' | 'low'  (NOT P1/P2/P3 — normalizeTask() converts)
 //
@@ -50,11 +54,17 @@ const handlers = {
   // Atomic conditional claim: todo → in_progress only if task is still todo.
   // Prevents two agent clones from both claiming the same task (shared-clone collision).
   // Returns { ok: false, collision: true } if another agent already claimed it.
+  // With COWORK_LEASE_ENABLED=1: uses TTL-based lease so expired in_progress tasks
+  // can be reclaimed (requires leased_until column — see FIELD DRIFT GUIDE above).
   // input: { id, notes?, fromStatus?, claimerId? }
   'board.task.claim': async function({ input }) {
     const { id, notes, fromStatus, claimerId } = input || {};
     if (!id) return { ok: false, error: 'board.task.claim: id is required' };
-    return getTracker().claimTask(id, notes, { fromStatus, claimerId });
+    const tracker = getTracker();
+    if (process.env.COWORK_LEASE_ENABLED === '1') {
+      return tracker.claimWithLease(id, notes, { fromStatus, claimerId });
+    }
+    return tracker.claimTask(id, notes, { fromStatus, claimerId });
   },
 
   // Mark an existing task done.

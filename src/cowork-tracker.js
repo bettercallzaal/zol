@@ -7,6 +7,9 @@
 
 'use strict';
 
+// Default TTL for board task leases (board task 1163). Requires leased_until column.
+const LEASE_TTL_MS = parseInt(process.env.COWORK_LEASE_TTL_MS || '600000', 10);
+
 // ---------------------------------------------------------------------------
 // COWORK CONSISTENCY standard: unified CoworkTask shape (Doc 1140 spec).
 // All repos that write to the cowork board use these field names and vocab.
@@ -146,6 +149,41 @@ class CoworkTracker {
     const rows = Array.isArray(resp.data) ? resp.data : (resp.data ? [resp.data] : []);
     if (rows.length === 0) return { ok: false, collision: true };
     return { ok: true, row: rows[0] };
+  }
+
+  // TTL-based claim: sets leased_until so a crashed agent's lease expires and can be reclaimed.
+  // Requires Supabase migration: ALTER TABLE tasks ADD COLUMN leased_until timestamptz;
+  // Enable with COWORK_LEASE_ENABLED=1. Falls back to { ok: false, collision: true } if
+  // the Supabase column is absent (the 400 from the primary PATCH short-circuits cleanly).
+  // On primary collision, retries against rows where leased_until < now (expired lease).
+  async claimWithLease(id, notes, { fromStatus = 'todo', claimerId, ttlMs = LEASE_TTL_MS } = {}) {
+    const leasedUntil = new Date(Date.now() + ttlMs).toISOString();
+    const body = { status: 'in_progress', leased_until: leasedUntil, notes: notes || undefined };
+    if (claimerId) body.claimer = claimerId;
+    const resp = await this._req(
+      'PATCH',
+      `/rest/v1/tasks?id=eq.${encodeURIComponent(id)}&status=eq.${encodeURIComponent(fromStatus)}`,
+      body,
+      { prefer: 'return=representation' }
+    );
+    if (!resp.ok) return { ok: false, error: resp.error };
+    const rows = Array.isArray(resp.data) ? resp.data : (resp.data ? [resp.data] : []);
+    if (rows.length > 0) return { ok: true, row: rows[0] };
+    // Primary claim missed — try reclaiming an expired in_progress lease.
+    const now = new Date().toISOString();
+    const newLease = new Date(Date.now() + ttlMs).toISOString();
+    const reclaimBody = { status: 'in_progress', leased_until: newLease, notes: notes || undefined };
+    if (claimerId) reclaimBody.claimer = claimerId;
+    const recResp = await this._req(
+      'PATCH',
+      `/rest/v1/tasks?id=eq.${encodeURIComponent(id)}&status=eq.in_progress&leased_until=lt.${encodeURIComponent(now)}`,
+      reclaimBody,
+      { prefer: 'return=representation' }
+    );
+    if (!recResp.ok) return { ok: false, collision: true };
+    const recRows = Array.isArray(recResp.data) ? recResp.data : (recResp.data ? [recResp.data] : []);
+    if (recRows.length > 0) return { ok: true, row: recRows[0], reclaimed: true };
+    return { ok: false, collision: true };
   }
 
   // Transition to done and record the PR / doc link in notes.
