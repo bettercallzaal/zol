@@ -710,6 +710,12 @@ const { handlers: warperKeeperHandlers } = require('./warper-keeper-handlers');
 // Board integration handlers (board.task.* — always available, fire-and-forget safe)
 const { handlers: boardHandlers } = require('./board-handlers');
 
+// Sparkz launch-readiness handlers (energy score, Farcaster signal readers — read-only)
+const { handlers: sparkzHandlers } = require('./sparkz-launch-readiness');
+
+// Community wins spotter handler (draft-only celebration casts from local receipts)
+const { handlers: winsSpotterHandlers } = require('./wins-spotter');
+
 // Merge all handlers
 const allHandlers = {
   ...handlers,
@@ -717,6 +723,8 @@ const allHandlers = {
   ...radarHandlers,
   ...warperKeeperHandlers,
   ...boardHandlers,
+  ...sparkzHandlers,
+  ...winsSpotterHandlers,
 };
 
 // Export all handlers
