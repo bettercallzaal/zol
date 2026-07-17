@@ -193,5 +193,58 @@
       "pr": "ws/v2-capability-gap-cycle2",
       "test_delta": "+3 tests (512 total)"
     }
+  },
+  "gap_report_cycle3": {
+    "cycle": 3,
+    "date": "2026-07-17",
+    "work_packets_scanned": "25 open PRs (#24, #26-#49); 512/512 tests passing; 24 stub handlers after cycle 2",
+    "failure_patterns_identified": [
+      {
+        "id": "log-handlers-stub",
+        "severity": "low",
+        "description": "log.relationship-events-write and log.zol-events-write returned mock shapes. Events not persisted to state store despite AtomicFileStore being available.",
+        "affected_loops": ["relationship-lifecycle-update", "heartbeat-v1", "morning-brief-v1"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle3",
+        "note": "Uses createStateStore() per call. Degrades gracefully on init failure (non-critical path)."
+      },
+      {
+        "id": "checkpoint-local-write-stub",
+        "severity": "low",
+        "description": "checkpoint.local.write returned mock shape without persisting. AtomicFileStore available.",
+        "affected_loops": ["heartbeat-v1", "relationship-lifecycle-update"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle3"
+      },
+      {
+        "id": "api-read-external-stub",
+        "severity": "medium",
+        "description": "api.read.external always returned {data:null} stub. zabal-submissions-watch-v1 received no submission data. Only known URL: https://zabalgamez.com/api/submissions.",
+        "affected_loops": ["zabal-submissions-watch-v1"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle3",
+        "note": "Conservative allowlist: api.neynar.com, hub-api.neynar.com, zabalgamez.com. New origins require PR review."
+      }
+    ],
+    "missing_tools_catalogued": [
+      {
+        "id": "artifact-draft-write-persistence",
+        "description": "artifact.draft.write returns a draft ID but does not persist the draft content anywhere. Requires a design decision on storage location, format, versioning, and disk-flood protection.",
+        "actionable": false,
+        "blocked_on": "Design decision: artifact storage backend (local FS, S3, AtomicFileStore). Formal improvement-proposal needed."
+      }
+    ],
+    "improvement_proposal": {
+      "id": "wire-log-checkpoint-api-read",
+      "title": "Wire log.*, checkpoint.local.write, api.read.external (Phase 5, cycle 3)",
+      "status": "implemented",
+      "pr": "ws/v2-capability-gap-cycle3",
+      "test_delta": "+1 test (513 total)",
+      "stubs_wired": 4,
+      "stubs_remaining": 20
+    }
   }
 }

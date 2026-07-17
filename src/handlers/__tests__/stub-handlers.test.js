@@ -7,7 +7,8 @@ const handlers = require('../index');
 
 // ===== REGISTRATION CHECKS =====
 describe('stub handler registration', () => {
-  // cowork.fetch-projects and model.completion wired to real implementations (capability-gap cycles 1-2)
+  // capability-gap cycles 1-3: model.completion, cowork.fetch-projects, receipt.local.query,
+  //   log.relationship-events-write, log.zol-events-write, checkpoint.local.write, api.read.external wired
   const stubNames = [
     'telegram.approval.request',
     'farcaster.activity-read',
@@ -15,11 +16,7 @@ describe('stub handler registration', () => {
     'cast.draft',
     'farcaster.recent-casts-parse',
     'farcaster.dm-send',
-    'log.relationship-events-write',
-    'log.zol-events-write',
-    'checkpoint.local.write',
     'artifact.draft.write',
-    'api.read.external',
     'bonfire.delve-recall',
     'toolgym.mastery.record',
     'toolgym.workout.run',
@@ -35,15 +32,25 @@ describe('stub handler registration', () => {
     'warper.trapper.sync',
   ];
 
-  test('all 24 remaining stub handlers are registered', () => {
+  test('all 20 remaining stub handlers are registered', () => {
     for (const name of stubNames) {
       assert.strictEqual(typeof handlers[name], 'function', `${name} must be registered`);
     }
   });
 
-  test('receipt.local.query and cowork.fetch-projects are registered as wired handlers', () => {
-    assert.strictEqual(typeof handlers['receipt.local.query'], 'function');
-    assert.strictEqual(typeof handlers['cowork.fetch-projects'], 'function');
+  test('wired handlers are registered (capability-gap cycles 1-3)', () => {
+    const wired = [
+      'model.completion',
+      'receipt.local.query',
+      'cowork.fetch-projects',
+      'log.relationship-events-write',
+      'log.zol-events-write',
+      'checkpoint.local.write',
+      'api.read.external',
+    ];
+    for (const name of wired) {
+      assert.strictEqual(typeof handlers[name], 'function', `${name} must be registered`);
+    }
   });
 });
 
@@ -206,14 +213,25 @@ describe('bonfire.delve-recall', () => {
 });
 
 describe('api.read.external', () => {
-  test('returns stub read with url', async () => {
+  test('non-allowlisted URL returns read:false with allowlist error', async () => {
     const result = await handlers['api.read.external']({
       input: { url: 'https://example.com/api', scope: 'zabal-submissions' },
       state: {},
       signal: null
     });
-    assert.ok(result.read === true);
+    assert.strictEqual(result.read, false);
+    assert.ok(result.error && result.error.includes('allowlist'), 'error must mention allowlist');
     assert.ok(result.timestamp);
+  });
+
+  test('allowlisted URL result has boolean read and timestamp (network may fail gracefully)', async () => {
+    const result = await handlers['api.read.external']({
+      input: { url: 'https://zabalgamez.com/api/submissions', method: 'GET', scope: 'zabal-submissions', timeout_ms: 5000 },
+      state: {},
+      signal: null
+    });
+    assert.ok(typeof result.read === 'boolean', 'read must be boolean');
+    assert.ok(result.timestamp, 'timestamp must be present');
   });
 });
 
