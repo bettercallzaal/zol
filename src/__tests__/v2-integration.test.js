@@ -15,11 +15,14 @@ const { describe, test, before } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
 const http = require('node:http');
+const os = require('os');
+const path = require('path');
 
 // ---------------------------------------------------------------------------
 // Module imports
 // ---------------------------------------------------------------------------
 
+const { AtomicFileStore } = require('../state-adapter');
 const { CapsuleRegistry } = require('../capsule-registry');
 const { DreamLoopRegistry } = require('../dreamloop-registry');
 const { ReceiptJournal } = require('../receipt-journal');
@@ -1331,5 +1334,90 @@ describe('One-Reply-Per-Social-Thread', () => {
       'Updated reply for thread xyz-001',
       'latest content must be preserved'
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 17. Migrations
+// ---------------------------------------------------------------------------
+
+describe('Migrations', () => {
+  function makeTempDir(label) {
+    return path.join(os.tmpdir(), `zol-migrate-${label}-${crypto.randomUUID()}`);
+  }
+
+  test('WorkRouter data survives to a fresh instance backed by the real AtomicFileStore', async () => {
+    const dir = makeTempDir('wr');
+    const store1 = new AtomicFileStore({ directory: dir });
+    await store1.initialize();
+
+    const router1 = new WorkRouter(store1);
+    const packet = await router1.createPacket({
+      title: 'Migrate Me',
+      description: 'Work packet written before simulated restart',
+      type: 'research',
+      requestedBy: 'zaal',
+    });
+
+    // Simulate process restart: new store instance pointing at the same directory
+    const store2 = new AtomicFileStore({ directory: dir });
+    const router2 = new WorkRouter(store2);
+
+    const recovered = await router2.get(packet.packetId);
+    assert.ok(recovered, 'work packet must be recoverable from a new store instance');
+    assert.equal(recovered.packetId, packet.packetId, 'packetId must be preserved across instances');
+    assert.equal(recovered.title, 'Migrate Me', 'title must survive the cross-instance round-trip');
+  });
+
+  test('MemoryWeaver entry survives to a fresh instance backed by the real AtomicFileStore', async () => {
+    const dir = makeTempDir('mw');
+    const store1 = new AtomicFileStore({ directory: dir });
+    await store1.initialize();
+
+    const weaver1 = new MemoryWeaver(store1);
+    await weaver1.write({
+      type: 'episodic',
+      content: 'ZOL v2 launched on the Pi',
+      tags: ['launch', 'milestone'],
+      dedupeKey: 'launch-2026',
+      provenance: { sourceType: 'handler', confidence: 1.0 },
+      freshness: {},
+      contradictions: [],
+      visibility: 'private',
+    });
+
+    // Simulate process restart
+    const store2 = new AtomicFileStore({ directory: dir });
+    const weaver2 = new MemoryWeaver(store2);
+
+    const memories = await weaver2.read({ type: 'episodic' });
+    assert.ok(memories.length > 0, 'memory must survive to fresh store instance');
+    assert.equal(memories[0].content, 'ZOL v2 launched on the Pi', 'memory content must be intact');
+  });
+
+  test('fresh AtomicFileStore (nothing to migrate) returns undefined for unknown keys without throwing', async () => {
+    const dir = makeTempDir('fresh');
+    const store = new AtomicFileStore({ directory: dir });
+
+    const value = await store.get('nonexistent-state-key');
+    assert.equal(value, undefined, 'get() on fresh store must return undefined, not throw');
+
+    const keys = await store.list();
+    assert.deepEqual(keys, [], 'list() on fresh store must return empty array');
+  });
+
+  test('re-initialization is idempotent — calling initialize() twice preserves existing state', async () => {
+    const dir = makeTempDir('idem');
+    const store = new AtomicFileStore({ directory: dir });
+    await store.initialize();
+    await store.put('restart-check', { marker: 'pre-restart', value: 42 });
+
+    // Simulate re-initialization (as happens on restart or re-import)
+    await store.initialize();
+
+    const recovered = await store.get('restart-check');
+    assert.ok(recovered, 'data must still exist after re-initialization');
+    assert.equal(recovered.marker, 'pre-restart', 'marker must be unchanged');
+    assert.equal(recovered.value, 42, 'numeric value must be unchanged');
   });
 });
