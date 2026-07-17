@@ -1,0 +1,126 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "checkpoint-work-v1",
+  "title": "Checkpoint Work",
+  "version": "1.0.0",
+  "owner": "zolbot",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "during long-running work tasks",
+  "inputs": [
+    "work packet",
+    "current task state"
+  ],
+  "context_sources": [
+    "local state",
+    "checkpoint store"
+  ],
+  "allowed_actions": [
+    "checkpoint.local.read",
+    "checkpoint.local.write",
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "work packet readable",
+    "checkpoint writable"
+  ],
+  "evidence_outputs": [
+    "work-packet-id",
+    "checkpoint-id",
+    "checkpoint-timestamp"
+  ],
+  "receipt_outputs": [
+    "checkpoint-work receipt"
+  ],
+  "knowledge_state_outputs": [
+    "checkpoint written"
+  ],
+  "execution_trace_outputs": [
+    "checkpoint-work execution trace"
+  ],
+  "memory_routes": [
+    "checkpoint in local checkpoint store"
+  ],
+  "cooldown": "300s",
+  "failure_modes": [
+    "budget exceeded",
+    "timeout",
+    "state corruption",
+    "handler error"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-16",
+  "limits": {
+    "max_wall_time_ms": 60000,
+    "max_steps": 6,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "read-packet",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {
+        "stateKey": "zol-work-packet"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "write-checkpoint",
+      "handler": "checkpoint.local.write",
+      "permission": "checkpoint.local.write",
+      "with": {
+        "checkpointType": "work-task"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-receipt",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {
+        "receiptType": "checkpoint-work"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "work_packet_active",
+    "checkpoint_interval_reached"
+  ],
+  "exit_conditions": [
+    "checkpoint_written",
+    "checkpoint_receipt_recorded"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
+  ]
+}

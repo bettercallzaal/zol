@@ -10,6 +10,8 @@
     "daily": "node scripts/zol-daily.js",
     "dashboard": "node scripts/dashboard.js",
     "dl:test": "node --test vendor/dreamloops/runtime/tests/*.test.js src/__tests__/*.test.js src/handlers/__tests__/*.test.js",
+    "v2:test": "node --test src/__tests__/capsule-registry.test.js src/__tests__/dreamloop-registry.test.js src/__tests__/receipt-journal.test.js src/__tests__/memory-weaver.test.js src/__tests__/work-router.test.js src/__tests__/model-gateway.test.js src/__tests__/tool-gateway.test.js",
+    "v2:check": "node --check src/capsule-registry.js src/dreamloop-registry.js src/dreamloop-registry.js src/memory-weaver.js src/model-gateway.js src/receipt-journal.js src/tool-gateway.js src/work-router.js",
     "dl:validate": "node vendor/dreamloops/cli/src/cli.js validate-all capsules/ loops/",
     "dl:secret-scan": "bash scripts/secret-scan.sh",
     "dl:state-migrate": "node scripts/dl-state-migrate.js",

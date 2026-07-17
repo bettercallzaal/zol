@@ -1,0 +1,109 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "open-trapper-v1",
+  "title": "Open Trapper",
+  "version": "1.0.0",
+  "owner": "zolbot",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "when a new Trapper assignment arrives or operator initiates a new bounded work contract",
+  "cooldown": "60s",
+  "description": "Open a new Trapper work contract: create the work packet, record the assignment, set initial checkpoint, and emit open receipt.",
+  "allowed_actions": [
+    "inbox.read",
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "failure_modes": [
+    "budget exceeded",
+    "timeout",
+    "state corruption",
+    "handler error"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-16",
+  "limits": {
+    "max_wall_time_ms": 60000,
+    "max_steps": 6,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "receive-assignment",
+      "handler": "inbox.read",
+      "permission": "inbox.read",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "create-work-packet",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-assignment",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "set-checkpoint",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "emit-open-receipt",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "trapper_assignment_received",
+    "work_packet_creatable"
+  ],
+  "exit_conditions": [
+    "trapper_open_receipt_written",
+    "assignment_contract_recorded"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
+  ]
+}

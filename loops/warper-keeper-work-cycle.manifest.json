@@ -3,7 +3,6 @@
   "loop_id": "warper-keeper-work-cycle-v1",
   "title": "Warper Keeper Work Cycle",
   "version": "1.0.0",
-  "status": "draft",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"
@@ -133,5 +132,23 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "specification-only",
+  "entry_conditions": [
+    "warper_assignment_accepted",
+    "keeper_context_loaded"
+  ],
+  "exit_conditions": [
+    "work_cycle_complete",
+    "cycle_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

@@ -34,7 +34,28 @@
       "self.modify.live",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "warper-assignment-accept",
+      "trapper-open",
+      "trapper-sync",
+      "trapper-close"
+    ],
+    "allowed_tools": [
+      "state.read",
+      "state.write",
+      "receipt.write",
+      "artifact.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "receipt.local",
+      "artifact.local",
+      "warper.assignment"
+    ],
+    "disallowed_wallets": ["*"],
+    "disallowed_signers": ["*"],
+    "disallowed_environments": ["production"]
   },
   "resource_limits": {
     "max_wall_time_ms": 600000,

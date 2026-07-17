@@ -1,0 +1,144 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "release-assignment-v1",
+  "title": "Release Assignment",
+  "version": "1.0.0",
+  "owner": "zolbot",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "after Warper Keeper Trapper delivered and receipted",
+  "inputs": [
+    "completed trapper reference",
+    "delivery receipt",
+    "assignment closure metadata"
+  ],
+  "context_sources": [
+    "trapper state store",
+    "delivery receipt store",
+    "Warper assignment record"
+  ],
+  "allowed_actions": [
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write",
+    "warper.trapper.release"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "trapper delivered and receipted",
+    "assignment release not already triggered",
+    "state closed successfully",
+    "release confirmation received"
+  ],
+  "evidence_outputs": [
+    "release confirmation",
+    "closed assignment reference",
+    "release timestamp"
+  ],
+  "receipt_outputs": [
+    "release-assignment receipt"
+  ],
+  "knowledge_state_outputs": [
+    "Warper assignment released",
+    "trapper state closed"
+  ],
+  "execution_trace_outputs": [
+    "release-assignment execution trace"
+  ],
+  "memory_routes": [
+    "episodic: assignment release events",
+    "durable: closed assignments log"
+  ],
+  "cooldown": "300s",
+  "failure_modes": [
+    "budget exceeded",
+    "timeout",
+    "state corruption",
+    "handler error"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-16",
+  "limits": {
+    "max_wall_time_ms": 60000,
+    "max_steps": 6,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "read-trapper",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {
+        "stateKey": "trapper-state",
+        "requireStatus": "delivered"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "release",
+      "handler": "warper.trapper.release",
+      "permission": "warper.trapper.release",
+      "with": {
+        "releaseTarget": "warper-keeper"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "close-state",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {
+        "stateKey": "trapper-state",
+        "updateStatus": "released"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-receipt",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {
+        "receiptType": "release-assignment"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "release_candidate_ready",
+    "assignment_spec_defined"
+  ],
+  "exit_conditions": [
+    "release_assigned",
+    "assignment_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
+  ]
+}

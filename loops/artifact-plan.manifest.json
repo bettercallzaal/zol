@@ -1,0 +1,145 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "artifact-plan-v1",
+  "title": "Artifact Plan",
+  "version": "1.0.0",
+  "owner": "zolbot",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "after work packet created with type=artifact",
+  "inputs": [
+    "work packet (type=artifact)",
+    "memory context for artifact scope",
+    "budget snapshot"
+  ],
+  "context_sources": [
+    "work packet state store",
+    "memory store (artifact context)",
+    "budget ledger"
+  ],
+  "allowed_actions": [
+    "artifact.local.write",
+    "budget.read",
+    "memory.read",
+    "receipt.local.write",
+    "state.local.read"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "work packet exists and type=artifact",
+    "memory context readable",
+    "artifact plan not duplicate",
+    "budget within limits"
+  ],
+  "evidence_outputs": [
+    "artifact plan draft",
+    "work packet reference",
+    "memory context snapshot"
+  ],
+  "receipt_outputs": [
+    "artifact-plan receipt"
+  ],
+  "knowledge_state_outputs": [
+    "artifact plan drafted",
+    "work packet linked to plan"
+  ],
+  "execution_trace_outputs": [
+    "artifact-plan execution trace"
+  ],
+  "memory_routes": [
+    "episodic: artifact planning decisions",
+    "durable: artifact plans archive"
+  ],
+  "cooldown": "300s",
+  "failure_modes": [
+    "budget exceeded",
+    "timeout",
+    "state corruption",
+    "handler error"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-16",
+  "limits": {
+    "max_wall_time_ms": 60000,
+    "max_steps": 6,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "read-work-packet",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {
+        "stateKey": "work-packet",
+        "filterType": "artifact"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "read-memory",
+      "handler": "memory.read",
+      "permission": "memory.read",
+      "with": {
+        "scope": "artifact-context"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "plan-artifact",
+      "handler": "artifact.local.write",
+      "permission": "artifact.local.write",
+      "with": {
+        "artifactType": "artifact-plan",
+        "draftOnly": true
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-receipt",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {
+        "receiptType": "artifact-plan"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "work_packet_active",
+    "artifact_spec_defined"
+  ],
+  "exit_conditions": [
+    "artifact_plan_written",
+    "plan_receipt_logged"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
+  ]
+}

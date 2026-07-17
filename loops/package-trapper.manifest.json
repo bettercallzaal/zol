@@ -1,0 +1,144 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "package-trapper-v1",
+  "title": "Package Trapper",
+  "version": "1.0.0",
+  "owner": "zolbot",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "after artifact verified and ready for delivery",
+  "inputs": [
+    "verified artifact reference",
+    "delivery target metadata",
+    "package manifest template"
+  ],
+  "context_sources": [
+    "artifact state store",
+    "delivery configuration",
+    "package manifest store"
+  ],
+  "allowed_actions": [
+    "artifact.local.write",
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "artifact verified and readable",
+    "package does not already exist",
+    "manifest written successfully",
+    "state updated with package reference"
+  ],
+  "evidence_outputs": [
+    "trapper package artifact",
+    "package manifest",
+    "delivery-ready timestamp"
+  ],
+  "receipt_outputs": [
+    "package-trapper receipt"
+  ],
+  "knowledge_state_outputs": [
+    "artifact packaged for delivery",
+    "package manifest recorded in state"
+  ],
+  "execution_trace_outputs": [
+    "package-trapper execution trace"
+  ],
+  "memory_routes": [
+    "episodic: packaging decisions",
+    "durable: packaged artifacts log"
+  ],
+  "cooldown": "300s",
+  "failure_modes": [
+    "budget exceeded",
+    "timeout",
+    "state corruption",
+    "handler error"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-16",
+  "limits": {
+    "max_wall_time_ms": 60000,
+    "max_steps": 6,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "read-artifact",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {
+        "stateKey": "verified-artifact"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "package-trapper",
+      "handler": "artifact.local.write",
+      "permission": "artifact.local.write",
+      "with": {
+        "artifactType": "trapper-package",
+        "draftOnly": false
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "write-manifest",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {
+        "stateKey": "package-manifest",
+        "linkedArtifact": "trapper-package"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-receipt",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {
+        "receiptType": "package-trapper"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "trapper_work_complete",
+    "package_spec_defined"
+  ],
+  "exit_conditions": [
+    "package_artifact_written",
+    "package_receipt_recorded"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
+  ]
+}

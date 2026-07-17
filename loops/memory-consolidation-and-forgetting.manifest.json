@@ -3,7 +3,6 @@
   "loop_id": "memory-consolidation-and-forgetting-v1",
   "title": "Memory Consolidation and Forgetting",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"
@@ -134,5 +133,24 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "schedule:periodic",
+    "memory_above_threshold"
+  ],
+  "exit_conditions": [
+    "memory_consolidated",
+    "stale_entries_pruned",
+    "receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }
