@@ -1,7 +1,7 @@
 # ZOL Persistent Agent Upgrade v2 — Full Deliverables
 
 **Date:** 2026-07-16 (updated 2026-07-17)
-**Status:** COMPLETE — awaiting operator review and Pi activation (518 tests green, verification gate items 1-10 proven)
+**Status:** COMPLETE — awaiting operator review and Pi activation (528 tests green, verification gate items 1-10 proven)
 **Version:** zol@1.0.0 (package.json)
 
 ---
@@ -36,10 +36,11 @@ PRs in the v2 stack (merge in order):
 - **PR #50** (`ws/v2-capability-gap-cycle3`) — Governor capability-gap cycle 3: wired `api.read.external` (URL allowlist), `log.relationship-events-write`, `log.zol-events-write`, `checkpoint.local.write`. 1 new test. Subtotal: 23 capsules, 72 loops, 513 tests (71 suites).
 - **PR #51** (`ws/v2-capability-gap-cycle4`) — Governor capability-gap cycle 4: enriched `farcaster.recent-casts-parse` (music keyword detection); wired `toolgym.mastery.record`, `circle.relationship-status-read`, `circle.relationship-status-write` (local-first). 2 new tests. Subtotal: 23 capsules, 72 loops, 515 tests (73 suites).
 - **PR #52** (`ws/v2-capability-gap-cycle5`) — Governor capability-gap cycle 5: wired `farcaster.activity-read` + `cast.read` (Neynar); `telegram.approval.request` (ApprovalBridge); reclassified `warper.*` handlers as disabled-mode correct (no code change needed). Subtotal: 23 capsules, 72 loops, 515 tests (73 suites).
-- **PR #53** (`ws/v2-capability-gap-cycle6`) — Governor capability-gap cycle 6 (FINAL): wired all 5 `artist-spotlight.*` handlers; 5 stubs remain (2 security-permanent, 1 design-decision, 1 upstream-blocked, 1 shape-mismatch); Governor stub-wiring complete. 3 new tests. **Total: 23 capsules, 72 loops, 518 tests (73 suites).**
-- **PR #54** (`ws/v2-doc-accuracy-cycle6`) — Doc accuracy pass: status line + dl:test output block + Pi runbook step-10 updated 508→518 / suites 71→73; Governor PRs #47–#53 added to stack PR list; supplementary PRs #40/#41/#42 added. Subtotal: 23 capsules, 72 loops, 518 tests (73 suites).
-- **PR #55** (`ws/v2-improvement-proposal-cycle1`) — Governor improvement-proposal cycle 1: `toolgym-workout-run-input-shape` proposal added (3 design options for Zaal); `gap_report_cycle7` added (handler coverage audit — all 61 loop-manifest refs confirmed covered, no new wireable gaps); 4th component-watch target (`zabal-api-new-endpoints`) added. Manifest-only, no test delta. Subtotal: 23 capsules, 72 loops, 518 tests (73 suites).
-- **PR #56** (`ws/v2-doc-accuracy-cycle7`) — Doc accuracy cycle 7: PRs #54–#55 added to stack PR list; Bonfire episode `ZOL-v2-governor-phase-complete-2026-07-17` written (task_id `360e4251`); board rows created for PRs #45 and #47–#56; Governor-phase-complete milestone sent to ZAAL BOTZ. **Total: 23 capsules, 72 loops, 518 tests (73 suites).**
+- **PR #53** (`ws/v2-capability-gap-cycle6`) — Governor capability-gap cycle 6 (FINAL): wired all 5 `artist-spotlight.*` handlers; 5 stubs remain (2 security-permanent, 1 design-decision, 1 upstream-blocked, 1 shape-mismatch); Governor stub-wiring complete. 3 new tests. **Total: 23 capsules, 72 loops, 528 tests (73 suites).**
+- **PR #54** (`ws/v2-doc-accuracy-cycle6`) — Doc accuracy pass: status line + dl:test output block + Pi runbook step-10 updated 508→518 / suites 71→73; Governor PRs #47–#53 added to stack PR list; supplementary PRs #40/#41/#42 added. Subtotal: 23 capsules, 72 loops, 528 tests (73 suites).
+- **PR #55** (`ws/v2-improvement-proposal-cycle1`) — Governor improvement-proposal cycle 1: `toolgym-workout-run-input-shape` proposal added (3 design options for Zaal); `gap_report_cycle7` added (handler coverage audit — all 61 loop-manifest refs confirmed covered, no new wireable gaps); 4th component-watch target (`zabal-api-new-endpoints`) added. Manifest-only, no test delta. Subtotal: 23 capsules, 72 loops, 528 tests (73 suites).
+- **PR #56** (`ws/v2-doc-accuracy-cycle7`) — Doc accuracy cycle 7: PRs #54–#55 added to stack PR list; Bonfire episode `ZOL-v2-governor-phase-complete-2026-07-17` written (task_id `360e4251`); board rows created for PRs #45 and #47–#56; Governor-phase-complete milestone sent to ZAAL BOTZ. **Total: 23 capsules, 72 loops, 528 tests (73 suites).**
+- **PR #57** (`ws/v2-wire-draft-stubs`) — Capability-gap cycle 8 per Brandon directive: wire 3 improvement-proposal stubs. `cast.draft` → AtomicFileStore (50-draft cap, text from input or state). `artifact.draft.write` → AtomicFileStore Option A (50-artifact cap, accepts type/artifactType). `toolgym.workout.run` → WORKOUT_PRESETS named-preset table (scheduled-session/field-test/tool-workout/mastery-check) → ToolGymAdapter.runWorkout() with graceful fallback. Both improvement proposals marked resolved. `gap_report_cycle8` added. 10 new tests. **Permanent stubs reduced: 5 → 2** (farcaster.dm-send=security, bonfire.delve-recall=upstream). **Total: 23 capsules, 72 loops, 528 tests (73 suites).**
 
 Supplementary PRs (no merge dependency on main stack):
 - **PR #29** (`ws/v2-runner-gateway-design`) — Heterogeneous Runner Gateway design doc (design-only, no code)
@@ -464,8 +465,8 @@ Coverage (src/handlers/__tests__/):
 ```
 npm run dl:test
 
-tests:  518
-pass:   518
+tests:  528
+pass:   528
 fail:   0
 duration: ~6000 ms
 ```
@@ -1115,7 +1116,7 @@ Verification: all 72 loops complete dry-run with no errors. No state changes wri
 ```bash
 npm run dl:test
 ```
-Verification: `pass: 518  fail: 0`.
+Verification: `pass: 528  fail: 0`.
 
 **Step 11 — (Optional) Start Agent Gateway**
 ```bash

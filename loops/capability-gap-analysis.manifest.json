@@ -389,6 +389,42 @@
       "note": "All wireable stubs complete. Remaining 5 are permanent or human-gated."
     }
   },
+  "gap_report_cycle8": {
+    "cycle": 8,
+    "date": "2026-07-17",
+    "work_packets_scanned": "32 open PRs (#24, #26-#56); 528/528 tests passing; Brandon directive to keep advancing (2026-07-17); 3 improvement-proposal stubs wired",
+    "failure_patterns_identified": [],
+    "missing_tools_catalogued": [
+      {
+        "id": "cast-draft-wired",
+        "description": "cast.draft wired to AtomicFileStore: persists staged drafts (capped 50), falls back gracefully. Text pulled from input.text or state.draft/approvedDraft/text.",
+        "actionable": true,
+        "resolved": true
+      },
+      {
+        "id": "artifact-draft-write-wired",
+        "description": "artifact.draft.write wired to AtomicFileStore (Option A per Brandon directive): persists draft artifacts (capped 50). Accepts input.type or input.artifactType.",
+        "actionable": true,
+        "resolved": true
+      },
+      {
+        "id": "toolgym-workout-run-wired",
+        "description": "toolgym.workout.run wired via WORKOUT_PRESETS table (Option A): maps workoutScope/workout string to ToolGymAdapter workoutDef. Presets: scheduled-session, field-test, tool-workout, mastery-check. Graceful fallback if ToolGym unavailable.",
+        "actionable": true,
+        "resolved": true
+      }
+    ],
+    "improvement_proposal": {
+      "id": "improvement-proposal-cycle8",
+      "title": "Capability Gap Cycle 8 — 3 stubs wired per Brandon directive",
+      "status": "resolved",
+      "pr": "ws/v2-wire-draft-stubs",
+      "test_delta": "+10 (528 total)",
+      "stubs_wired": 3,
+      "stubs_remaining": 2,
+      "note": "cast.draft + artifact.draft.write + toolgym.workout.run all wired. 2 permanent stubs remain: farcaster.dm-send (security) + bonfire.delve-recall (upstream dream-net PRs #1559/#1560)."
+    }
+  },
   "gap_report_cycle7": {
     "cycle": 7,
     "date": "2026-07-17",
