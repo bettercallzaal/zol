@@ -133,5 +133,25 @@
     "pending_proposals"
   ],
   "execution_trace_outputs": [],
-  "memory_routes": []
+  "memory_routes": [],
+  "last_checked": "2026-07-17",
+  "proposals": [
+    {
+      "id": "artifact-draft-write-storage-design",
+      "status": "queued",
+      "date": "2026-07-17",
+      "triggered_by": "capability-gap-analysis-v1 cycle 3",
+      "title": "Artifact Draft Write — Storage Backend Design",
+      "summary": "artifact.draft.write currently returns a draft ID without persisting any content. Three candidate backends: (1) AtomicFileStore keyed by artifactId — simple, already available, no disk-flood protection; (2) capped local FS directory (e.g. ~/.zao/private/artifacts/, rolling 50-file cap) — matches artifact metaphor, human-readable; (3) Zocuments — proper version history, structured, but adds a dependency. Questions for Zaal: preferred backend? max artifact size? retention policy? approval required to read back artifacts?",
+      "gaps_addressed": ["artifact-draft-write-persistence"],
+      "design_questions": [
+        "Which storage backend? (AtomicFileStore / local FS directory / Zocuments)",
+        "Max artifact size per write (bytes)?",
+        "Retention cap (max number of drafts, or TTL)?",
+        "Should artifact.draft.read be a paired handler, or is read-back out of scope for v2?"
+      ],
+      "blocked_on": "Zaal design decision on storage backend and retention policy",
+      "security_note": "Drafts must never be published without the approval gate. artifact.draft.write stays draft-only regardless of backend."
+    }
+  ]
 }
