@@ -157,19 +157,37 @@ class Zictionary {
     if (allowed.visibility && !VALID_VISIBILITIES.includes(allowed.visibility)) {
       throw new Error(`Zictionary.edit: visibility must be one of: ${VALID_VISIBILITIES.join(', ')}`);
     }
+    if (allowed.status === 'approved') {
+      throw new Error('Zictionary.edit: cannot set status=approved via edit(); use approve() with verified authority.');
+    }
     if (allowed.status && !VALID_STATUSES.includes(allowed.status)) {
       throw new Error(`Zictionary.edit: status must be one of: ${VALID_STATUSES.join(', ')}`);
     }
 
     const now = new Date().toISOString();
     const changedFields = Object.keys(allowed).join(', ');
+
+    // Any edit on an approved entry invalidates approval and returns it to draft.
+    // Re-approval requires a fresh call to approve() with verified authority.
+    const wasApproved = entry.status === 'approved';
+    if (wasApproved) {
+      allowed.status = 'draft';
+      allowed.approvedBy = null;
+    }
+
     const updated = stripSecrets({
       ...entry,
       ...allowed,
       updatedAt: now,
       history: [
         ...entry.history,
-        { at: now, change: `Fields edited: ${changedFields || 'none'}`, changedBy: changes.changedBy || 'operator' },
+        {
+          at: now,
+          change: wasApproved
+            ? `Fields edited: ${changedFields || 'none'} (approval invalidated — returned to draft)`
+            : `Fields edited: ${changedFields || 'none'}`,
+          changedBy: changes.changedBy || 'operator',
+        },
       ],
     });
 

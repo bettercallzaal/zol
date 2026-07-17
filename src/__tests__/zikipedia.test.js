@@ -140,4 +140,30 @@ describe('Zikipedia', () => {
       assert.equal(p.status, 'approved');
     }
   });
+
+  test('edit() throws when trying to set status=approved (hardening-pass item 10)', async () => {
+    const wiki = new Zikipedia(makeMockStore(), zocuments, zictionary);
+    const page = await wiki.create({ title: 'Self Approve Attempt', sourceDocId: approvedDoc.docId });
+
+    await assert.rejects(
+      () => wiki.edit(page.pageId, { status: 'approved' }),
+      /cannot set status=approved via edit/,
+      'edit() must reject status=approved and direct callers to approve()'
+    );
+  });
+
+  test('edit() on an approved page invalidates approval and resets to draft (hardening-pass item 10)', async () => {
+    const wiki = new Zikipedia(makeMockStore(), zocuments, zictionary);
+    const page = await wiki.create({ title: 'WillBeApproved', sourceDocId: approvedDoc.docId });
+    const approved = await wiki.approve(page.pageId, { approvedBy: 'zaal' });
+
+    assert.equal(approved.status, 'approved');
+    assert.equal(approved.approvedBy, 'zaal');
+
+    const edited = await wiki.edit(approved.pageId, { content: 'Updated content post-approval' });
+
+    assert.equal(edited.status, 'draft', 'edit() must reset approved page back to draft');
+    assert.equal(edited.approvedBy, null, 'approvedBy must be cleared after edit');
+    assert.equal(edited.content, 'Updated content post-approval', 'content should be updated');
+  });
 });

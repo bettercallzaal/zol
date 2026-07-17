@@ -155,4 +155,35 @@ describe('Zocuments', () => {
     );
     assert.ok(doc.sourceUrl.includes('[REDACTED]'), 'redacted placeholder should appear in sourceUrl');
   });
+
+  test('edit() throws when trying to set status=approved (hardening-pass item 10)', async () => {
+    const docs = new Zocuments(makeMockStore());
+    const doc = await docs.add({ type: 'note', title: 'Approval Guard Test', content: 'cannot self-approve' });
+
+    await assert.rejects(
+      () => docs.edit(doc.docId, { status: 'approved' }),
+      /cannot set status=approved via edit/,
+      'edit() must reject status=approved and direct callers to approve()'
+    );
+  });
+
+  test('edit() on an approved document invalidates approval and resets to draft (hardening-pass item 10)', async () => {
+    const docs = new Zocuments(makeMockStore());
+    const doc = await docs.add({ type: 'document', title: 'WillBeApproved', content: 'initial content' });
+    const approved = await docs.approve(doc.docId, { approvedBy: 'zaal' });
+
+    assert.equal(approved.status, 'approved');
+    assert.equal(approved.approvedBy, 'zaal');
+
+    const edited = await docs.edit(approved.docId, { notes: 'post-approval edit' });
+
+    assert.equal(edited.status, 'draft', 'edit() must reset approved document back to draft');
+    assert.equal(edited.approvedBy, null, 'approvedBy must be cleared after edit');
+    assert.equal(edited.notes, 'post-approval edit', 'notes should be updated');
+    const lastChange = edited.changeLog[edited.changeLog.length - 1];
+    assert.ok(
+      lastChange.note && lastChange.note.includes('approval invalidated'),
+      'changeLog must record that approval was invalidated'
+    );
+  });
 });
