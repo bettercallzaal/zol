@@ -152,6 +152,23 @@
       ],
       "blocked_on": "Zaal design decision on storage backend and retention policy",
       "security_note": "Drafts must never be published without the approval gate. artifact.draft.write stays draft-only regardless of backend."
+    },
+    {
+      "id": "toolgym-workout-run-input-shape",
+      "status": "queued",
+      "date": "2026-07-17",
+      "triggered_by": "capability-gap-analysis-v1 cycle 4 (missing_tools_catalogued: toolgym-workout-run-input-mismatch)",
+      "title": "ToolGym Workout Run — Input Shape Decision",
+      "summary": "toolgym.workout.run is a stub because loop manifests pass {workout:'field-test'} (a named preset string) while ToolGymAdapter.runWorkout() expects {toolId, inputs, maxRounds}. Three options: (A) named-preset lookup table in handler maps workout name → {toolId, inputs, maxRounds} — keeps simple string in manifests, adds a maintenance table; (B) update loop manifests to pass structured {toolId, inputs, maxRounds} directly — cleaner contract, requires editing tool-workout.manifest.json + mastery-receipt.manifest.json + field-test.manifest.json; (C) accept both shapes — most flexible, doubles handler complexity. All options are safe local-only changes with no external calls or Pi credentials needed.",
+      "gaps_addressed": ["toolgym-workout-run-input-mismatch"],
+      "design_questions": [
+        "Which input shape? (A: named-preset lookup in handler / B: structured inputs in manifests / C: accept both)",
+        "If Option A: should the preset table live in the handler file or a separate config JSON (e.g. loops/toolgym-presets.json)?",
+        "Which named workout presets are needed for v2? (e.g. field-test, tool-workout, mastery-check)",
+        "Should workout output include per-round results, or only a final pass/fail summary?"
+      ],
+      "blocked_on": "Zaal decision on input shape preference",
+      "security_note": "toolgym.workout.run must never auto-install packages or modify handler files. All workout steps are bounded, local, read/invoke only."
     }
   ]
 }
