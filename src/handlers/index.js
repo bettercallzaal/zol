@@ -338,6 +338,25 @@ const handlers = {
     };
   },
 
+  'receipt.local.query': async function({ input, state, executionMode, signal }) {
+    validateInput(input, {
+      types: { loopId: 'string', limit: 'number' }
+    });
+    if (executionMode !== 'mock') {
+      try {
+        const journal = getReceiptJournal();
+        const receipts = await journal.list({
+          loopId: input.loopId || undefined,
+          limit: typeof input.limit === 'number' ? input.limit : 20,
+        });
+        return { receipts, count: receipts.length, queried: true, timestamp: new Date().toISOString() };
+      } catch (err) {
+        // fall through to empty result
+      }
+    }
+    return { receipts: [], count: 0, queried: false, timestamp: new Date().toISOString() };
+  },
+
   // ===== BUDGET / MODEL HANDLERS =====
   'budget.read': async function({ input, state, signal }) {
     // Mock: return budget state
@@ -921,12 +940,12 @@ const handlers = {
     validateInput(input, {
       types: { project: 'string', owner: 'string' }
     });
-    // PHASE 5: reads from COWORK_TRACKER_URL/rest/v1/tasks (project: zaodevz)
-    return {
-      projects: [],
-      count: 0,
-      timestamp: new Date().toISOString()
-    };
+    const { getTracker } = require('../cowork-tracker');
+    const result = await getTracker().listOpen({ limit: 100, normalize: true });
+    if (!result.ok) {
+      return { projects: [], count: 0, ok: false, error: result.error, timestamp: new Date().toISOString() };
+    }
+    return { projects: result.rows, count: result.rows.length, ok: true, timestamp: new Date().toISOString() };
   },
 
   'circle.relationship-status-read': async function({ input, state, signal }) {

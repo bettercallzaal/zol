@@ -7,6 +7,7 @@ const handlers = require('../index');
 
 // ===== REGISTRATION CHECKS =====
 describe('stub handler registration', () => {
+  // cowork.fetch-projects and model.completion wired to real implementations (capability-gap cycles 1-2)
   const stubNames = [
     'telegram.approval.request',
     'farcaster.activity-read',
@@ -16,14 +17,12 @@ describe('stub handler registration', () => {
     'farcaster.dm-send',
     'log.relationship-events-write',
     'log.zol-events-write',
-    'model.completion',
     'checkpoint.local.write',
     'artifact.draft.write',
     'api.read.external',
     'bonfire.delve-recall',
     'toolgym.mastery.record',
     'toolgym.workout.run',
-    'cowork.fetch-projects',
     'circle.relationship-status-read',
     'circle.relationship-status-write',
     'artist-spotlight.filter-eligible-artists',
@@ -36,10 +35,15 @@ describe('stub handler registration', () => {
     'warper.trapper.sync',
   ];
 
-  test('all 26 stub handlers are registered', () => {
+  test('all 24 remaining stub handlers are registered', () => {
     for (const name of stubNames) {
       assert.strictEqual(typeof handlers[name], 'function', `${name} must be registered`);
     }
+  });
+
+  test('receipt.local.query and cowork.fetch-projects are registered as wired handlers', () => {
+    assert.strictEqual(typeof handlers['receipt.local.query'], 'function');
+    assert.strictEqual(typeof handlers['cowork.fetch-projects'], 'function');
   });
 });
 
@@ -331,14 +335,37 @@ describe('toolgym stubs', () => {
 });
 
 describe('cowork.fetch-projects', () => {
-  test('returns empty projects array stub', async () => {
+  test('returns projects array (empty when COWORK_TRACKER_URL not configured)', async () => {
     const result = await handlers['cowork.fetch-projects']({
       input: { project: 'zaodevz' },
       state: {},
       signal: null
     });
-    assert.ok(Array.isArray(result.projects));
-    assert.strictEqual(result.count, 0);
+    assert.ok(Array.isArray(result.projects), 'projects must be array');
+    assert.strictEqual(result.count, 0, 'count must be 0 without tracker URL');
     assert.ok(result.timestamp);
+  });
+});
+
+describe('receipt.local.query', () => {
+  test('returns {receipts: [], count: 0} in mock/test context (no live state store)', async () => {
+    const result = await handlers['receipt.local.query']({
+      input: { limit: 10 },
+      state: {},
+      signal: null
+    });
+    assert.ok(Array.isArray(result.receipts), 'receipts must be array');
+    assert.ok(typeof result.count === 'number', 'count must be number');
+    assert.ok(result.timestamp);
+  });
+
+  test('accepts loopId filter without throwing', async () => {
+    const result = await handlers['receipt.local.query']({
+      input: { loopId: 'heartbeat', limit: 5 },
+      state: {},
+      signal: null
+    });
+    assert.ok(Array.isArray(result.receipts));
+    assert.ok(typeof result.count === 'number');
   });
 });
