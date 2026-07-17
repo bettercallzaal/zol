@@ -44,7 +44,7 @@ If `@farcaster/hub-nodejs` warns about build: that's expected; it's lazy-loaded 
 
 ## Phase 2 — Run the Test Suite on the Pi (15 minutes)
 
-**Goal:** Prove the 422-test suite passes on actual Pi hardware before touching crons.
+**Goal:** Prove the 483-test suite passes on actual Pi hardware before touching crons.
 
 ```bash
 cd ~/zol-git
