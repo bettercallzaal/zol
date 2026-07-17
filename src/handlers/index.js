@@ -1153,66 +1153,119 @@ const handlers = {
     validateInput(input, {
       types: { cooldownDays: 'number' }
     });
-    // PHASE 5: delegate to artistspotlight filter logic
-    return {
-      eligible: [],
-      count: 0,
-      cooldownDays: input.cooldownDays || 60,
-      timestamp: new Date().toISOString()
-    };
+    const cooldownDays = typeof input.cooldownDays === 'number' ? input.cooldownDays : 60;
+    const cooldownMs = cooldownDays * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    // candidates may come from input or prior state (bonfire recall / parse step)
+    const candidates = Array.isArray(input.candidates) ? input.candidates :
+                       (state && Array.isArray(state.candidates) ? state.candidates : []);
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      const history = await store.get('spotlight-history') || [];
+      const recentSet = new Set(
+        (Array.isArray(history) ? history : [])
+          .filter(e => e && (now - new Date(e.timestamp).getTime()) < cooldownMs)
+          .map(e => (e.artist || '').toLowerCase())
+      );
+      const eligible = candidates.filter(c => !recentSet.has((c || '').toLowerCase()));
+      return { eligible, count: eligible.length, cooldownDays, timestamp: new Date().toISOString() };
+    } catch (_err) {
+      // fall through — return unfiltered candidates on store failure
+    }
+    return { eligible: candidates, count: candidates.length, cooldownDays, timestamp: new Date().toISOString() };
   },
 
   'artist-spotlight.select-one-artist': async function({ input, state, signal }) {
     validateInput(input, {
       types: { strategy: 'string' }
     });
-    // PHASE 5: delegate to artistspotlight selection logic
-    return {
-      selected: null,
-      strategy: input.strategy || 'rotation',
-      timestamp: new Date().toISOString()
-    };
+    const eligible = Array.isArray(input.eligible) ? input.eligible :
+                     (state && Array.isArray(state.eligible) ? state.eligible : []);
+    if (eligible.length === 0) {
+      return { selected: null, strategy: input.strategy || 'rotation', timestamp: new Date().toISOString() };
+    }
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      const rotationState = await store.get('spotlight-rotation-state') || { lastSelectedIndex: 0 };
+      const idx = (rotationState.lastSelectedIndex || 0) % eligible.length;
+      const selected = eligible[idx];
+      await store.put('spotlight-rotation-state', { lastSelectedIndex: idx + 1 });
+      return { selected, strategy: input.strategy || 'rotation', timestamp: new Date().toISOString() };
+    } catch (_err) {
+      // fall through — pick first on store failure
+    }
+    return { selected: eligible[0], strategy: input.strategy || 'rotation', timestamp: new Date().toISOString() };
   },
 
   'artist-spotlight.compose-spotlight-draft': async function({ input, state, signal }) {
     validateInput(input, {
       types: { artist: 'string', maxLength: 'number' }
     });
-    // SECURITY: draft only — never posts
-    return {
-      drafted: true,
-      draftId: `spot_${Math.random().toString(36).slice(2, 9)}`,
-      artist: input.artist || null,
-      text: '',
-      status: 'draft',
-      timestamp: new Date().toISOString()
-    };
+    // SECURITY: draft only — posting requires explicit approval gate
+    const artist = input.artist || (state && state.selected) || null;
+    const maxLength = typeof input.maxLength === 'number' ? input.maxLength : 280;
+    const draftId = `spot_${Math.random().toString(36).slice(2, 9)}`;
+    const prompt = artist
+      ? `Write a 2-sentence artist spotlight post for ${artist}. Be warm, specific, and artist-serving. Max ${maxLength} characters. No emojis.`
+      : 'Write a generic 2-sentence artist appreciation post for the ZAO music community.';
+    try {
+      const result = await getModelGateway().complete(prompt, { tier: 'standard' });
+      const text = (result.text || '').slice(0, maxLength);
+      return { drafted: true, draftId, artist, text, status: 'draft', timestamp: new Date().toISOString() };
+    } catch (_err) {
+      // fall through — return draft with empty text
+    }
+    return { drafted: true, draftId, artist, text: '', status: 'draft', timestamp: new Date().toISOString() };
   },
 
   'artist-spotlight.stage-draft-for-approval': async function({ input, state, signal }) {
     validateInput(input, {
       types: { draftId: 'string', channel: 'string' }
     });
-    // PHASE 5: submit staged draft to approval queue
-    return {
-      staged: true,
-      draftId: input.draftId || null,
-      status: 'pending_approval',
-      timestamp: new Date().toISOString()
-    };
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const { ReceiptJournal } = require('../receipt-journal');
+      const { ApprovalBridge } = require('../approval-bridge');
+      const store = await createStateStore();
+      const journal = new ReceiptJournal(store, { agentId: 'zolbot' });
+      const bridge = new ApprovalBridge(store, journal);
+      const req = await bridge.request({
+        action: `artist-spotlight-approval:${input.draftId || 'unknown'}`,
+        context: { draftId: input.draftId || null, channel: input.channel || 'telegram' },
+        requestedBy: 'zolbot',
+        timeoutMs: 300000,
+      });
+      return { staged: true, draftId: input.draftId || null, requestId: req.requestId, status: 'pending_approval', timestamp: new Date().toISOString() };
+    } catch (_err) {
+      // fall through
+    }
+    return { staged: true, draftId: input.draftId || null, status: 'pending_approval', timestamp: new Date().toISOString() };
   },
 
   'artist-spotlight.record-spotlight-completion': async function({ input, state, signal }) {
     validateInput(input, {
       types: { artist: 'string', draftId: 'string' }
     });
-    // PHASE 5: record completion in spotlight history
-    return {
-      recorded: true,
-      artist: input.artist || null,
+    const entry = {
+      artist: input.artist || (state && state.selected) || null,
       draftId: input.draftId || null,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      let history = await store.get('spotlight-history') || [];
+      if (!Array.isArray(history)) history = [];
+      history.push(entry);
+      if (history.length > 200) history = history.slice(history.length - 200);
+      await store.put('spotlight-history', history);
+      return { recorded: true, artist: entry.artist, draftId: entry.draftId, timestamp: entry.timestamp };
+    } catch (_err) {
+      // fall through — spotlight history non-critical
+    }
+    return { recorded: true, artist: entry.artist, draftId: entry.draftId, timestamp: entry.timestamp };
   }
 };
 
