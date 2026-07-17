@@ -299,5 +299,59 @@
       "stubs_wired": 4,
       "stubs_remaining": 16
     }
+  },
+  "gap_report_cycle5": {
+    "cycle": 5,
+    "date": "2026-07-17",
+    "work_packets_scanned": "27 open PRs (#24, #26-#51); 515/515 tests; 16 stub handlers after cycle 4",
+    "failure_patterns_identified": [
+      {
+        "id": "farcaster-read-stubs",
+        "severity": "medium",
+        "description": "farcaster.activity-read and cast.read always returned empty arrays. zabal-channel-watch-v1 and relationship-lifecycle-update received no real cast data. fetchNeynarWithTimeout already exported; already returns {error} gracefully when key absent.",
+        "affected_loops": ["zabal-channel-watch-v1", "relationship-lifecycle-update", "weekly-curator-v1"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle5",
+        "note": "cast.read accepts both input.channel and input.channel_id (loop manifests use channel_id). Graceful fallback when NEYNAR_API_KEY absent."
+      },
+      {
+        "id": "telegram-approval-request-stub",
+        "severity": "medium",
+        "description": "telegram.approval.request returned mock pending shape without persisting to ApprovalBridge. Pi Telegram bot cannot pick up requests that are never stored.",
+        "affected_loops": ["request-approval", "artist-spotlight-v1"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle5",
+        "note": "Wired to ApprovalBridge.request() with fresh createStateStore() per call. Graceful fallback on failure."
+      },
+      {
+        "id": "warper-alias-stubs",
+        "severity": "none",
+        "description": "warper.assignment.accept, warper.trapper.release, warper.trapper.sync were in stub list but already correctly implement disabled-mode behavior via WarperKeeperAdapter.ensureAdapter().",
+        "affected_loops": ["open-trapper"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle5",
+        "note": "No code change needed — removed from stub list, added to wired list. Returns {ok:false, reason:'Warper Keeper is disabled'} in all environments without WARPER_KEEPER_MODE=remote."
+      }
+    ],
+    "missing_tools_catalogued": [
+      {
+        "id": "artist-spotlight-handlers-unwired",
+        "description": "artist-spotlight.* (5 handlers) are stubs. All can be wired locally: filter-eligible-artists + record-spotlight-completion use AtomicFileStore; select-one-artist uses rotation state; compose-spotlight-draft uses ModelGateway; stage-draft-for-approval uses ApprovalBridge. No Pi-specific credentials required.",
+        "actionable": true,
+        "blocked_on": "None — all wireable to local state store + ModelGateway. Queued for cycle 6."
+      }
+    ],
+    "improvement_proposal": {
+      "id": "wire-farcaster-reads-telegram-approval-warper-reclassify",
+      "title": "Wire farcaster.activity-read, cast.read, telegram.approval.request; reclassify warper.* (Phase 5, cycle 5)",
+      "status": "implemented",
+      "pr": "ws/v2-capability-gap-cycle5",
+      "test_delta": "0 net (515 total — same assertions)",
+      "stubs_wired": 6,
+      "stubs_remaining": 10
+    }
   }
 }

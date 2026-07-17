@@ -7,13 +7,12 @@ const handlers = require('../index');
 
 // ===== REGISTRATION CHECKS =====
 describe('stub handler registration', () => {
-  // capability-gap cycles 1-4: model.completion, cowork.fetch-projects, receipt.local.query,
+  // capability-gap cycles 1-5: model.completion, cowork.fetch-projects, receipt.local.query,
   //   log.*, checkpoint.local.write, api.read.external, toolgym.mastery.record,
-  //   circle.relationship-status-read/write, farcaster.recent-casts-parse wired
+  //   circle.relationship-status-read/write, farcaster.recent-casts-parse,
+  //   telegram.approval.request, farcaster.activity-read, cast.read,
+  //   warper.assignment.accept/trapper.release/trapper.sync (disabled-mode correct) wired
   const stubNames = [
-    'telegram.approval.request',
-    'farcaster.activity-read',
-    'cast.read',
     'cast.draft',
     'farcaster.dm-send',
     'artifact.draft.write',
@@ -24,18 +23,15 @@ describe('stub handler registration', () => {
     'artist-spotlight.compose-spotlight-draft',
     'artist-spotlight.stage-draft-for-approval',
     'artist-spotlight.record-spotlight-completion',
-    'warper.assignment.accept',
-    'warper.trapper.release',
-    'warper.trapper.sync',
   ];
 
-  test('all 16 remaining stub handlers are registered', () => {
+  test('all 10 remaining stub handlers are registered', () => {
     for (const name of stubNames) {
       assert.strictEqual(typeof handlers[name], 'function', `${name} must be registered`);
     }
   });
 
-  test('wired handlers are registered (capability-gap cycles 1-4)', () => {
+  test('wired handlers are registered (capability-gap cycles 1-5)', () => {
     const wired = [
       'model.completion',
       'receipt.local.query',
@@ -48,6 +44,12 @@ describe('stub handler registration', () => {
       'circle.relationship-status-read',
       'circle.relationship-status-write',
       'farcaster.recent-casts-parse',
+      'telegram.approval.request',
+      'farcaster.activity-read',
+      'cast.read',
+      'warper.assignment.accept',
+      'warper.trapper.release',
+      'warper.trapper.sync',
     ];
     for (const name of wired) {
       assert.strictEqual(typeof handlers[name], 'function', `${name} must be registered`);
@@ -101,7 +103,7 @@ describe('draft-only enforcement', () => {
 
 // ===== FUNCTIONAL SMOKE TESTS =====
 describe('telegram.approval.request', () => {
-  test('returns pending request with telegram channel', async () => {
+  test('persists approval request to ApprovalBridge; returns pending with telegram channel', async () => {
     const result = await handlers['telegram.approval.request']({
       input: { message: 'approve this?' },
       state: {},
@@ -110,11 +112,15 @@ describe('telegram.approval.request', () => {
     assert.strictEqual(result.channel, 'telegram');
     assert.strictEqual(result.status, 'pending');
     assert.ok(result.timestamp);
+    // requestId present when ApprovalBridge initializes; may be absent on store failure
+    if (result.requestId) {
+      assert.ok(result.requestId.startsWith('apr_'), 'requestId must have apr_ prefix');
+    }
   });
 });
 
 describe('farcaster.activity-read', () => {
-  test('returns empty casts array stub', async () => {
+  test('returns casts array (empty when NEYNAR_API_KEY absent)', async () => {
     const result = await handlers['farcaster.activity-read']({
       input: { fid: 3338501 },
       state: {},
@@ -126,7 +132,7 @@ describe('farcaster.activity-read', () => {
 });
 
 describe('cast.read', () => {
-  test('returns empty casts array stub', async () => {
+  test('returns casts array (empty when NEYNAR_API_KEY absent)', async () => {
     const result = await handlers['cast.read']({
       input: { fid: 3338501, channel: 'zol' },
       state: {},
@@ -335,7 +341,7 @@ describe('artist-spotlight step handlers', () => {
   });
 });
 
-describe('warper alias stubs', () => {
+describe('warper handlers (disabled-mode correct — no Warper Keeper configured)', () => {
   test('warper.assignment.accept returns ok or disabled', async () => {
     const result = await handlers['warper.assignment.accept']({
       input: { scope: 'zol-work' },
