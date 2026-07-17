@@ -87,6 +87,7 @@ class ToolGateway {
    * @param {object|null} receiptJournal - ReceiptJournal instance (may be null)
    * @param {object} [opts]
    * @param {string} [opts.agentId="zolbot"]
+   * @param {object} [opts.idempotencyStore] - IdempotencyStore instance for write-tool dedup
    * @param {object} [handlers={}]    - optional map of handler functions to auto-register
    */
   constructor(stateStore, receiptJournal, opts = {}, handlers = {}) {
@@ -94,6 +95,7 @@ class ToolGateway {
     this._journal = receiptJournal || null;
     this._agentId = (opts && opts.agentId) || 'zolbot';
     this._approvalBridge = (opts && opts.approvalBridge) || null;
+    this._idempotencyStore = (opts && opts.idempotencyStore) || null;
 
     // Tool registry: toolId -> toolDef
     this._tools = new Map();
@@ -339,7 +341,8 @@ class ToolGateway {
    * @param {string}   [opts.runId="unknown"]
    * @param {string}   [opts.loopId="unknown"]
    * @param {string}   [opts.capsuleId="unknown"]
-   * @returns {Promise<{ output: object, receiptId: string|null }>}
+   * @param {string}   [opts.idempotencyKey] - caller-supplied key; duplicate calls within TTL return cached result
+   * @returns {Promise<{ output: object, receiptId: string|null, idempotent?: true }>}
    */
   async execute(toolId, input, opts = {}) {
     const {
@@ -349,6 +352,7 @@ class ToolGateway {
       loopId = 'unknown',
       capsuleId = 'unknown',
       approvalId,
+      idempotencyKey,
     } = opts;
 
     // Step 1: Get tool
@@ -365,7 +369,15 @@ class ToolGateway {
       );
     }
 
-    // Step 3: Approval gate (skip in mock mode)
+    // Step 3: Idempotency check — for consequential tools only (reads are always re-executed)
+    if (idempotencyKey && tool.isConsequential && this._idempotencyStore) {
+      const hit = this._idempotencyStore.check(idempotencyKey);
+      if (hit) {
+        return { ...hit.result, idempotent: true };
+      }
+    }
+
+    // Step 4: Approval gate (skip in mock mode)
     if (tool.requiresApproval && executionMode !== 'mock') {
       if (!approvalId) {
         throw new ApprovalRequiredError(
@@ -389,7 +401,7 @@ class ToolGateway {
       }
     }
 
-    // Step 4: Call the handler
+    // Step 5: Call the handler
     const output = await tool.handler({
       input: input || {},
       state: {},
@@ -397,7 +409,7 @@ class ToolGateway {
       signal: AbortSignal.timeout(5000),
     });
 
-    // Step 5: Write receipt for consequential tools
+    // Step 6: Write receipt for consequential tools
     let receipt = null;
     if (tool.isConsequential && this._journal) {
       receipt = await this._journal.append({
@@ -413,7 +425,14 @@ class ToolGateway {
       });
     }
 
-    return { output, receiptId: receipt ? receipt.receiptId : null };
+    const result = { output, receiptId: receipt ? receipt.receiptId : null };
+
+    // Step 7: Cache result for future idempotency checks on consequential tools
+    if (idempotencyKey && tool.isConsequential && this._idempotencyStore) {
+      this._idempotencyStore.store(idempotencyKey, result);
+    }
+
+    return result;
   }
 
   /**
