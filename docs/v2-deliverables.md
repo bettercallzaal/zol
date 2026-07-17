@@ -1,7 +1,7 @@
 # ZOL Persistent Agent Upgrade v2 — Full Deliverables
 
 **Date:** 2026-07-16 (updated 2026-07-17)
-**Status:** COMPLETE — awaiting operator review and Pi activation (532 tests green, verification gate items 1-10 proven)
+**Status:** COMPLETE — awaiting operator review and Pi activation (496 tests green, verification gate items 1-10 proven)
 **Version:** zol@1.0.0 (package.json)
 
 ---
@@ -25,31 +25,14 @@ PRs in the v2 stack (merge in order):
 - **PR #36** (`ws/v2-sparkz-launch-rail`) — `launch-rail.decision` handler (0xSplits-first default per doc 1098) + legal guardrail + 27 stub handlers closing loop manifest gap + model-gateway cheap-model tier routing (doc 1111) + Neynar/Supabase API field-drift guides. Handler smoke tests. 41 new tests total. Subtotal: 23 capsules, 72 loops, 483 tests. Handler registry: 80 handlers (all 72 loop steps satisfied).
 - **PR #37** (`ws/v2-weekly-scheduler`) — Ports weekly-cadence scheduler (originally PR #24, pre-v2 branch) into the v2 stack. `scripts/dl-run-weekly.js`: weekly counterpart to `dl-run.js`; double-flag-gated (`DREAMLOOPS_ENABLED` + per-loop flag); each loop gets its own dedicated `DreamLoopRunner` instance (no merged handler maps — avoids silent shadowing of identically-named handlers across weekly-curator/artist-spotlight). `deploy/systemd/zol-weekly-loops.service` + `.timer` (Monday 6am UTC). `deploy/migrate.sh` updated. Subtotal: 23 capsules, 72 loops, 483 tests. PR #24 to be closed after this merges.
 - **PR #38** (`ws/v2-source-citations-test`) — Closes spec coverage gap: "Test … source citations" was listed in the integration test header but never exercised. 9 new tests: Zictionary `citations` field round-trip + immutability + secret redaction (3 in zictionary.test.js); Zocuments `sourceUrl`/`sourceName` storage + secret redaction (2 in zocuments.test.js); new "Source Citations" integration section #15 with 4 end-to-end tests (v2-integration.test.js). Subtotal: 23 capsules, 72 loops, 492 tests (70 suites).
-- **PR #39** (`ws/v2-migrations-test`) — Closes spec coverage gap: "Test … migrations" was claimed in the integration test header but had zero coverage. 4 new tests in new "Migrations" section #17 of v2-integration.test.js: (1) WorkRouter work packet survives to a fresh AtomicFileStore instance (cross-instance durability); (2) MemoryWeaver entry survives to a fresh AtomicFileStore instance; (3) fresh store returns `undefined` for unknown keys without throwing (fresh Pi / nothing-to-migrate scenario); (4) calling `initialize()` twice preserves existing state (idempotent re-initialization). Adds `os`, `path`, `AtomicFileStore` imports. Subtotal: 23 capsules, 72 loops, 496 tests (71 suites).
-- **PR #43** (`ws/v2-trapper-roundtrip-fix`) — Fixes 2 bugs in POST /trappers/import + createTrapperBundle lifecycle; adds Trapper round-trip real-backend test. Bug 1: `_handleTrappersImport` passed artifact object to `build()` instead of string ID (→ "artifact not found: [object Object]"). Bug 2: `createTrapperBundle` called `package()` directly after `build()` bypassing the `built→verified→packaged` lifecycle (→ invalid transition error). Fix: add `verify({passed:true, verifiedBy:'trapper-bundle-auto'})` before `package()`. New test 12 in real-backend.test.js: full export/import round trip on live AgentGateway (port 0) + fresh AtomicFileStore. Also corrects misleading test 8 comment (was "Trapper round trip", is CapsuleRegistry round trip). **Total: 23 capsules, 72 loops, 497 tests (71 suites).**
-- **PR #44** (`ws/v2-task-lease-ttl`) — Implements TTL-based board task lease (board task 1163). `CoworkTracker.claimWithLease()`: sets `leased_until = now + TTL` on claim; on primary collision, retries against tasks where `leased_until < now` (expired lease reclaim). `board.task.claim` handler uses `claimWithLease` when `COWORK_LEASE_ENABLED=1`, falls back to existing conditional-PATCH when disabled. Adds migration note for `leased_until timestamptz` column. Fixes handler count test (8→9, adds `board.task.claim`). 4 new tests. Subtotal: 23 capsules, 72 loops, 501 tests (71 suites).
-- **PR #45** (`ws/v2-runloop-status-fix`) — Fixes hardening-pass spec violation: `run_loop` MCP tool was returning `status:'queued'` even though nothing was enqueued. Changed to `status:'validated'` (loop confirmed in registry; execution requires DreamLoopRunner on Pi). Updated note to be accurate. Added test 13 in real-backend.test.js: asserts `validated ≠ queued` for a known loop and `unknown-loop` for a missing loopId. Subtotal: 23 capsules, 72 loops, 502 tests (71 suites).
-- **PR #46** (`ws/v2-knowledge-approval-hardening`) — Hardens hardening-pass item 10 across all three knowledge products (Zictionary, Zocuments, Zikipedia). `edit()` now throws when caller passes `status:'approved'` (must use `approve()` with verified authority). Any `edit()` on an already-approved object immediately resets `status→'draft'` and clears `approvedBy`; history/changeLog records "approval invalidated". 6 new tests (2 per class). **Total: 23 capsules, 72 loops, 508 tests (71 suites).**
-- **PR #47** (`ws/v2-component-watch-cycle1`) — Self-Improvement Governor component-watch cycle 1: no targets triggered; corrected Clanker watch URL; Optimism S9 scope noted. Subtotal: 23 capsules, 72 loops, 508 tests (71 suites).
-- **PR #48** (`ws/v2-capability-gap-cycle1`) — Governor capability-gap cycle 1: wired `model.completion` to ModelGateway (real LLM completion path). 1 new test. Subtotal: 23 capsules, 72 loops, 509 tests (71 suites).
-- **PR #49** (`ws/v2-capability-gap-cycle2`) — Governor capability-gap cycle 2: added `receipt.local.query`; wired `cowork.fetch-projects`. 3 new tests. Subtotal: 23 capsules, 72 loops, 512 tests (71 suites).
-- **PR #50** (`ws/v2-capability-gap-cycle3`) — Governor capability-gap cycle 3: wired `api.read.external` (URL allowlist), `log.relationship-events-write`, `log.zol-events-write`, `checkpoint.local.write`. 1 new test. Subtotal: 23 capsules, 72 loops, 513 tests (71 suites).
-- **PR #51** (`ws/v2-capability-gap-cycle4`) — Governor capability-gap cycle 4: enriched `farcaster.recent-casts-parse` (music keyword detection); wired `toolgym.mastery.record`, `circle.relationship-status-read`, `circle.relationship-status-write` (local-first). 2 new tests. Subtotal: 23 capsules, 72 loops, 515 tests (73 suites).
-- **PR #52** (`ws/v2-capability-gap-cycle5`) — Governor capability-gap cycle 5: wired `farcaster.activity-read` + `cast.read` (Neynar); `telegram.approval.request` (ApprovalBridge); reclassified `warper.*` handlers as disabled-mode correct (no code change needed). Subtotal: 23 capsules, 72 loops, 515 tests (73 suites).
-- **PR #53** (`ws/v2-capability-gap-cycle6`) — Governor capability-gap cycle 6 (FINAL): wired all 5 `artist-spotlight.*` handlers; 5 stubs remain (2 security-permanent, 1 design-decision, 1 upstream-blocked, 1 shape-mismatch); Governor stub-wiring complete. 3 new tests. **Total: 23 capsules, 72 loops, 528 tests (73 suites).**
-- **PR #54** (`ws/v2-doc-accuracy-cycle6`) — Doc accuracy pass: status line + dl:test output block + Pi runbook step-10 updated 508→518 / suites 71→73; Governor PRs #47–#53 added to stack PR list; supplementary PRs #40/#41/#42 added. Subtotal: 23 capsules, 72 loops, 528 tests (73 suites).
-- **PR #55** (`ws/v2-improvement-proposal-cycle1`) — Governor improvement-proposal cycle 1: `toolgym-workout-run-input-shape` proposal added (3 design options for Zaal); `gap_report_cycle7` added (handler coverage audit — all 61 loop-manifest refs confirmed covered, no new wireable gaps); 4th component-watch target (`zabal-api-new-endpoints`) added. Manifest-only, no test delta. Subtotal: 23 capsules, 72 loops, 528 tests (73 suites).
-- **PR #56** (`ws/v2-doc-accuracy-cycle7`) — Doc accuracy cycle 7: PRs #54–#55 added to stack PR list; Bonfire episode `ZOL-v2-governor-phase-complete-2026-07-17` written (task_id `360e4251`); board rows created for PRs #45 and #47–#56; Governor-phase-complete milestone sent to ZAAL BOTZ. **Total: 23 capsules, 72 loops, 528 tests (76 suites).**
-- **PR #57** (`ws/v2-wire-draft-stubs`) — Capability-gap cycle 8 per Brandon directive: wire 3 improvement-proposal stubs. `cast.draft` → AtomicFileStore (50-draft cap, text from input or state). `artifact.draft.write` → AtomicFileStore Option A (50-artifact cap, accepts type/artifactType). `toolgym.workout.run` → WORKOUT_PRESETS named-preset table (scheduled-session/field-test/tool-workout/mastery-check) → ToolGymAdapter.runWorkout() with graceful fallback. Both improvement proposals marked resolved. `gap_report_cycle8` added. 10 new tests. **Permanent stubs reduced: 5 → 2** (farcaster.dm-send=security, bonfire.delve-recall=upstream). **Total: 23 capsules, 72 loops, 528 tests (76 suites).**
-- **PR #58** (`ws/v2-loop-lifecycle-promote`) — Capability-gap cycle 9: lifecycle promotion audit post cycle 8. All loop handlers verified wired. Promoted 3 `specification-only` loops → `dry-run`: `accept-warper-assignment-v1`, `proof-drop-export-v1`, `tool-workout-v1`. `warper-keeper-work-cycle-v1` retained at `specification-only` (Warper Keeper disabled mode — cannot rehearse until WK activated). `gap_report_cycle9` added. 0 test delta (manifest-only). **Specification-only count: 4 → 1. Total: 23 capsules, 72 loops, 528 tests (76 suites).**
-- **PR #59** (`ws/v2-doc-accuracy-cycle9`) — Doc accuracy cycle 9: correct suite count 73→76 in Pi runbook expected output (`# suites`) and PR #56/57 deliverables entries. Actual suite count was 76 as of PR #53; PR #54 doc-accuracy-cycle6 recorded an inaccurate 71→73 update. 0 test delta. **Total: 23 capsules, 72 loops, 528 tests (76 suites).**
+- **PR #39** (`ws/v2-migrations-test`) — Closes spec coverage gap: "Test … migrations" was claimed in the integration test header but had zero coverage. 4 new tests in new "Migrations" section #17 of v2-integration.test.js: (1) WorkRouter work packet survives to a fresh AtomicFileStore instance (cross-instance durability); (2) MemoryWeaver entry survives to a fresh AtomicFileStore instance; (3) fresh store returns `undefined` for unknown keys without throwing (fresh Pi / nothing-to-migrate scenario); (4) calling `initialize()` twice preserves existing state (idempotent re-initialization). Adds `os`, `path`, `AtomicFileStore` imports. **Total: 23 capsules, 72 loops, 496 tests (71 suites).**
 
 Supplementary PRs (no merge dependency on main stack):
 - **PR #29** (`ws/v2-runner-gateway-design`) — Heterogeneous Runner Gateway design doc (design-only, no code)
 - **PR #30** (`ws/fleet-standard-v0.1-expanded`) — Fleet Standard v0.1 operating constitution + conformance harness (72 checks)
-- **PR #40** (`ws/v2-keystone3-bridge-design`) — ZOE→ZOL intent bridge design v1 (design-only); 4 open questions for Zaal/Brandon
-- **PR #41** (`ws/v2-ci`) — `.github/workflows/ci.yml`; Node 22; full gate (dl:test + dl:validate + dl:secret-scan + v2:check + npm audit); CI green; standalone, can merge independently
-- **PR #42** (`ws/v2-keystone4-fleet-design`) — Zaalcaster fleet page design v1; Supabase fleet_state relay (design-only)
+- **PR #40** (`ws/v2-keystone3-bridge-design`) — Keystone 3: ZOE→ZOL intent bridge design v1. Supabase board message bus (Option A) + SSH tunnel (Option B). Intent-router skeleton, board.zol-intent.claim handler, full API contract, 4 open Qs.
+- **PR #41** (`ws/v2-ci`) — GitHub Actions CI: full conformance gate (v2:check + dl:test 496 + dl:validate 23/72 + dl:secret-scan + npm audit) on every non-main push and PR to main. Node 22, `--ignore-scripts`, sqlite3 native binding probe. All CI runs green.
+- **PR #42** (`ws/v2-keystone4-fleet-design`) — Keystone 4: zaalcaster fleet page design v1. Supabase `fleet_state` relay: ZOL heartbeat writes snapshots, zaalcaster reads via anon REST. No Pi exposure. fleet.state.write handler, SQL migration, api/fleet.js, Fleet tab, 4 open Qs.
 
 ---
 
@@ -421,8 +404,8 @@ zol-upgrade/
 ```
 npm run v2:test
 
-tests: 166
-pass:  166
+tests: 147
+pass:  147
 fail:  0
 duration: ~1800 ms
 
@@ -467,8 +450,8 @@ Coverage (src/handlers/__tests__/):
 ```
 npm run dl:test
 
-tests:  532
-pass:   532
+tests:  496
+pass:   496
 fail:   0
 duration: ~6000 ms
 ```
@@ -870,7 +853,7 @@ npm install
 # 4. Verify syntax
 npm run check
 
-# 5. Run v2 core tests (should see 166 pass, 0 fail)
+# 5. Run v2 core tests (should see 147 pass, 0 fail)
 npm run v2:test
 
 # 6. Run full DreamLoops test suite
@@ -1087,7 +1070,7 @@ Verification: output shows 23 capsules valid, 72 loops valid, 0 errors.
 ```bash
 npm run v2:test
 ```
-Verification: `pass: 166  fail: 0`.
+Verification: `pass: 51  fail: 0`.
 
 **Step 7 — Migrate state**
 ```bash
@@ -1118,7 +1101,7 @@ Verification: all 72 loops complete dry-run with no errors. No state changes wri
 ```bash
 npm run dl:test
 ```
-Verification: `pass: 528  fail: 0`.
+Verification: `pass: 496  fail: 0`.
 
 **Step 11 — (Optional) Start Agent Gateway**
 ```bash
