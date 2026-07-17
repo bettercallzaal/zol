@@ -12,12 +12,16 @@ const { createStateStore, AtomicFileStore, SqliteWalStore, BonfireStore, shouldR
 // Test both backends: sqlite (if available) and atomic-file
 const BACKENDS_TO_TEST = ['atomic-file'];
 
-// Try to add sqlite if available
+// Try to add sqlite if available — probe native binding by opening :memory: DB.
+// require() alone succeeds even when --ignore-scripts skipped the native build;
+// the binding error only surfaces on first DB open, so we must probe here.
 try {
-  require('better-sqlite3');
+  const Database = require('better-sqlite3');
+  const _probe = new Database(':memory:');
+  _probe.close();
   BACKENDS_TO_TEST.push('sqlite');
 } catch (e) {
-  console.warn('[Test] better-sqlite3 not available, skipping SQLite tests');
+  console.warn('[Test] better-sqlite3 native binding not available, skipping SQLite tests');
 }
 
 function createTestDir(backendName, testName) {
