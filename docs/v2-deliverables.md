@@ -110,7 +110,7 @@ zol-upgrade/
 │   ├── zol-warper-keeper-client-v1.json      [NEW]
 │   ├── zol-weekly-curator-v1.json            [NEW]
 │   └── zol-work-router-v1.json              [NEW]
-├── loops/                                    (67 total manifest files)
+├── loops/                                    (69 total manifest files)
 │   ├── accept-warper-assignment.manifest.json
 │   ├── artifact-plan.manifest.json
 │   ├── artist-context.manifest.json
@@ -301,7 +301,7 @@ zol-upgrade/
 | weave-memory | 3 | memory.weave | PASS |
 | weekly-curator-v1 | 5 | weekly-cron | PASS |
 
-64 loops: PASS | 3 loops: disabled (Warper Keeper — off by default, correct behavior)
+66 loops: PASS | 3 loops: disabled (Warper Keeper — off by default, correct behavior)
 
 ---
 
@@ -946,7 +946,7 @@ Verification: output ends with `all scripts OK`.
 ```bash
 npm run dl:validate
 ```
-Verification: output shows 21 capsules valid, 67 loops valid, 0 errors.
+Verification: output shows 21 capsules valid, 69 loops valid, 0 errors.
 
 **Step 6 — Run v2 test suite**
 ```bash
@@ -977,7 +977,7 @@ Verification: `grep DREAMLOOPS_ENABLED ~/.zao/private/.env` returns `DREAMLOOPS_
 source ~/.zao/private/.env
 node scripts/dl-dry-run.js
 ```
-Verification: all 67 loops complete dry-run with no errors. No state changes written.
+Verification: all 69 loops complete dry-run with no errors. No state changes written.
 
 **Step 10 — Run full test suite on Pi**
 ```bash
@@ -990,7 +990,7 @@ Verification: `pass: 381  fail: 0`.
 node src/agent-gateway.js &
 curl http://localhost:8089/health
 ```
-Verification: health endpoint returns `{"ok":true,"status":"ok","capsules":21,"loops":67}`.
+Verification: health endpoint returns `{"ok":true,"status":"ok","capsules":21,"loops":69}`.
 
 **Step 12 — Enable and verify first live run**
 ```bash

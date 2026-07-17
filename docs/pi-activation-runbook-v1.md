@@ -76,7 +76,7 @@ cd ~/zol-git
 
 # Validate all 21 capsules and 66 loops
 npm run dl:validate
-# Expected: "validated 21 manifests" + "validated 67 manifests"
+# Expected: "validated 21 manifests" + "validated 69 manifests"
 
 # Secret scan (must be clean before any cron wiring)
 npm run dl:secret-scan
@@ -191,7 +191,7 @@ source ~/.zao/private/.env   # DREAMLOOPS_ENABLED=1
 node scripts/dl-dry-run.js
 ```
 
-Expected: 67 loops complete dry-run with no errors.
+Expected: 69 loops complete dry-run with no errors.
 
 ---
 
@@ -263,7 +263,7 @@ sed -i 's/DREAMLOOPS_ENABLED=1/DREAMLOOPS_ENABLED=0/' ~/.zao/private/.env
 | Command | Purpose |
 |---------|---------|
 | `npm run dl:test` | Run all 381 tests |
-| `npm run dl:validate` | Validate 21 capsules + 67 loops |
+| `npm run dl:validate` | Validate 21 capsules + 69 loops |
 | `npm run dl:secret-scan` | Secret scan (must be clean) |
 | `npm run dl:dry-run` | Dry-run all loops (no state changes) |
 | `npm run dl:dry-run:board` | Dry-run board-triage handlers |
