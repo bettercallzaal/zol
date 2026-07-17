@@ -79,7 +79,7 @@ describe('ProofDropAdapter', () => {
     const validBundle = {
       bundleId: 'pd_test-123',
       artifactId: 'exists',
-      contentHash: 'abc123',
+      contentHash: 'sha256:' + 'a'.repeat(64), // valid format: sha256:<64 hex chars>
       receipts: [],
       generatedAt: new Date().toISOString(),
     };
@@ -88,6 +88,23 @@ describe('ProofDropAdapter', () => {
 
     assert.equal(result.valid, true);
     assert.deepEqual(result.errors, []);
+  });
+
+  test('validate() rejects sha256:[REDACTED] as invalid proof', () => {
+    const adapter = new ProofDropAdapter(mockArtifactPipeline, mockReceiptJournal);
+
+    const bundleWithRedactedHash = {
+      bundleId: 'pd_test-456',
+      artifactId: 'exists',
+      contentHash: 'sha256:[REDACTED]',
+      receipts: [],
+      generatedAt: new Date().toISOString(),
+    };
+
+    const result = adapter.validate(bundleWithRedactedHash);
+
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some(e => e.includes('not a valid proof')), 'should flag invalid contentHash');
   });
 
   test('validate() on bundle missing bundleId → { valid: false }', () => {

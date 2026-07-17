@@ -222,8 +222,11 @@ class AgentGateway {
    * @param {object} opts.artifactPipeline
    * @param {object} opts.receiptJournal
    * @param {object} opts.toolGateway
+   * @param {object} [opts.memoryWeaver]      - MemoryWeaver instance for query_memory
+   * @param {object} [opts.proofDropAdapter]  - ProofDropAdapter instance for export_proof_drop
    * @param {number} [opts.port]
    * @param {string} [opts.bindAddress]
+   * @param {string} [opts.authToken]         - Bearer token required when remote mode is enabled
    */
   constructor({
     capsuleRegistry,
@@ -232,8 +235,11 @@ class AgentGateway {
     artifactPipeline,
     receiptJournal,
     toolGateway,
+    memoryWeaver,
+    proofDropAdapter,
     port,
     bindAddress,
+    authToken,
   } = {}) {
     this._capsuleRegistry = capsuleRegistry;
     this._dreamloopRegistry = dreamloopRegistry;
@@ -241,6 +247,8 @@ class AgentGateway {
     this._artifactPipeline = artifactPipeline;
     this._receiptJournal = receiptJournal;
     this._toolGateway = toolGateway;
+    this._memoryWeaver = memoryWeaver || null;
+    this._proofDropAdapter = proofDropAdapter || null;
 
     // Port: explicit arg > env var > default
     this._port = port != null
@@ -252,6 +260,20 @@ class AgentGateway {
     this._bindAddress = bindAddress != null
       ? bindAddress
       : (remoteEnabled ? '0.0.0.0' : '127.0.0.1');
+
+    // Remote mode requires an auth token — fail at construction time, not at first request
+    if (remoteEnabled) {
+      const token = authToken || process.env.ZOL_AGENT_GATEWAY_TOKEN || '';
+      if (!token) {
+        throw new Error(
+          'AgentGateway: ZOL_AGENT_GATEWAY_REMOTE=1 requires ZOL_AGENT_GATEWAY_TOKEN ' +
+          '(or authToken constructor option). Refusing to bind to 0.0.0.0 without authentication.'
+        );
+      }
+      this._authToken = token;
+    } else {
+      this._authToken = null;
+    }
 
     this._rateLimiter = new RateLimiter(60, 60_000);
     this._server = null;
@@ -314,6 +336,15 @@ class AgentGateway {
     const rl = this._rateLimiter.check(ip);
     if (!rl.allowed) {
       return sendError(res, 429, 'Too Many Requests');
+    }
+
+    // Bearer token auth — required when running in remote mode
+    if (this._authToken) {
+      const authHeader = req.headers['authorization'] || '';
+      const provided = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+      if (provided !== this._authToken) {
+        return sendError(res, 401, 'Unauthorized');
+      }
     }
 
     // Parse URL
@@ -564,13 +595,11 @@ class AgentGateway {
 
       case 'query_memory': {
         const { type, tags, limit } = input;
-        result = await this._capsuleRegistry.list();
-        // Filter by type/tags if the registry exposes that; return all if not supported
-        if (type || tags || limit) {
-          // Best-effort filter on whatever shape list() returns
-          let filtered = result;
-          if (limit) filtered = filtered.slice(0, limit);
-          result = filtered;
+        if (this._memoryWeaver && typeof this._memoryWeaver.query === 'function') {
+          result = await this._memoryWeaver.query({ type, tags, limit });
+        } else {
+          // MemoryWeaver not wired — return empty rather than leaking capsule registry internals
+          result = [];
         }
         break;
       }
@@ -604,7 +633,10 @@ class AgentGateway {
         if (!artifactId) {
           return sendError(res, 400, 'Bad Request: artifactId is required');
         }
-        const exported = await this._artifactPipeline.export(artifactId);
+        if (!this._proofDropAdapter) {
+          return sendError(res, 503, 'ProofDropAdapter not configured');
+        }
+        const exported = await this._proofDropAdapter.export(artifactId);
         if (!exported) {
           return sendError(res, 404, 'not found');
         }
@@ -621,3 +653,56 @@ class AgentGateway {
 }
 
 module.exports = { AgentGateway };
+
+// ---------------------------------------------------------------------------
+// Standalone entry point
+// ---------------------------------------------------------------------------
+if (require.main === module) {
+  (async () => {
+    const { createStateStore } = require('./state-adapter');
+    const { CapsuleRegistry } = require('./capsule-registry');
+    const { DreamloopRegistry } = require('./dreamloop-registry');
+    const { WorkRouter } = require('./work-router');
+    const { ArtifactPipeline } = require('./artifact-pipeline');
+    const { ReceiptJournal } = require('./receipt-journal');
+    const { ToolGateway } = require('./tool-gateway');
+    const { MemoryWeaver } = require('./memory-weaver');
+
+    const stateDir = process.env.ZOL_STATE_DIR ||
+      require('path').join(process.env.HOME || '/root', 'zol', 'state');
+
+    const store = await createStateStore(stateDir);
+    const capsuleRegistry = new CapsuleRegistry(store);
+    const dreamloopRegistry = new DreamloopRegistry(store);
+    const workRouter = new WorkRouter(store);
+    const receiptJournal = new ReceiptJournal(store);
+    const artifactPipeline = new ArtifactPipeline(store, receiptJournal);
+    const toolGateway = new ToolGateway(store, receiptJournal);
+    const memoryWeaver = new MemoryWeaver(store);
+
+    const gateway = new AgentGateway({
+      capsuleRegistry,
+      dreamloopRegistry,
+      workRouter,
+      artifactPipeline,
+      receiptJournal,
+      toolGateway,
+      memoryWeaver,
+    });
+
+    const { port, url } = await gateway.start();
+    console.log(`[AgentGateway] Listening at ${url}`);
+
+    process.on('SIGTERM', async () => {
+      await gateway.stop();
+      process.exit(0);
+    });
+    process.on('SIGINT', async () => {
+      await gateway.stop();
+      process.exit(0);
+    });
+  })().catch(err => {
+    console.error('[AgentGateway] Fatal startup error:', err.message);
+    process.exit(1);
+  });
+}

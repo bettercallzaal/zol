@@ -10,10 +10,12 @@ const crypto = require('crypto');
 // Secret patterns — walk content recursively and redact before storage
 // ---------------------------------------------------------------------------
 
+// Credential patterns — SHA-256 content hashes must NOT be redacted.
 const SECRET_PATTERNS = [
-  /[0-9a-fA-F]{64}/g,      // 64-char hex (private keys)
-  /sk-[a-zA-Z0-9_-]+/g,    // OpenAI/OpenRouter API keys
-  /ghp_[a-zA-Z0-9_-]+/g,   // GitHub personal access tokens
+  /sk-[a-zA-Z0-9_-]{20,}/g,   // OpenAI/OpenRouter API keys
+  /ghp_[a-zA-Z0-9_-]{4,}/g,   // GitHub personal access tokens
+  /github_pat_[a-zA-Z0-9_]+/g,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
 ];
 
 /**
@@ -68,6 +70,16 @@ function bumpPatch(version) {
   const patch = parseInt(parts[2], 10);
   return `${parts[0]}.${parts[1]}.${isNaN(patch) ? 1 : patch + 1}`;
 }
+
+// Valid lifecycle transitions: from_status → allowed_next_statuses
+const LIFECYCLE_TRANSITIONS = {
+  planned:   new Set(['built']),
+  built:     new Set(['verified', 'failed']),
+  verified:  new Set(['packaged']),
+  packaged:  new Set(['delivered']),
+  failed:    new Set(['built']),       // rebuild after failure is allowed
+  delivered: new Set([]),              // terminal
+};
 
 // Statuses that are considered "built or later" for version-bump purposes
 const BUILT_OR_LATER = new Set(['built', 'verifying', 'verified', 'packaged', 'delivered', 'failed']);
@@ -251,7 +263,16 @@ class ArtifactPipeline {
     const artifact = await this._loadArtifact(artifactId);
     if (!artifact) throw new Error(`ArtifactPipeline.build: artifact not found: ${artifactId}`);
 
-    // Bump patch version if already built or beyond
+    // Lifecycle guard: only planned or failed artifacts can transition to built.
+    const allowed = LIFECYCLE_TRANSITIONS[artifact.status];
+    if (!allowed || !allowed.has('built')) {
+      throw new Error(
+        `ArtifactPipeline.build: invalid transition "${artifact.status}" → "built". ` +
+        `Allowed transitions from "${artifact.status}": [${allowed ? [...allowed].join(', ') : 'none'}]`
+      );
+    }
+
+    // Bump patch version if already built or beyond (rebuild after failure)
     if (BUILT_OR_LATER.has(artifact.status)) {
       artifact.version = bumpPatch(artifact.version);
     }
@@ -261,6 +282,8 @@ class ArtifactPipeline {
     artifact.contentHash = contentHash(cleaned);
     artifact.format = format || 'json';
     artifact.status = 'built';
+    // Invalidate prior verification/approval on rebuild
+    artifact.verificationEvidence = null;
 
     await this._saveArtifact(artifact);
     return artifact;
@@ -278,8 +301,18 @@ class ArtifactPipeline {
     const artifact = await this._loadArtifact(artifactId);
     if (!artifact) throw new Error(`ArtifactPipeline.verify: artifact not found: ${artifactId}`);
 
+    // Lifecycle guard: only built artifacts can be verified
+    const allowed = LIFECYCLE_TRANSITIONS[artifact.status];
+    const nextStatus = (evidence && evidence.passed === true) ? 'verified' : 'failed';
+    if (!allowed || !allowed.has(nextStatus)) {
+      throw new Error(
+        `ArtifactPipeline.verify: invalid transition "${artifact.status}" → "${nextStatus}". ` +
+        `Artifact must be in "built" status before verification.`
+      );
+    }
+
     artifact.verificationEvidence = evidence && typeof evidence === 'object' ? { ...evidence } : evidence;
-    artifact.status = (evidence && evidence.passed === true) ? 'verified' : 'failed';
+    artifact.status = nextStatus;
 
     await this._saveArtifact(artifact);
     return artifact;
@@ -296,9 +329,13 @@ class ArtifactPipeline {
     const artifact = await this._loadArtifact(artifactId);
     if (!artifact) throw new Error(`ArtifactPipeline.package: artifact not found: ${artifactId}`);
 
-    // Bump version on re-packaging
-    if (artifact.status === 'packaged') {
-      artifact.version = bumpPatch(artifact.version);
+    // Lifecycle guard: only verified artifacts can be packaged
+    const allowed = LIFECYCLE_TRANSITIONS[artifact.status];
+    if (!allowed || !allowed.has('packaged')) {
+      throw new Error(
+        `ArtifactPipeline.package: invalid transition "${artifact.status}" → "packaged". ` +
+        `Artifact must be in "verified" status before packaging.`
+      );
     }
 
     artifact.status = 'packaged';
@@ -318,6 +355,15 @@ class ArtifactPipeline {
   async deliver(artifactId, { receiptId } = {}) {
     const artifact = await this._loadArtifact(artifactId);
     if (!artifact) throw new Error(`ArtifactPipeline.deliver: artifact not found: ${artifactId}`);
+
+    // Lifecycle guard: only packaged artifacts can be delivered
+    const allowed = LIFECYCLE_TRANSITIONS[artifact.status];
+    if (!allowed || !allowed.has('delivered')) {
+      throw new Error(
+        `ArtifactPipeline.deliver: invalid transition "${artifact.status}" → "delivered". ` +
+        `Artifact must be in "packaged" status before delivery.`
+      );
+    }
 
     artifact.status = 'delivered';
     artifact.deliveredAt = new Date().toISOString();

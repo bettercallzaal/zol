@@ -12,14 +12,25 @@ const crypto = require('crypto');
 // Secret patterns — redact these from any string value in the bundle
 // ---------------------------------------------------------------------------
 
+// Credential patterns — redact these from any string value in the bundle.
+// SHA-256 hashes (contentHash, receipt sha256) are evidence and must NOT be redacted.
 const SECRET_PATTERNS = [
-  /[0-9a-fA-F]{64}/g,       // 64-char hex (eth private key / raw SHA-256)
-  /sk-[a-zA-Z0-9_-]+/g,     // OpenAI / Anthropic / OpenRouter API keys
-  /ghp_[a-zA-Z0-9_-]+/g,    // GitHub personal access tokens
+  /sk-[a-zA-Z0-9_-]{20,}/g,   // OpenAI / Anthropic / OpenRouter API keys
+  /ghp_[a-zA-Z0-9_-]{4,}/g,   // GitHub personal access tokens
+  /github_pat_[a-zA-Z0-9_]+/g, // GitHub PATs v2
+  /ghs_[a-zA-Z0-9_]+/g,        // GitHub Actions tokens
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
 ];
 
-// Evidence field keys that must never appear in a proof-drop bundle
-const PRIVATE_EVIDENCE_KEYS = new Set(['prompt', 'privateKey', 'memory']);
+// Evidence field keys that must never appear in a proof-drop bundle.
+// These are removed recursively from nested evidence objects.
+const PRIVATE_EVIDENCE_KEYS = new Set([
+  'prompt', 'privateKey', 'memory', 'secret', 'token', 'credential', 'credentials',
+  'apiKey', 'api_key', 'password', 'mnemonic', 'seed',
+]);
+
+// Valid contentHash format: "sha256:<64 hex chars>"
+const CONTENT_HASH_RE = /^sha256:[0-9a-f]{64}$/;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -56,16 +67,16 @@ function redactSecrets(value) {
 }
 
 /**
- * Remove private evidence keys from a receipt's evidence object.
+ * Recursively remove private evidence keys from an evidence object.
  * Returns { cleaned, redactedPaths } where redactedPaths lists every
- * dot-path that was removed (e.g. 'evidence.prompt').
+ * dot-path that was removed (e.g. 'evidence.prompt', 'evidence.nested.token').
  *
- * @param {object|null} evidence
- * @param {string}      basePath  prefix for path reporting
- * @returns {{ cleaned: object|null, redactedPaths: string[] }}
+ * @param {*}      evidence
+ * @param {string} basePath  prefix for path reporting
+ * @returns {{ cleaned: *, redactedPaths: string[] }}
  */
 function sanitizeEvidenceFields(evidence, basePath = 'evidence') {
-  if (!evidence || typeof evidence !== 'object') {
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) {
     return { cleaned: evidence, redactedPaths: [] };
   }
 
@@ -76,13 +87,35 @@ function sanitizeEvidenceFields(evidence, basePath = 'evidence') {
     const path = `${basePath}.${key}`;
     if (PRIVATE_EVIDENCE_KEYS.has(key)) {
       redactedPaths.push(path);
-      // Do not copy this key into cleaned
+    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+      // Recurse into nested objects
+      const { cleaned: nestedCleaned, redactedPaths: nestedPaths } = sanitizeEvidenceFields(value, path);
+      cleaned[key] = nestedCleaned;
+      redactedPaths.push(...nestedPaths);
     } else {
       cleaned[key] = value;
     }
   }
 
   return { cleaned, redactedPaths };
+}
+
+/**
+ * Validate that a receipt has the minimum required structural fields.
+ * Returns an error string if invalid, or null if valid.
+ */
+function validateReceiptStructure(receipt, index) {
+  const required = ['receiptId', 'action', 'status', 'agentId'];
+  for (const field of required) {
+    if (!receipt[field]) {
+      return `receipt[${index}] missing required field: ${field}`;
+    }
+  }
+  const validStatuses = ['success', 'failure', 'pending'];
+  if (!validStatuses.includes(receipt.status)) {
+    return `receipt[${index}].status is invalid: "${receipt.status}"`;
+  }
+  return null;
 }
 
 /**
@@ -184,18 +217,25 @@ class ProofDropAdapter {
       receiptBelongsToArtifact(r, artifactId, artifactReceiptIdSet)
     );
 
-    // 4. Sanitize each receipt and collect redacted paths
+    // 4. Validate receipt structure, sanitize, and collect redacted paths
     const allRedactedPaths = [];
-    const sanitizedReceipts = relatedReceipts.map(receipt => {
+    const sanitizedReceipts = [];
+    for (let i = 0; i < relatedReceipts.length; i++) {
+      const receipt = relatedReceipts[i];
+      const structErr = validateReceiptStructure(receipt, i);
+      if (structErr) {
+        // Skip malformed receipts and note the exclusion
+        allRedactedPaths.push(`[excluded:${structErr}]`);
+        continue;
+      }
+
       const { cleaned: cleanedEvidence, redactedPaths } = sanitizeEvidenceFields(
         receipt.evidence,
         `receipts[${receipt.receiptId}].evidence`
       );
       allRedactedPaths.push(...redactedPaths);
 
-      // Build a receipt copy that excludes the evidence.prompt / private keys
-      // and redacts secrets in remaining string values
-      const sanitized = {
+      sanitizedReceipts.push({
         receiptId: receipt.receiptId,
         loopId: receipt.loopId,
         runId: receipt.runId,
@@ -207,11 +247,12 @@ class ProofDropAdapter {
         startedAt: receipt.startedAt,
         finishedAt: receipt.finishedAt,
         durationMs: receipt.durationMs,
+        sha256: receipt.sha256 || null,
+        previousReceiptId: receipt.previousReceiptId || null,
+        previousReceiptHash: receipt.previousReceiptHash || null,
         evidence: redactSecrets(cleanedEvidence),
-      };
-
-      return sanitized;
-    });
+      });
+    }
 
     // 5. Extract only public evidence from the artifact's verificationEvidence
     let publicEvidence = {};
@@ -274,6 +315,17 @@ class ProofDropAdapter {
     for (const field of required) {
       if (bundle[field] === undefined || bundle[field] === null) {
         errors.push(`missing required field: ${field}`);
+      }
+    }
+
+    // contentHash must be a valid "sha256:<64 hex chars>" string
+    if (bundle.contentHash !== undefined && bundle.contentHash !== null) {
+      if (!CONTENT_HASH_RE.test(bundle.contentHash)) {
+        errors.push(
+          `contentHash is not a valid proof: "${bundle.contentHash}". ` +
+          'Expected format: sha256:<64 lowercase hex chars>. ' +
+          'sha256:[REDACTED] is rejected — contentHash is evidence, not a secret.'
+        );
       }
     }
 

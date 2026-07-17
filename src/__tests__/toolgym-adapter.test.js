@@ -122,7 +122,7 @@ describe('ToolGymAdapter', () => {
     assert.ok(workout.results[0].output.error, 'error should be recorded in output');
   });
 
-  test('recordMasteryReceipt() on passed workout → returns masteryReceipt with passRate', async () => {
+  test('recordMasteryReceipt() on mock workout → throws MOCK_WORKOUT_MASTERY_BLOCKED', async () => {
     const adapter = new ToolGymAdapter(
       makeToolGateway(),
       makeArtifactPipeline(),
@@ -131,12 +131,40 @@ describe('ToolGymAdapter', () => {
 
     const workout = await adapter.runWorkout({
       toolId: 'tool_test',
-      name: 'Mastery Workout',
+      name: 'Mock Mastery Workout',
       inputs: [{ query: 'test' }],
       expectedOutputKeys: ['result'],
     });
 
-    assert.equal(workout.status, 'passed', 'workout must pass to record mastery');
+    assert.equal(workout.status, 'passed', 'workout passes but is mock');
+    assert.equal(workout.executionMode, 'mock', 'runWorkout always returns mock mode');
+
+    try {
+      await adapter.recordMasteryReceipt('tool_test', workout);
+      assert.fail('Should have thrown MOCK_WORKOUT_MASTERY_BLOCKED');
+    } catch (e) {
+      assert.equal(e.code, 'MOCK_WORKOUT_MASTERY_BLOCKED', 'must block mock mastery');
+    }
+  });
+
+  test('recordMasteryReceipt() on live workout → returns masteryReceipt with passRate', async () => {
+    const adapter = new ToolGymAdapter(
+      makeToolGateway(),
+      makeArtifactPipeline(),
+      makeReceiptJournal()
+    );
+
+    // Simulate a live field test workout (executionMode: 'live')
+    const workout = await adapter.runWorkout({
+      toolId: 'tool_test',
+      name: 'Live Mastery Workout',
+      inputs: [{ query: 'test' }],
+      expectedOutputKeys: ['result'],
+    });
+
+    // Override executionMode to simulate a live field test
+    // (in production, this comes from a live ToolGateway execution, not a mock)
+    workout.executionMode = 'live';
 
     const masteryReceipt = await adapter.recordMasteryReceipt('tool_test', workout);
 
@@ -144,6 +172,6 @@ describe('ToolGymAdapter', () => {
     assert.ok(masteryReceipt.receiptId, 'receiptId should be set');
     assert.equal(masteryReceipt.toolId, 'tool_test');
     assert.ok(typeof masteryReceipt.passRate === 'number', 'passRate should be a number');
-    assert.ok(masteryReceipt.passRate >= 0 && masteryReceipt.passRate <= 1, 'passRate should be between 0 and 1');
+    assert.ok(masteryReceipt.passRate >= 0 && masteryReceipt.passRate <= 1, 'passRate between 0 and 1');
   });
 });

@@ -73,6 +73,8 @@ class ToolGymAdapter {
     this._pipeline = artifactPipeline;
     this._journal = receiptJournal;
     this._agentId = agentId;
+    // Track workoutIds issued by this adapter to block fabricated mastery
+    this._issuedWorkoutIds = new Set();
   }
 
   // -------------------------------------------------------------------------
@@ -203,6 +205,9 @@ class ToolGymAdapter {
     // Overall pass requires ALL rounds to have passed
     status = results.length > 0 && results.every(r => r.passed) ? 'passed' : 'failed';
 
+    // Track this workoutId so recordMasteryReceipt() can verify it came from here
+    this._issuedWorkoutIds.add(workoutId);
+
     return {
       workoutId,
       toolId: workoutDef.toolId,
@@ -214,6 +219,8 @@ class ToolGymAdapter {
       expectedOutputKeys,
       status,
       results,
+      // executionMode is always 'mock' — mastery requires a live field test
+      executionMode: 'mock',
       evidence: null,
     };
   }
@@ -237,17 +244,56 @@ class ToolGymAdapter {
       );
     }
 
+    // Block mock workouts from issuing mastery credentials
+    if (workoutResult.executionMode === 'mock') {
+      const err = new Error(
+        `ToolGymAdapter.recordMasteryReceipt: mock workouts cannot issue mastery credentials. ` +
+        `Mastery requires a controlled live field test with independent verification.`
+      );
+      err.code = 'MOCK_WORKOUT_MASTERY_BLOCKED';
+      throw err;
+    }
+
+    // Verify this workoutResult came from this adapter instance
+    if (!this._issuedWorkoutIds.has(workoutResult.workoutId)) {
+      const err = new Error(
+        `ToolGymAdapter.recordMasteryReceipt: workoutId "${workoutResult.workoutId}" was not ` +
+        `issued by this adapter instance — cannot attest mastery for untracked workouts.`
+      );
+      err.code = 'UNTRACKED_WORKOUT';
+      throw err;
+    }
+
+    // Verify toolId matches the workout
+    if (workoutResult.toolId !== toolId) {
+      const err = new Error(
+        `ToolGymAdapter.recordMasteryReceipt: toolId mismatch — ` +
+        `requested "${toolId}" but workout was for "${workoutResult.toolId}".`
+      );
+      err.code = 'TOOLID_MISMATCH';
+      throw err;
+    }
+
+    // Require non-empty results with a real pass rate
+    const results = Array.isArray(workoutResult.results) ? workoutResult.results : [];
+    if (results.length === 0) {
+      throw new Error(
+        'ToolGymAdapter.recordMasteryReceipt: workoutResult.results is empty — cannot attest mastery without evidence.'
+      );
+    }
+
     const receiptId = `mast_${crypto.randomUUID()}`;
     const masteredAt = new Date().toISOString();
-    const passRate = computePassRate(workoutResult.results);
-    const roundsCompleted = Array.isArray(workoutResult.results) ? workoutResult.results.length : 0;
+    const passRate = computePassRate(results);
+    const roundsCompleted = results.length;
 
-    // Evidence: summarize the workout without exposing raw inputs/outputs
+    // Evidence: include per-round pass/fail summary (no raw inputs/outputs)
     const evidence = {
       workoutId: workoutResult.workoutId,
       toolId,
       passRate,
       roundsCompleted,
+      roundResults: results.map((r, i) => ({ round: i + 1, passed: r.passed, durationMs: r.durationMs })),
       expectedOutputKeys: workoutResult.expectedOutputKeys || [],
       masteredAt,
     };
@@ -264,7 +310,7 @@ class ToolGymAdapter {
       attestedBy: 'toolgym-adapter',
     };
 
-    // 1. Store as a full artifact: plan → build → verify → deliver
+    // 1. Store as full artifact: plan → build → verify → package → deliver
     const artifact = await this._pipeline.plan({
       type: 'training-manifest',
       title: `Mastery receipt: ${toolId} [${receiptId}]`,
@@ -275,6 +321,7 @@ class ToolGymAdapter {
 
     await this._pipeline.build(artifact.artifactId, masteryReceipt, { format: 'json' });
     await this._pipeline.verify(artifact.artifactId, { passed: true, passRate, roundsCompleted });
+    await this._pipeline.package(artifact.artifactId);
     await this._pipeline.deliver(artifact.artifactId);
 
     // 2. Append to receipt journal
@@ -288,6 +335,9 @@ class ToolGymAdapter {
       evidence,
       idempotencyKey: `${toolId}:${workoutResult.workoutId}:mastery`,
     });
+
+    // Remove workoutId from tracking once consumed (one-use)
+    this._issuedWorkoutIds.delete(workoutResult.workoutId);
 
     return masteryReceipt;
   }

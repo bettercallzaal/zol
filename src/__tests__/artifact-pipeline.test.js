@@ -53,7 +53,7 @@ describe('ArtifactPipeline', () => {
     assert.ok(built.contentHash.length > 0, 'contentHash should be non-empty');
   });
 
-  test('build() strips secrets from content (64-char hex → "[REDACTED]")', async () => {
+  test('build() strips credential-format secrets but preserves SHA-256 evidence hashes', async () => {
     const pipeline = new ArtifactPipeline(makeMockStore(), mockJournal);
 
     const planned = await pipeline.plan({
@@ -62,15 +62,17 @@ describe('ArtifactPipeline', () => {
       description: 'Testing secret stripping',
     });
 
-    const hexSecret = 'a'.repeat(64); // 64-char hex string
+    const evidenceHash = 'a'.repeat(64); // SHA-256 digest — evidence, not a secret
+    const apiKey = 'sk-' + 'x'.repeat(30); // OpenRouter key — always a secret
     const built = await pipeline.build(planned.artifactId, {
-      body: 'some text',
-      key: hexSecret,
+      sha256: evidenceHash,       // must be preserved
+      api_config: apiKey,         // must be redacted
     });
 
     assert.equal(built.status, 'built');
     const contentStr = JSON.stringify(built.content);
-    assert.ok(!contentStr.includes(hexSecret), '64-char hex should be stripped');
+    assert.ok(contentStr.includes(evidenceHash), 'SHA-256 evidence hash must be preserved');
+    assert.ok(!contentStr.includes(apiKey), 'sk- API key must be redacted');
     assert.ok(contentStr.includes('[REDACTED]'), 'content should contain [REDACTED]');
   });
 
