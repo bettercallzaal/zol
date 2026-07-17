@@ -146,12 +146,23 @@
       "source_doc": "1209",
       "last_checked": "2026-07-17",
       "last_checked_result": "NOT triggered — S7 Onchain Builders closed July 31 2025; S8 Onchain Builders closed July 30 2025. No Season 9 round announced as of 2026-07-17. Watch gov.optimism.io for S9 announcement."
+    },
+    {
+      "id": "zabal-api-new-endpoints",
+      "url": "https://zabalgamez.com",
+      "check": "new API endpoints or developer documentation published at zabalgamez.com (submissions, events, music catalog, artist profiles) that justify expanding the api.read.external allowlist beyond the current 'https://zabalgamez.com/' prefix",
+      "on_detect": "open improvement-proposal to add specific new endpoint prefixes to the api.read.external ALLOWED_PREFIXES list in src/handlers/index.js",
+      "priority": "low",
+      "source_doc": "cycle3-capability-gap-wiring",
+      "last_checked": "2026-07-17",
+      "last_checked_result": "NOT triggered — zabalgamez.com is accessible; api.read.external already allows the full 'https://zabalgamez.com/' prefix. No new API documentation found. Current coverage is sufficient."
     }
   ],
   "checks": [
     "clanker_v5_released",
     "fractally_directory_live",
-    "atlas_round_open"
+    "atlas_round_open",
+    "zabal_api_new_endpoints"
   ],
   "evidence_outputs": [
     "watch_report"
