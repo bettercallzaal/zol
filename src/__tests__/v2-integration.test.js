@@ -975,7 +975,7 @@ describe('AgentGateway {ok} Response Shape', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 14. Proof Drop Redaction
+// 13. Proof Drop Redaction
 // ---------------------------------------------------------------------------
 
 describe('Proof Drop Redaction', () => {
@@ -1079,7 +1079,103 @@ describe('Proof Drop Redaction', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 14. One-Reply-Per-Social-Thread
+// 14. AgentGateway Route Validation (safeParse HTTP-level)
+// ---------------------------------------------------------------------------
+
+describe('AgentGateway Route Validation (safeParse HTTP-level)', () => {
+  function makeGateway(port = 0) {
+    const store = makeMockStore();
+    const capsuleRegistry = new CapsuleRegistry(store);
+    const dreamloopRegistry = new DreamLoopRegistry(store);
+    const workRouter = new WorkRouter(store);
+    const pipeline = new ArtifactPipeline(store, null);
+    const journal = new ReceiptJournal(store);
+    const toolGateway = new ToolGateway(store, null);
+    return new AgentGateway({
+      capsuleRegistry, dreamloopRegistry, workRouter,
+      artifactPipeline: pipeline, receiptJournal: journal, toolGateway,
+      port, bindAddress: '127.0.0.1',
+    });
+  }
+
+  async function post(port, path, body) {
+    const resp = await fetch(`http://127.0.0.1:${port}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return { status: resp.status, body: await resp.json() };
+  }
+
+  test('POST /tasks with missing required fields returns ok:false with validation error', async () => {
+    const gw = makeGateway(0);
+    const { port } = await gw.start();
+    try {
+      const { status, body } = await post(port, '/tasks', {});
+      assert.equal(status, 400, 'missing required fields must return 400');
+      assert.equal(body.ok, false, 'response must have ok:false');
+      assert.ok(typeof body.error === 'string', 'error must be a string');
+      assert.ok(body.error.includes('title') || body.error.includes('required'),
+        `error must mention missing field, got: ${body.error}`);
+    } finally {
+      await gw.stop();
+    }
+  });
+
+  test('POST /tasks with valid body creates packet and returns ok:true', async () => {
+    const gw = makeGateway(0);
+    const { port } = await gw.start();
+    try {
+      const { status, body } = await post(port, '/tasks', {
+        title: 'Test task',
+        description: 'Integration test work packet',
+        type: 'research',
+      });
+      assert.equal(status, 200, 'valid task body must return 200');
+      assert.equal(body.ok, true, 'valid task body must have ok:true');
+      assert.ok(body.task, 'response must include task object');
+      assert.equal(body.created, true, 'response must indicate created:true');
+    } finally {
+      await gw.stop();
+    }
+  });
+
+  test('POST /mcp/execute with missing tool field returns ok:false', async () => {
+    const gw = makeGateway(0);
+    const { port } = await gw.start();
+    try {
+      const { status, body } = await post(port, '/mcp/execute', {});
+      assert.equal(status, 400, 'missing tool field must return 400');
+      assert.equal(body.ok, false, 'response must have ok:false');
+      assert.ok(body.error.includes('tool') || body.error.includes('Validation'),
+        `error must reference missing tool field, got: ${body.error}`);
+    } finally {
+      await gw.stop();
+    }
+  });
+
+  test('POST /mcp/execute with known tool + invalid input returns ok:false with schema error', async () => {
+    const gw = makeGateway(0);
+    const { port } = await gw.start();
+    try {
+      // create_work_packet requires title and description (strings)
+      const { status, body } = await post(port, '/mcp/execute', {
+        tool: 'create_work_packet',
+        input: { title: 123, description: 456 },
+      });
+      // The body-level safeParse passes (tool is present), but input schema validation fails
+      assert.equal(status, 400, 'invalid input schema must return 400');
+      assert.equal(body.ok, false, 'response must have ok:false');
+      assert.ok(body.error.toLowerCase().includes('validation'),
+        `error must mention validation, got: ${body.error}`);
+    } finally {
+      await gw.stop();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 15. One-Reply-Per-Social-Thread
 // ---------------------------------------------------------------------------
 
 describe('One-Reply-Per-Social-Thread', () => {
