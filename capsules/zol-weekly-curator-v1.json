@@ -78,7 +78,31 @@
       "self.modify.live",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "weekly-recap-collect",
+      "weekly-recap-contextualize",
+      "weekly-recap-highlight",
+      "weekly-recap-draft",
+      "weekly-recap-stage"
+    ],
+    "allowed_tools": [
+      "farcaster.read",
+      "state.read",
+      "state.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "farcaster.public",
+      "bonfire.recall"
+    ],
+    "disallowed_wallets": [
+      "*"
+    ],
+    "disallowed_signers": [
+      "*"
+    ],
+    "disallowed_environments": []
   },
   "resource_limits": {
     "max_wall_time_ms": 60000,
@@ -95,6 +119,6 @@
   },
   "provenance": {
     "source": "https://github.com/bettercallzaal/zol",
-    "content_hash": "sha256:draft-weekly-curator-v1"
+    "content_hash": "sha256:f4c35bd639b6574e776a51bd3819abfa8639c57221d4283ba17a5e55c716825a"
   }
 }

@@ -3,7 +3,7 @@
   "loop_id": "weekly-curator-v1",
   "title": "Weekly Curator Recap",
   "version": "1.0.0",
-  "status": "draft",
+  "status": "rehearsed",
   "owner": "zol-weekly-curator-v1",
   "stewards": [
     "zaal"
@@ -209,5 +209,23 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "experimental",
+  "entry_conditions": [
+    "schedule:weekly_end",
+    "week_activity_log_available"
+  ],
+  "exit_conditions": [
+    "curator_recap_published OR queued",
+    "recap_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

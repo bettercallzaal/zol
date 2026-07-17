@@ -133,5 +133,23 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "creative_task_assigned",
+    "context_loaded"
+  ],
+  "exit_conditions": [
+    "creative_output_produced",
+    "session_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

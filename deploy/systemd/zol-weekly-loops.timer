@@ -1,0 +1,15 @@
+[Unit]
+Description=ZOL Weekly DreamLoops Timer (Mondays 6am UTC)
+Documentation=https://github.com/bettercallzaal/zol
+Requires=zol-weekly-loops.service
+
+[Timer]
+# Matches weekly-curator-v1's declared trigger ("scheduled weekly (Monday
+# 6am UTC)") - adjust if the Pi's system timezone isn't UTC, or set
+# artist-spotlight's own cadence separately later if it should differ.
+OnCalendar=Mon *-*-* 06:00:00 UTC
+AccuracySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

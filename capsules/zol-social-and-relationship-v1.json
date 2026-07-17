@@ -1,0 +1,75 @@
+{
+  "schema": "dreamnet.synergy_capsule.v1",
+  "capsule_id": "zol-social-and-relationship-v1",
+  "name": "ZOL Social and Relationship",
+  "version": "1.0.0",
+  "capsule_type": "runtime_profile",
+  "status": "rehearsed",
+  "purpose": "Relationship sync, conversation follow-up, community CRM, and social context for zolbot on Farcaster.",
+  "payload": {
+    "components": [
+      "relationship-tracker",
+      "conversation-history",
+      "community-crm"
+    ]
+  },
+  "permissions": {
+    "allowed": [
+      "approval.request",
+      "memory.read",
+      "memory.write",
+      "receipt.local.write",
+      "relationship.read",
+      "relationship.write",
+      "state.local.read",
+      "state.local.write",
+      "task.read"
+    ],
+    "blocked": [
+      "cloud.mutate",
+      "component.install",
+      "deployment.production.write",
+      "package.install",
+      "public.publish",
+      "secret.value.read",
+      "self.modify.live",
+      "signer.change",
+      "wallet.sign"
+    ],
+    "allowed_loops": [
+      "conversation-follow-up",
+      "relationship-sync",
+      "inbox-triage"
+    ],
+    "allowed_tools": [
+      "farcaster.read",
+      "state.read",
+      "state.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "relationship.local",
+      "farcaster.public"
+    ],
+    "disallowed_wallets": [
+      "*"
+    ],
+    "disallowed_signers": [
+      "*"
+    ],
+    "disallowed_environments": []
+  },
+  "resource_limits": {
+    "max_wall_time_ms": 600000,
+    "max_steps": 40,
+    "max_retries_per_step": 2
+  },
+  "activation": {
+    "mode": "manual_review",
+    "rollback_version": "disabled"
+  },
+  "provenance": {
+    "source": "https://github.com/BrandonDucar/dreamloops",
+    "content_hash": "sha256:b1c0c82160bfea5f8f3c8986ea251a29e37e38ab8fade6c4f0591e60b4965dce"
+  }
+}

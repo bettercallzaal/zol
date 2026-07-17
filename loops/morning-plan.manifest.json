@@ -5,7 +5,9 @@
   "version": "1.0.0",
   "status": "rehearsed",
   "owner": "zol-curator-v1",
-  "stewards": ["zaal"],
+  "stewards": [
+    "zaal"
+  ],
   "permission_tier": "local_draft_write",
   "trigger": "daily at 5:00am (Zaal's wake time per ~user_zaal_schedule.md)",
   "inputs": [
@@ -151,7 +153,10 @@
       "handler": "task.capture",
       "permission": "task.capture",
       "with": {
-        "fromSources": ["calendar", "farcaster_mentions"]
+        "fromSources": [
+          "calendar",
+          "farcaster_mentions"
+        ]
       },
       "retry": {
         "max_attempts": 2
@@ -168,5 +173,23 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "schedule:morning",
+    "state_readable"
+  ],
+  "exit_conditions": [
+    "plan_artifact_written",
+    "receipt_logged"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

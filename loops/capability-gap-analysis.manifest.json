@@ -1,0 +1,138 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "capability-gap-analysis-v1",
+  "title": "Capability Gap Analysis",
+  "version": "1.0.0",
+  "status": "rehearsed",
+  "owner": "zolbot",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "weekly or when a task fails due to missing capability",
+  "cooldown": "604800s",
+  "description": "Scan recent work packets for patterns of failure or missing tools, identify capability gaps, and draft an improvement proposal.",
+  "allowed_actions": [
+    "memory.read",
+    "memory.write",
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "failure_modes": [
+    "budget exceeded",
+    "timeout",
+    "state corruption",
+    "handler error"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-17",
+  "limits": {
+    "max_wall_time_ms": 60000,
+    "max_steps": 6,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "scan-work-history",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "read-tool-health",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "identify-gaps",
+      "handler": "memory.read",
+      "permission": "memory.read",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "draft-proposal",
+      "handler": "memory.write",
+      "permission": "memory.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-gap-analysis",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "work_packets_available",
+    "failure_patterns_detectable"
+  ],
+  "exit_conditions": [
+    "gap_report_drafted",
+    "improvement_proposal_queued OR skipped"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
+  ],
+  "inputs": [
+    "recent_work_packets",
+    "tool_health_snapshot"
+  ],
+  "context_sources": [
+    "recent work packet history (state store)",
+    "tool gateway health records",
+    "receipt journal (last 7 days)",
+    "component-watch alert queue"
+  ],
+  "checks": [
+    "work_packets_scanned",
+    "failure_patterns_identified",
+    "missing_tools_catalogued",
+    "improvement_proposal_queued_or_skipped"
+  ],
+  "evidence_outputs": [
+    "gap_analysis_report"
+  ],
+  "receipt_outputs": [
+    "capability-gap-receipt"
+  ],
+  "knowledge_state_outputs": [
+    "identified_gaps"
+  ],
+  "execution_trace_outputs": [],
+  "memory_routes": []
+}
