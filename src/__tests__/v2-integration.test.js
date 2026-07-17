@@ -815,7 +815,7 @@ describe('Agent Gateway MCP Endpoint Availability', () => {
       const { status, body } = await httpGet(port, '/mcp/tools');
       assert.equal(status, 200, 'status must be 200');
       assert.ok(Array.isArray(body), 'body must be an array');
-      assert.equal(body.length, 5, 'must return exactly 5 MCP tool definitions');
+      assert.ok(body.length >= 7, 'must return at least 7 MCP tool definitions, got ' + body.length);
       // Verify all entries have a name field
       for (const tool of body) {
         assert.ok(typeof tool.name === 'string', 'each tool must have a name');
