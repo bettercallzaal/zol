@@ -1,7 +1,7 @@
 # ZOL Persistent Agent Upgrade v2 — Full Deliverables
 
 **Date:** 2026-07-16 (updated 2026-07-17)
-**Status:** COMPLETE — awaiting operator review and Pi activation (508 tests green, verification gate items 1-10 proven)
+**Status:** COMPLETE — awaiting operator review and Pi activation (518 tests green, verification gate items 1-10 proven)
 **Version:** zol@1.0.0 (package.json)
 
 ---
@@ -30,10 +30,20 @@ PRs in the v2 stack (merge in order):
 - **PR #44** (`ws/v2-task-lease-ttl`) — Implements TTL-based board task lease (board task 1163). `CoworkTracker.claimWithLease()`: sets `leased_until = now + TTL` on claim; on primary collision, retries against tasks where `leased_until < now` (expired lease reclaim). `board.task.claim` handler uses `claimWithLease` when `COWORK_LEASE_ENABLED=1`, falls back to existing conditional-PATCH when disabled. Adds migration note for `leased_until timestamptz` column. Fixes handler count test (8→9, adds `board.task.claim`). 4 new tests. Subtotal: 23 capsules, 72 loops, 501 tests (71 suites).
 - **PR #45** (`ws/v2-runloop-status-fix`) — Fixes hardening-pass spec violation: `run_loop` MCP tool was returning `status:'queued'` even though nothing was enqueued. Changed to `status:'validated'` (loop confirmed in registry; execution requires DreamLoopRunner on Pi). Updated note to be accurate. Added test 13 in real-backend.test.js: asserts `validated ≠ queued` for a known loop and `unknown-loop` for a missing loopId. Subtotal: 23 capsules, 72 loops, 502 tests (71 suites).
 - **PR #46** (`ws/v2-knowledge-approval-hardening`) — Hardens hardening-pass item 10 across all three knowledge products (Zictionary, Zocuments, Zikipedia). `edit()` now throws when caller passes `status:'approved'` (must use `approve()` with verified authority). Any `edit()` on an already-approved object immediately resets `status→'draft'` and clears `approvedBy`; history/changeLog records "approval invalidated". 6 new tests (2 per class). **Total: 23 capsules, 72 loops, 508 tests (71 suites).**
+- **PR #47** (`ws/v2-component-watch-cycle1`) — Self-Improvement Governor component-watch cycle 1: no targets triggered; corrected Clanker watch URL; Optimism S9 scope noted. Subtotal: 23 capsules, 72 loops, 508 tests (71 suites).
+- **PR #48** (`ws/v2-capability-gap-cycle1`) — Governor capability-gap cycle 1: wired `model.completion` to ModelGateway (real LLM completion path). 1 new test. Subtotal: 23 capsules, 72 loops, 509 tests (71 suites).
+- **PR #49** (`ws/v2-capability-gap-cycle2`) — Governor capability-gap cycle 2: added `receipt.local.query`; wired `cowork.fetch-projects`. 3 new tests. Subtotal: 23 capsules, 72 loops, 512 tests (71 suites).
+- **PR #50** (`ws/v2-capability-gap-cycle3`) — Governor capability-gap cycle 3: wired `api.read.external` (URL allowlist), `log.relationship-events-write`, `log.zol-events-write`, `checkpoint.local.write`. 1 new test. Subtotal: 23 capsules, 72 loops, 513 tests (71 suites).
+- **PR #51** (`ws/v2-capability-gap-cycle4`) — Governor capability-gap cycle 4: enriched `farcaster.recent-casts-parse` (music keyword detection); wired `toolgym.mastery.record`, `circle.relationship-status-read`, `circle.relationship-status-write` (local-first). 2 new tests. Subtotal: 23 capsules, 72 loops, 515 tests (73 suites).
+- **PR #52** (`ws/v2-capability-gap-cycle5`) — Governor capability-gap cycle 5: wired `farcaster.activity-read` + `cast.read` (Neynar); `telegram.approval.request` (ApprovalBridge); reclassified `warper.*` handlers as disabled-mode correct (no code change needed). Subtotal: 23 capsules, 72 loops, 515 tests (73 suites).
+- **PR #53** (`ws/v2-capability-gap-cycle6`) — Governor capability-gap cycle 6 (FINAL): wired all 5 `artist-spotlight.*` handlers; 5 stubs remain (2 security-permanent, 1 design-decision, 1 upstream-blocked, 1 shape-mismatch); Governor stub-wiring complete. 3 new tests. **Total: 23 capsules, 72 loops, 518 tests (73 suites).**
 
 Supplementary PRs (no merge dependency on main stack):
 - **PR #29** (`ws/v2-runner-gateway-design`) — Heterogeneous Runner Gateway design doc (design-only, no code)
 - **PR #30** (`ws/fleet-standard-v0.1-expanded`) — Fleet Standard v0.1 operating constitution + conformance harness (72 checks)
+- **PR #40** (`ws/v2-keystone3-bridge-design`) — ZOE→ZOL intent bridge design v1 (design-only); 4 open questions for Zaal/Brandon
+- **PR #41** (`ws/v2-ci`) — `.github/workflows/ci.yml`; Node 22; full gate (dl:test + dl:validate + dl:secret-scan + v2:check + npm audit); CI green; standalone, can merge independently
+- **PR #42** (`ws/v2-keystone4-fleet-design`) — Zaalcaster fleet page design v1; Supabase fleet_state relay (design-only)
 
 ---
 
@@ -451,8 +461,8 @@ Coverage (src/handlers/__tests__/):
 ```
 npm run dl:test
 
-tests:  508
-pass:   508
+tests:  518
+pass:   518
 fail:   0
 duration: ~6000 ms
 ```
@@ -1102,7 +1112,7 @@ Verification: all 72 loops complete dry-run with no errors. No state changes wri
 ```bash
 npm run dl:test
 ```
-Verification: `pass: 508  fail: 0`.
+Verification: `pass: 518  fail: 0`.
 
 **Step 11 — (Optional) Start Agent Gateway**
 ```bash
