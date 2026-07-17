@@ -225,6 +225,10 @@ class WorkRouter {
     const now = new Date().toISOString();
     const packetId = 'work_' + crypto.randomUUID();
 
+    // Every packet gets a guaranteed unique idempotency key so write-tool calls
+    // routed through it can be deduplicated even if the caller does not supply one.
+    const resolvedSideEffectKey = sideEffectKey || crypto.randomUUID();
+
     const packet = {
       packetId,
       title,
@@ -238,7 +242,7 @@ class WorkRouter {
       attemptId: null,     // unique ID per lease acquisition; changes on re-acquire
       fencingEpoch: 0,     // monotonically increasing; reject stale writers
       leaseExpiry: null,   // ISO timestamp; null when not in_progress
-      sideEffectKey,       // caller-supplied idempotency key for side-effecting actions
+      sideEffectKey: resolvedSideEffectKey, // always set; caller may override
       assignedTo: null,
       createdAt: now,
       updatedAt: now,

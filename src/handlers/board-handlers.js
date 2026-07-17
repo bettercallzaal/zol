@@ -25,6 +25,16 @@ const handlers = {
     return getTracker().startTask(id, notes);
   },
 
+  // Atomic conditional claim: todo → in_progress only if task is still todo.
+  // Prevents two agent clones from both claiming the same task (shared-clone collision).
+  // Returns { ok: false, collision: true } if another agent already claimed it.
+  // input: { id, notes?, fromStatus?, claimerId? }
+  'board.task.claim': async function({ input }) {
+    const { id, notes, fromStatus, claimerId } = input || {};
+    if (!id) return { ok: false, error: 'board.task.claim: id is required' };
+    return getTracker().claimTask(id, notes, { fromStatus, claimerId });
+  },
+
   // Mark an existing task done.
   // input: { id, notes } — notes should include PR/doc link
   'board.task.finish': async function({ input }) {

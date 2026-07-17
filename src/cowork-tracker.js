@@ -129,6 +129,25 @@ class CoworkTracker {
     return this._patch(id, { status: 'in_progress', notes: notes || undefined });
   }
 
+  // Atomic claim: transition todo → in_progress only if the task is still in 'todo' state.
+  // If two agents race, only the first PATCH matches the ?status=eq.todo filter;
+  // the second gets an empty result set and { ok: false, collision: true }.
+  // Also accepts tasks in a custom fromStatus (e.g. 'pending') for flexibility.
+  async claimTask(id, notes, { fromStatus = 'todo', claimerId } = {}) {
+    const body = { status: 'in_progress', notes: notes || undefined };
+    if (claimerId) body.claimer = claimerId;
+    const resp = await this._req(
+      'PATCH',
+      `/rest/v1/tasks?id=eq.${encodeURIComponent(id)}&status=eq.${encodeURIComponent(fromStatus)}`,
+      body,
+      { prefer: 'return=representation' }
+    );
+    if (!resp.ok) return { ok: false, error: resp.error };
+    const rows = Array.isArray(resp.data) ? resp.data : (resp.data ? [resp.data] : []);
+    if (rows.length === 0) return { ok: false, collision: true };
+    return { ok: true, row: rows[0] };
+  }
+
   // Transition to done and record the PR / doc link in notes.
   async finishTask(id, notes) {
     return this._patch(id, {
