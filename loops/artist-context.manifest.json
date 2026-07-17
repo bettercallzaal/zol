@@ -1,0 +1,123 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "artist-context-v1",
+  "title": "Artist Context",
+  "version": "1.0.0",
+  "status": "rehearsed",
+  "owner": "zolbot",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "before drafting artist spotlight",
+  "inputs": [
+    "artist state",
+    "relationship record",
+    "memory context"
+  ],
+  "context_sources": [
+    "local state",
+    "relationship store",
+    "memory"
+  ],
+  "allowed_actions": [
+    "memory.read",
+    "memory.write",
+    "receipt.local.write",
+    "relationship.read",
+    "state.local.read"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "artist state readable",
+    "relationship readable",
+    "context writable"
+  ],
+  "evidence_outputs": [
+    "artist-state-read",
+    "relationship-record-read",
+    "context-written"
+  ],
+  "receipt_outputs": [
+    "artist-context receipt"
+  ],
+  "knowledge_state_outputs": [
+    "artist context written to memory"
+  ],
+  "execution_trace_outputs": [
+    "artist-context execution trace"
+  ],
+  "memory_routes": [
+    "artist context in memory store"
+  ],
+  "cooldown": "3600s",
+  "failure_modes": [
+    "budget exceeded",
+    "timeout",
+    "state corruption",
+    "handler error"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-16",
+  "limits": {
+    "max_wall_time_ms": 60000,
+    "max_steps": 6,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "read-artist-state",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {
+        "stateKey": "zol-artist-state"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "read-relationship",
+      "handler": "relationship.read",
+      "permission": "relationship.read",
+      "with": {
+        "scope": "artist"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "write-context",
+      "handler": "memory.write",
+      "permission": "memory.write",
+      "with": {
+        "memoryType": "artist-context"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-receipt",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {
+        "receiptType": "artist-context"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "detect-contradictions-v1",
+  "title": "Detect Memory Contradictions",
+  "version": "1.0.0",
+  "status": "rehearsed",
+  "owner": "zolbot",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "after weave-memory or daily",
+  "inputs": [
+    "current memory state",
+    "recent memory writes"
+  ],
+  "context_sources": [
+    "episodic memory",
+    "working memory"
+  ],
+  "allowed_actions": [
+    "memory.read",
+    "memory.write",
+    "receipt.local.write"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "memory readable",
+    "contradiction flags writable"
+  ],
+  "evidence_outputs": [
+    "memory-entries-scanned",
+    "contradictions-flagged"
+  ],
+  "receipt_outputs": [
+    "detect-contradictions receipt"
+  ],
+  "knowledge_state_outputs": [
+    "conflict flags written to memory"
+  ],
+  "execution_trace_outputs": [
+    "detect-contradictions execution trace"
+  ],
+  "memory_routes": [
+    "contradiction flags in memory store"
+  ],
+  "cooldown": "3600s",
+  "failure_modes": [
+    "budget exceeded",
+    "timeout",
+    "state corruption",
+    "handler error"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-16",
+  "limits": {
+    "max_wall_time_ms": 60000,
+    "max_steps": 6,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "read-memory",
+      "handler": "memory.read",
+      "permission": "memory.read",
+      "with": {
+        "scope": "full"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "flag-conflicts",
+      "handler": "memory.write",
+      "permission": "memory.write",
+      "with": {
+        "memoryType": "contradiction-flags"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-receipt",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {
+        "receiptType": "detect-contradictions"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    }
+  ]
+}
