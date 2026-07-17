@@ -99,7 +99,7 @@
     "Neynar key missing: ok:false, neynar:'no-key' — alert fires, casting queue halted",
     "Neynar API timeout: ok:false, neynar:'timeout' — alert fires, casting queue halted",
     "Neynar HTTP error: ok:false, neynar:'error:...' — alert fires",
-    "Signer file missing: ok:false, signer:'missing' — alert fires",
+    "Creds file missing: ok:false, creds:'missing' — alert fires",
     "All checks pass: ok:true, readiness state written, downstream loops proceed"
   ],
   "inputs": ["fid override (optional, default 3338501)", "connectivity_timeout_ms (optional, default 10000)"],

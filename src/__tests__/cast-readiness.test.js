@@ -51,8 +51,8 @@ describe('farcaster.connectivity.check handler', () => {
       `${HANDLER_NAME} must be registered`);
   });
 
-  test('returns ok:false when signer file is missing', async () => {
-    // No signer file created yet — expect signer:'missing', ok:false
+  test('returns ok:false when creds file is missing', async () => {
+    // No creds file created yet — expect creds:'missing', ok:false
     const result = await handlers[HANDLER_NAME]({
       input: { fid: 3338501, timeoutMs: 1000 },
     });
@@ -64,7 +64,7 @@ describe('farcaster.connectivity.check handler', () => {
     assert.ok(result.ok === false, 'ok must be false when creds missing');
   });
 
-  test('returns signer:present when credentials file exists with content', async () => {
+  test('returns creds:present when credentials file exists with content', async () => {
     fs.mkdirSync(fakeSignerDir, { recursive: true });
     fs.writeFileSync(fakeSignerPath, '{"key":"test-placeholder","fid":3338501}');
     const result = await handlers[HANDLER_NAME]({
@@ -75,7 +75,7 @@ describe('farcaster.connectivity.check handler', () => {
     assert.ok(Object.hasOwn(result, 'neynar'));
   });
 
-  test('returns signer:empty when credentials file is too small', async () => {
+  test('returns creds:empty when credentials file is too small', async () => {
     fs.mkdirSync(fakeSignerDir, { recursive: true });
     fs.writeFileSync(fakeSignerPath, '{}');  // 2 bytes < 10 byte threshold
     const result = await handlers[HANDLER_NAME]({
