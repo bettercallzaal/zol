@@ -876,6 +876,7 @@ describe('Agent Gateway MCP Endpoint Availability', () => {
     try {
       const { status, body } = await httpGet(port, '/health');
       assert.equal(status, 200, 'status must be 200');
+      assert.equal(body.ok, true, 'body.ok must be true');
       assert.equal(body.status, 'ok', 'body.status must be "ok"');
       assert.equal(body.agentId, 'zolbot', 'body.agentId must be "zolbot"');
     } finally {
@@ -902,7 +903,79 @@ describe('Agent Gateway MCP Endpoint Availability', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 13. Proof Drop Redaction
+// 13. AgentGateway {ok} Response Shape (cross-repo T1 ea8ad43c)
+// ---------------------------------------------------------------------------
+
+describe('AgentGateway {ok} Response Shape', () => {
+  function makeGateway(port = 0) {
+    const store = makeMockStore();
+    const capsuleRegistry = new CapsuleRegistry(store);
+    const dreamloopRegistry = new DreamLoopRegistry(store);
+    const workRouter = new WorkRouter(store);
+    const pipeline = new ArtifactPipeline(store, null);
+    const journal = new ReceiptJournal(store);
+    const toolGateway = new ToolGateway(store, null);
+    return new AgentGateway({
+      capsuleRegistry, dreamloopRegistry, workRouter,
+      artifactPipeline: pipeline, receiptJournal: journal, toolGateway,
+      port, bindAddress: '127.0.0.1',
+    });
+  }
+
+  async function get(port, path) {
+    const resp = await fetch(`http://127.0.0.1:${port}${path}`);
+    const body = await resp.json();
+    return { status: resp.status, body };
+  }
+
+  test('all REST success responses include ok:true', async () => {
+    const gw = makeGateway(0);
+    const { port } = await gw.start();
+    try {
+      const routes = [
+        '/health', '/agent-card', '/capabilities',
+        '/tasks', '/artifacts', '/receipts', '/capsules', '/dreamloops',
+        '/trappers/export',
+      ];
+      for (const route of routes) {
+        const { status, body } = await get(port, route);
+        assert.equal(status, 200, `${route} must return 200`);
+        assert.equal(body.ok, true, `${route} must have ok:true, got ${JSON.stringify(body)}`);
+      }
+    } finally {
+      await gw.stop();
+    }
+  });
+
+  test('error responses include ok:false', async () => {
+    const gw = makeGateway(0);
+    const { port } = await gw.start();
+    try {
+      // 404 for unknown route
+      const { status, body } = await get(port, '/no-such-route');
+      assert.equal(status, 404, 'unknown route must return 404');
+      assert.equal(body.ok, false, 'error response must have ok:false');
+      assert.ok(body.error, 'error response must have error field');
+    } finally {
+      await gw.stop();
+    }
+  });
+
+  test('MCP /mcp/tools retains raw array (MCP protocol, no ok wrapper)', async () => {
+    const gw = makeGateway(0);
+    const { port } = await gw.start();
+    try {
+      const { status, body } = await get(port, '/mcp/tools');
+      assert.equal(status, 200, '/mcp/tools must return 200');
+      assert.ok(Array.isArray(body), '/mcp/tools body must be a raw array (MCP protocol)');
+    } finally {
+      await gw.stop();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 14. Proof Drop Redaction
 // ---------------------------------------------------------------------------
 
 describe('Proof Drop Redaction', () => {

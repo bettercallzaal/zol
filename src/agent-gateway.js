@@ -218,7 +218,7 @@ function sendJson(res, status, body) {
  * @param {string} message
  */
 function sendError(res, code, message) {
-  sendJson(res, code, { error: message, code });
+  sendJson(res, code, { ok: false, error: message, code });
 }
 
 /**
@@ -480,6 +480,7 @@ class AgentGateway {
 
   _handleHealth(_req, res) {
     sendJson(res, 200, {
+      ok: true,
       status: 'ok',
       version: VERSION,
       agentId: AGENT_ID,
@@ -490,6 +491,7 @@ class AgentGateway {
 
   _handleAgentCard(_req, res) {
     sendJson(res, 200, {
+      ok: true,
       agentId: AGENT_ID,
       fid: FID,
       name: 'ZOL',
@@ -502,12 +504,12 @@ class AgentGateway {
 
   async _handleCapabilities(_req, res) {
     const result = await this._toolGateway.discover();
-    sendJson(res, 200, result);
+    sendJson(res, 200, { ok: true, ...result });
   }
 
   async _handleListTasks(_req, res, _parsedUrl) {
     const tasks = await this._workRouter.list({ limit: 50 });
-    sendJson(res, 200, { tasks, total: tasks.length });
+    sendJson(res, 200, { ok: true, tasks, total: tasks.length });
   }
 
   async _handleGetTask(_req, res, id) {
@@ -518,7 +520,7 @@ class AgentGateway {
     if (!task) {
       return sendError(res, 404, 'not found');
     }
-    sendJson(res, 200, { task });
+    sendJson(res, 200, { ok: true, task });
   }
 
   async _handleCreateTask(req, res) {
@@ -535,12 +537,12 @@ class AgentGateway {
     }
 
     const packet = await this._workRouter.createPacket({ title, description, type, priority, requestedBy });
-    sendJson(res, 200, { task: packet, created: true });
+    sendJson(res, 200, { ok: true, task: packet, created: true });
   }
 
   async _handleListArtifacts(_req, res, _parsedUrl) {
     const artifacts = await this._artifactPipeline.list({ limit: 50 });
-    sendJson(res, 200, { artifacts, total: artifacts.length });
+    sendJson(res, 200, { ok: true, artifacts, total: artifacts.length });
   }
 
   async _handleListReceipts(_req, res, parsedUrl) {
@@ -549,17 +551,17 @@ class AgentGateway {
     const limit = limitParam ? parseInt(limitParam, 10) : 20;
 
     const receipts = await this._receiptJournal.list({ limit, loopId });
-    sendJson(res, 200, { receipts, total: receipts.length });
+    sendJson(res, 200, { ok: true, receipts, total: receipts.length });
   }
 
   async _handleListCapsules(_req, res) {
     const capsules = await this._capsuleRegistry.list();
-    sendJson(res, 200, { capsules, total: capsules.length });
+    sendJson(res, 200, { ok: true, capsules, total: capsules.length });
   }
 
   async _handleListDreamLoops(_req, res) {
     const loops = await this._dreamloopRegistry.list();
-    sendJson(res, 200, { loops, total: loops.length });
+    sendJson(res, 200, { ok: true, loops, total: loops.length });
   }
 
   async _handleTrappersImport(req, res) {
@@ -579,12 +581,12 @@ class AgentGateway {
     const artifact = await this._artifactPipeline.build(plan);
     const artifactId = artifact.artifactId || artifact.id || crypto.randomUUID();
 
-    sendJson(res, 200, { artifactId, imported: true });
+    sendJson(res, 200, { ok: true, artifactId, imported: true });
   }
 
   async _handleTrappersExportList(_req, res) {
     const artifacts = await this._artifactPipeline.list({ status: 'delivered', limit: 50 });
-    sendJson(res, 200, { artifacts, total: artifacts.length });
+    sendJson(res, 200, { ok: true, artifacts, total: artifacts.length });
   }
 
   async _handleTrappersExport(_req, res, id) {
@@ -597,7 +599,7 @@ class AgentGateway {
       return sendError(res, 404, 'not found');
     }
 
-    sendJson(res, 200, exported);
+    sendJson(res, 200, { ok: true, ...exported });
   }
 
   _handleMcpTools(_req, res) {
@@ -711,7 +713,7 @@ class AgentGateway {
         return sendError(res, 404, `unknown tool: ${tool}`);
     }
 
-    sendJson(res, 200, { result });
+    sendJson(res, 200, { ok: true, result });
   }
 }
 

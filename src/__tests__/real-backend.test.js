@@ -378,6 +378,7 @@ test('unauthenticated remote gateway request returns 401', async () => {
       `Expected 401 Unauthorized for unauthenticated request, got ${resp.status}`);
 
     const body = await resp.json();
+    assert.equal(body.ok, false, 'error response must have ok:false');
     assert.ok(body.error, 'response body should have an error field');
 
     // Request WITH the correct Bearer token should succeed
