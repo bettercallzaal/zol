@@ -389,6 +389,30 @@
       "note": "All wireable stubs complete. Remaining 5 are permanent or human-gated."
     }
   },
+  "gap_report_cycle9": {
+    "cycle": 9,
+    "date": "2026-07-17",
+    "work_packets_scanned": "33 open PRs (#24, #26-#57); 528/528 tests passing; all loop handlers wired post cycle 8; 4 specification-only loops audited — 3 promoted to dry-run, 1 retained (WK disabled); 2 permanent stubs remain",
+    "failure_patterns_identified": [],
+    "missing_tools_catalogued": [
+      {
+        "id": "no-new-wireable-gaps",
+        "description": "All 72 loop handlers confirmed wired. 2 permanent stubs remain: farcaster.dm-send (security invariant) and bonfire.delve-recall (upstream dream-net PRs #1559/#1560). No new wireable gaps found.",
+        "actionable": false,
+        "blocked_on": "Permanent — security and upstream constraints only."
+      }
+    ],
+    "improvement_proposal": {
+      "id": "improvement-proposal-cycle9",
+      "title": "Capability Gap Cycle 9 — lifecycle promotion: 4 specification-only loops → dry-run",
+      "status": "resolved",
+      "pr": "ws/v2-loop-lifecycle-promote",
+      "test_delta": "0 (528 total — manifest-only changes)",
+      "stubs_wired": 0,
+      "stubs_remaining": 2,
+      "note": "No new wireable stubs. All handlers complete. Promoted 3 loops from specification-only → dry-run: accept-warper-assignment-v1, proof-drop-export-v1, tool-workout-v1. warper-keeper-work-cycle-v1 remains specification-only (Warper Keeper disabled mode — cannot rehearse until WK activated). Specification-only count: 4 → 1."
+    }
+  },
   "gap_report_cycle8": {
     "cycle": 8,
     "date": "2026-07-17",
