@@ -266,9 +266,12 @@ const handlers = {
     }
   },
 
-  // Clanker v4 mechanics (doc 1094b):
-  //   - Up to 7 reward recipients at deploy; percentages immutable; wallet can change.
-  //   - 0xSplits: use when adjustable %, dynamic membership, or >7 recipients needed.
+  // Launch rail (doc 1098 Iman dogfood fix + doc 1094b Clanker v4 mechanics):
+  //   0xSplits-first is the SAFE DEFAULT. Clanker v4 rewardBps are immutable at deploy —
+  //   routing through a mutable 0xSplits contract as the sole Clanker recipient lets the
+  //   creator rebalance splits after launch without a token redeploy. Clanker native is
+  //   only correct when the split is small, fixed, and will never need to change.
+  //   Wizard default = zero_x_splits (splitIsFixed not provided → false → 0xSplits).
   'launch-rail.decision': async function({ input, signal }) {
     validateInput(input, {
       required: ['creatorFid'],
@@ -281,7 +284,7 @@ const handlers = {
       const {
         creatorFid,
         collaboratorCount = 1,
-        splitIsFixed = true,
+        splitIsFixed = false,
         recipientsMayChange = false,
         rebalanceExpected = false,
       } = input;
@@ -310,10 +313,12 @@ const handlers = {
         reasoning = `${collaboratorCount} collaborator(s) with fixed percentages and stable membership. Use Clanker native recipients — no Splits contract needed. Each admin can update their wallet address if it changes.`;
         constraints.push('Clanker v4: percentages immutable; wallet per-recipient can change');
       } else {
-        // splitIsFixed=false with ≤7 collaborators and no other dynamic flag — default to 0xSplits for safety
+        // 0xSplits-first doctrine (doc 1098): when splitIsFixed is not confirmed, always
+        // default to 0xSplits. Clanker v4 rewardBps are immutable — routing through a
+        // mutable Splits contract lets the creator rebalance without a token redeploy.
         rail = 'zero_x_splits';
-        reasoning = 'Split structure is not fixed. Defaulting to 0xSplits for maximum flexibility to adjust percentages post-deploy.';
-        constraints.push('Clanker v4: cannot adjust percentages after deploy');
+        reasoning = 'Default rail: 0xSplits-first (doc 1098). Clanker v4 rewardBps are immutable at deploy — deploy a mutable 0xSplits contract first, set it as the sole Clanker fee recipient, then adjust the real split anytime via the Splits controller without a token redeploy.';
+        constraints.push('Clanker v4: rewardBps immutable at deploy — 0xSplits is the safe default (doc 1098)');
       }
 
       // Legal guardrail (doc 1108): 0xSplits routes to CONTRIBUTORS (the workers doing the
@@ -331,10 +336,10 @@ const handlers = {
         reasoning,
         constraints,
         inputs: { collaboratorCount, splitIsFixed, recipientsMayChange, rebalanceExpected },
-        clankerNativeEligible: !needsDynamic && collaboratorCount <= CLANKER_MAX_RECIPIENTS,
+        clankerNativeEligible: splitIsFixed && !needsDynamic && collaboratorCount <= CLANKER_MAX_RECIPIENTS,
         legalNote,
         timestamp: new Date().toISOString(),
-        source: 'clanker-v4-mechanics-doc-1094b',
+        source: 'clanker-v4-mechanics-doc-1094b-doc-1098',
       };
     } catch (err) {
       if (signal?.aborted) throw new Error('launch-rail.decision timed out');

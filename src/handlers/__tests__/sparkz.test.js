@@ -165,7 +165,7 @@ describe('Sparkz launch-readiness handlers', () => {
 });
 
 // ---------------------------------------------------------------------------
-// launch-rail.decision — Clanker v4 decision tree (doc 1094b)
+// launch-rail.decision — 0xSplits-first doctrine (doc 1098) + Clanker v4 mechanics (doc 1094b)
 // ---------------------------------------------------------------------------
 
 describe('launch-rail.decision handler', () => {
@@ -175,11 +175,18 @@ describe('launch-rail.decision handler', () => {
     handler = handlers['launch-rail.decision'];
   });
 
-  test('returns clanker_native for single creator (fixed, no change expected)', async () => {
+  test('returns zero_x_splits by default (0xSplits-first doctrine, doc 1098)', async () => {
+    // No splitIsFixed provided → defaults to false → 0xSplits (safe default)
     const r = await handler({ input: { creatorFid: 1 } });
+    assert.equal(r.rail, 'zero_x_splits');
+    assert.equal(r.clankerNativeEligible, false);
+    assert.ok(r.source.includes('doc-1098'), 'source must reference doc 1098');
+  });
+
+  test('returns clanker_native for single creator when split is explicitly fixed', async () => {
+    const r = await handler({ input: { creatorFid: 1, splitIsFixed: true } });
     assert.equal(r.rail, 'clanker_native');
     assert.equal(r.clankerNativeEligible, true);
-    assert.equal(r.source, 'clanker-v4-mechanics-doc-1094b');
   });
 
   test('returns clanker_native for fixed 7-way split within limit', async () => {
@@ -228,7 +235,7 @@ describe('launch-rail.decision handler', () => {
   });
 
   test('legalNote is always present in output (doc 1108 design guardrail)', async () => {
-    const native = await handler({ input: { creatorFid: 1, collaboratorCount: 2 } });
+    const native = await handler({ input: { creatorFid: 1, collaboratorCount: 2, splitIsFixed: true } });
     assert.ok(typeof native.legalNote === 'string' && native.legalNote.length > 0, 'legalNote must be present for clanker_native');
     assert.ok(native.legalNote.includes('doc 1108'));
 
