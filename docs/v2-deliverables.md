@@ -1,7 +1,7 @@
 # ZOL Persistent Agent Upgrade v2 — Full Deliverables
 
 **Date:** 2026-07-16 (updated 2026-07-17)
-**Status:** COMPLETE — awaiting operator review and Pi activation (359 tests green, verification gate items 1-10 proven)
+**Status:** COMPLETE — awaiting operator review and Pi activation (392 tests green, verification gate items 1-10 proven)
 **Version:** zol@1.0.0 (package.json)
 
 ---
@@ -18,6 +18,8 @@ PRs in the v2 stack (merge in order):
 - **PR #27** (`ws/v2-layer-9-12-gateway`) — Agent Gateway, Zictionary, Artifact Pipeline, Proof Drop Adapter, ToolGym Adapter, Knowledge Products (Layers 9, 12, 14-15)
 - **PR #28** (`ws/v2-integration-loops`) — Layer 10 ApprovalBridge, ToolGateway+AgentGateway wiring, 10 new DreamLoops, real-backend durability tests (8 tests)
 - **PR #31** (`ws/v2-board-integration`) — CoworkTracker + board.task handlers + nightly-triage DreamLoop; 3 gate-item-8 tests completing all 7 state-machine scenarios
+- **PR #32** (`ws/v2-api-response-shape`) — All AgentGateway REST success responses include `ok:true`; all errors include `ok:false`. MCP `/mcp/tools` raw array preserved. 3 new tests.
+- **PR #33** (`ws/v2-route-validation`) — Native `safeParse(jsonSchema, input)` validator (zero deps, mirrors Zod safeParse contract); applied to all body-receiving routes + per-tool MCP inputSchema lookup. 14 unit tests + 4 HTTP-level integration tests. Also: `farcaster.connectivity.check` handler, `cast-readiness-check-v1` loop, `zabal-channel-watch-v1`, `zabal-submissions-watch-v1` DreamLoops.
 
 Supplementary PRs (no merge dependency on main stack):
 - **PR #29** (`ws/v2-runner-gateway-design`) — Heterogeneous Runner Gateway design doc (design-only, no code)
@@ -95,7 +97,7 @@ zol-upgrade/
 │   ├── knowledge-and-research-v1.json
 │   ├── persistent-agent-base-v1.json
 │   ├── warper-keeper-connector-v1.json
-│   ├── zol-artist-spotlight-v1.json          [NEW]
+│   ├── zol-artist-spotlight-v1.json           [NEW]
 │   ├── zol-builder-and-artifact-v1.json      [NEW]
 │   ├── zol-core-continuity-v1.json           [NEW]
 │   ├── zol-memory-weaver-v1.json             [NEW]
@@ -108,7 +110,7 @@ zol-upgrade/
 │   ├── zol-warper-keeper-client-v1.json      [NEW]
 │   ├── zol-weekly-curator-v1.json            [NEW]
 │   └── zol-work-router-v1.json              [NEW]
-├── loops/                                    (52 total manifest files)
+├── loops/                                    (69 total manifest files)
 │   ├── accept-warper-assignment.manifest.json
 │   ├── artifact-plan.manifest.json
 │   ├── artist-context.manifest.json
@@ -299,7 +301,7 @@ zol-upgrade/
 | weave-memory | 3 | memory.weave | PASS |
 | weekly-curator-v1 | 5 | weekly-cron | PASS |
 
-50 loops: PASS | 3 loops: disabled (Warper Keeper — off by default, correct behavior)
+66 loops: PASS | 3 loops: disabled (Warper Keeper — off by default, correct behavior)
 
 ---
 
@@ -310,10 +312,10 @@ zol-upgrade/
 ```
 npm run v2:test
 
-tests: 51
-pass:  51
+tests: 139
+pass:  139
 fail:  0
-duration: ~800 ms
+duration: ~1200 ms
 
 Coverage:
   capsule-registry.test.js    — CapsuleRegistry load/validate/compose
@@ -330,15 +332,10 @@ Coverage:
 ```
 npm run dl:test
 
-tests:  192
-pass:   187
-fail:   5    (pre-existing env failures — see note)
-duration: ~1424 ms
-
-Note: 5 failures are @farcaster/hub-nodejs import errors.
-The package is listed in dependencies but not installed in the dev
-environment (no Farcaster node running locally). All 5 affected tests
-pass on the Pi where the hub dependency is present.
+tests:  392
+pass:   392
+fail:   0
+duration: ~2200 ms
 ```
 
 ---
@@ -949,7 +946,7 @@ Verification: output ends with `all scripts OK`.
 ```bash
 npm run dl:validate
 ```
-Verification: output shows 21 capsules valid, 52 loops valid, 0 errors.
+Verification: output shows 21 capsules valid, 69 loops valid, 0 errors.
 
 **Step 6 — Run v2 test suite**
 ```bash
@@ -980,20 +977,20 @@ Verification: `grep DREAMLOOPS_ENABLED ~/.zao/private/.env` returns `DREAMLOOPS_
 source ~/.zao/private/.env
 node scripts/dl-dry-run.js
 ```
-Verification: all 52 loops complete dry-run with no errors. No state changes written.
+Verification: all 69 loops complete dry-run with no errors. No state changes written.
 
 **Step 10 — Run full test suite on Pi**
 ```bash
 npm run dl:test
 ```
-Verification: `pass: 192  fail: 0` (all pass on Pi with hub installed).
+Verification: `pass: 392  fail: 0`.
 
 **Step 11 — (Optional) Start Agent Gateway**
 ```bash
 node src/agent-gateway.js &
 curl http://localhost:8089/health
 ```
-Verification: health endpoint returns `{"status":"ok","capsules":21,"loops":52}`.
+Verification: health endpoint returns `{"ok":true,"status":"ok","capsules":21,"loops":69}`.
 
 **Step 12 — Enable and verify first live run**
 ```bash
