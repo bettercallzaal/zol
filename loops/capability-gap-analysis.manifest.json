@@ -38,6 +38,7 @@
   ],
   "promotion_path": "rehearsed -> active_local -> live_guarded",
   "last_reviewed": "2026-07-17",
+  "last_checked": "2026-07-17",
   "limits": {
     "max_wall_time_ms": 60000,
     "max_steps": 6,
@@ -134,5 +135,37 @@
     "identified_gaps"
   ],
   "execution_trace_outputs": [],
-  "memory_routes": []
+  "memory_routes": [],
+  "gap_report": {
+    "cycle": 1,
+    "date": "2026-07-17",
+    "work_packets_scanned": "22 open PRs (#24, #26-#47); 508/508 tests passing; 72 loops (15 active, 4 draft, 53 rehearsed); 23 stub handlers in src/handlers/index.js",
+    "failure_patterns_identified": [
+      {
+        "id": "model-completion-stub",
+        "severity": "medium",
+        "description": "model.completion handler returns {text: ''} (stub). Two active loops (zabal-channel-watch-v1, zabal-submissions-watch-v1) use this handler for classify/route steps and receive empty model output, making those steps no-ops.",
+        "affected_loops": ["zabal-channel-watch-v1", "zabal-submissions-watch-v1"],
+        "root_cause": "Handler never wired to ModelGateway.complete() despite ModelGateway being fully implemented since PR #36 (ws/v2-sparkz-launch-rail).",
+        "implementation_path": "Wire model.completion handler to getModelGateway().complete(prompt, {tier, model}). ModelGateway falls back to mock provider in test/dev environments without API keys. ~20 line change, 2 new tests.",
+        "actionable": true
+      }
+    ],
+    "missing_tools_catalogued": [
+      {
+        "id": "receipt-local-query",
+        "description": "No receipt.local.query handler exists. Self-Improvement Governor loops (capability-gap-analysis, component-watch) cannot scan the receipt journal by date range — they must know the exact state key. Limits evidence-based self-improvement.",
+        "actionable": false,
+        "blocked_on": "Requires design decision: what query shape (date range? loop_id filter?) and whether to expose via ReceiptJournal.list()."
+      }
+    ],
+    "improvement_proposal_queued": true,
+    "improvement_proposal": {
+      "id": "wire-model-completion-to-gateway",
+      "title": "Wire model.completion handler to ModelGateway (Phase 5)",
+      "status": "implemented",
+      "pr": "ws/v2-capability-gap-cycle1",
+      "note": "Gap identified and fix implemented in same cycle — change is small, unambiguous, and already has full test coverage."
+    }
+  }
 }

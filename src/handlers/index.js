@@ -38,6 +38,23 @@ function getReceiptJournal() {
   return _receiptJournal;
 }
 
+// ModelGateway uses a noop store — getStateStore() is async-initialized (returns a Promise)
+// so it can't be passed directly to ModelGateway's synchronous constructor. Quota/telemetry
+// not persisted at the handler layer; the WorkRouter/AgentGateway provide higher-level accounting.
+const _MGW_NOOP_STORE = {
+  async get() { return undefined; },
+  async put() {},
+  async initialize() {},
+};
+let _modelGateway = null;
+function getModelGateway() {
+  if (!_modelGateway) {
+    const { ModelGateway } = require('../model-gateway');
+    _modelGateway = new ModelGateway(_MGW_NOOP_STORE);
+  }
+  return _modelGateway;
+}
+
 // Validation helper
 function validateInput(input, schema) {
   const { required = [], types = {} } = schema;
@@ -804,14 +821,18 @@ const handlers = {
     validateInput(input, {
       types: { prompt: 'string', model: 'string', tier: 'string', maxTokens: 'number' }
     });
-    // PHASE 5: wire to ModelGateway.complete(prompt, { tier, model })
     // tier: 'cheap' (classify/route), 'standard' (default), 'frontier' (build/reason)
+    const result = await getModelGateway().complete(input.prompt || '', {
+      tier: input.tier || 'standard',
+      model: input.model || undefined,
+    });
     return {
       completed: true,
-      text: '',
+      text: result.text,
       tier: input.tier || 'standard',
-      model: input.model || 'stub',
-      tokens: 0,
+      model: result.model,
+      tokens: result.tokensEstimate || 0,
+      provider: result.provider,
       timestamp: new Date().toISOString()
     };
   },
