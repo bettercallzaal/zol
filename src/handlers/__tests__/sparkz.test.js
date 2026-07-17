@@ -10,7 +10,7 @@ before(() => { allHandlers = require('../index'); });
 
 describe('Sparkz launch-readiness handlers', () => {
 
-  test('all 8 sparkz handlers are registered', () => {
+  test('all 9 sparkz handlers are registered', () => {
     const expected = [
       'farcaster.follower-growth-read',
       'farcaster.cast-engagement-read',
@@ -18,6 +18,7 @@ describe('Sparkz launch-readiness handlers', () => {
       'energy-score.compute',
       'energy-score.launch-recommendation',
       'energy-score.trend-analysis',
+      'launch-rail.decision',
       'state.energy-history-write',
       'receipt.launch-recommendation-write',
     ];
@@ -148,5 +149,81 @@ describe('Sparkz launch-readiness handlers', () => {
     assert.ok(result.receiptId.startsWith('launch-rec_42'));
     assert.equal(result.recommendation, 'launch_now');
     assert.equal(result.type, 'launch_recommendation');
+  });
+
+  test('receipt.launch-recommendation-write carries railDecision when provided', async () => {
+    const result = await allHandlers['receipt.launch-recommendation-write']({
+      input: {
+        creatorFid: 42,
+        energyScore: 80,
+        recommendation: 'launch_now',
+        railDecision: { rail: 'clanker_native', reasoning: 'Fixed 2-way split.' },
+      },
+    });
+    assert.deepEqual(result.railDecision, { rail: 'clanker_native', reasoning: 'Fixed 2-way split.' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// launch-rail.decision — Clanker v4 decision tree (doc 1094b)
+// ---------------------------------------------------------------------------
+
+describe('launch-rail.decision handler', () => {
+  let handler;
+  before(() => {
+    const { handlers } = require('../sparkz-launch-readiness');
+    handler = handlers['launch-rail.decision'];
+  });
+
+  test('returns clanker_native for single creator (fixed, no change expected)', async () => {
+    const r = await handler({ input: { creatorFid: 1 } });
+    assert.equal(r.rail, 'clanker_native');
+    assert.equal(r.clankerNativeEligible, true);
+    assert.equal(r.source, 'clanker-v4-mechanics-doc-1094b');
+  });
+
+  test('returns clanker_native for fixed 7-way split within limit', async () => {
+    const r = await handler({ input: { creatorFid: 1, collaboratorCount: 7, splitIsFixed: true } });
+    assert.equal(r.rail, 'clanker_native');
+    assert.equal(r.clankerNativeEligible, true);
+  });
+
+  test('returns zero_x_splits when collaboratorCount exceeds 7', async () => {
+    const r = await handler({ input: { creatorFid: 2, collaboratorCount: 8 } });
+    assert.equal(r.rail, 'zero_x_splits');
+    assert.equal(r.clankerNativeEligible, false);
+    assert.ok(r.constraints.some(c => c.includes('7')), 'constraint must mention 7-recipient limit');
+  });
+
+  test('returns zero_x_splits when rebalanceExpected is true', async () => {
+    const r = await handler({ input: { creatorFid: 3, collaboratorCount: 3, rebalanceExpected: true } });
+    assert.equal(r.rail, 'zero_x_splits');
+    assert.equal(r.clankerNativeEligible, false);
+    assert.ok(r.reasoning.includes('immutable'));
+  });
+
+  test('returns zero_x_splits when recipientsMayChange is true', async () => {
+    const r = await handler({ input: { creatorFid: 4, collaboratorCount: 2, recipientsMayChange: true } });
+    assert.equal(r.rail, 'zero_x_splits');
+    assert.equal(r.clankerNativeEligible, false);
+  });
+
+  test('returns zero_x_splits when splitIsFixed is false (safety default)', async () => {
+    const r = await handler({ input: { creatorFid: 5, collaboratorCount: 4, splitIsFixed: false } });
+    assert.equal(r.rail, 'zero_x_splits');
+  });
+
+  test('throws when creatorFid is missing', async () => {
+    await assert.rejects(
+      () => handler({ input: {} }),
+      /missing required input/
+    );
+  });
+
+  test('output includes all input echo fields', async () => {
+    const r = await handler({ input: { creatorFid: 9, collaboratorCount: 3, splitIsFixed: true, recipientsMayChange: false, rebalanceExpected: false } });
+    assert.equal(r.inputs.collaboratorCount, 3);
+    assert.equal(r.inputs.splitIsFixed, true);
+    assert.ok(r.timestamp);
   });
 });

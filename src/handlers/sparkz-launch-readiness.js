@@ -266,19 +266,86 @@ const handlers = {
     }
   },
 
+  // Clanker v4 mechanics (doc 1094b):
+  //   - Up to 7 reward recipients at deploy; percentages immutable; wallet can change.
+  //   - 0xSplits: use when adjustable %, dynamic membership, or >7 recipients needed.
+  'launch-rail.decision': async function({ input, signal }) {
+    validateInput(input, {
+      required: ['creatorFid'],
+      types: {
+        creatorFid: 'number',
+        collaboratorCount: 'number',
+      },
+    });
+    try {
+      const {
+        creatorFid,
+        collaboratorCount = 1,
+        splitIsFixed = true,
+        recipientsMayChange = false,
+        rebalanceExpected = false,
+      } = input;
+
+      const CLANKER_MAX_RECIPIENTS = 7;
+      const needsDynamic = rebalanceExpected || recipientsMayChange || collaboratorCount > CLANKER_MAX_RECIPIENTS;
+
+      let rail;
+      let reasoning;
+      const constraints = [];
+
+      if (collaboratorCount > CLANKER_MAX_RECIPIENTS) {
+        rail = 'zero_x_splits';
+        reasoning = `${collaboratorCount} collaborators exceeds Clanker's ${CLANKER_MAX_RECIPIENTS}-recipient limit. Use 0xSplits.`;
+        constraints.push(`Clanker v4: max ${CLANKER_MAX_RECIPIENTS} recipients at deploy`);
+      } else if (rebalanceExpected) {
+        rail = 'zero_x_splits';
+        reasoning = 'Split percentages may need rebalancing. 0xSplits enables adjustable allocation; Clanker percentages are immutable at deploy.';
+        constraints.push('Clanker v4: percentages immutable at deploy');
+      } else if (recipientsMayChange) {
+        rail = 'zero_x_splits';
+        reasoning = 'New recipients may be added later (growing team or leaderboard). 0xSplits handles dynamic membership; Clanker recipient list is fixed at deploy.';
+        constraints.push('Clanker v4: recipient list fixed at deploy');
+      } else if (splitIsFixed && collaboratorCount <= CLANKER_MAX_RECIPIENTS) {
+        rail = 'clanker_native';
+        reasoning = `${collaboratorCount} collaborator(s) with fixed percentages and stable membership. Use Clanker native recipients — no Splits contract needed. Each admin can update their wallet address if it changes.`;
+        constraints.push('Clanker v4: percentages immutable; wallet per-recipient can change');
+      } else {
+        // splitIsFixed=false with ≤7 collaborators and no other dynamic flag — default to 0xSplits for safety
+        rail = 'zero_x_splits';
+        reasoning = 'Split structure is not fixed. Defaulting to 0xSplits for maximum flexibility to adjust percentages post-deploy.';
+        constraints.push('Clanker v4: cannot adjust percentages after deploy');
+      }
+
+      return {
+        creatorFid,
+        rail,
+        reasoning,
+        constraints,
+        inputs: { collaboratorCount, splitIsFixed, recipientsMayChange, rebalanceExpected },
+        clankerNativeEligible: !needsDynamic && collaboratorCount <= CLANKER_MAX_RECIPIENTS,
+        timestamp: new Date().toISOString(),
+        source: 'clanker-v4-mechanics-doc-1094b',
+      };
+    } catch (err) {
+      if (signal?.aborted) throw new Error('launch-rail.decision timed out');
+      throw err;
+    }
+  },
+
   'receipt.launch-recommendation-write': async function({ input, signal }) {
     validateInput(input, {
       required: ['creatorFid', 'energyScore', 'recommendation'],
       types: { creatorFid: 'number', energyScore: 'number', recommendation: 'string' },
     });
     try {
-      const { creatorFid, energyScore, recommendation, reasoning } = input;
+      const { creatorFid, energyScore, recommendation, reasoning, railDecision } = input;
       return {
         receiptId: `launch-rec_${creatorFid}_${Date.now()}`,
         creatorFid,
         energyScore,
         recommendation,
         reasoning: (reasoning || '').substring(0, 500),
+        railDecision: railDecision || null,
         timestamp: new Date().toISOString(),
         type: 'launch_recommendation',
       };

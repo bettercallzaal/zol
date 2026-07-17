@@ -17,6 +17,7 @@
     "energy-score.compute",
     "energy-score.launch-recommendation",
     "energy-score.trend-analysis",
+    "launch-rail.decision",
     "state.energy-history-write",
     "receipt.local.write",
     "state.local.read",
@@ -54,7 +55,7 @@
   ],
   "limits": {
     "max_wall_time_ms": 30000,
-    "max_steps": 8,
+    "max_steps": 9,
     "max_retries_per_step": 2
   },
   "promotion_path": "prototype -> dry_run -> active_local -> live_guarded",
@@ -99,6 +100,12 @@
       "retry": { "max_attempts": 1 }
     },
     {
+      "id": "decide-launch-rail",
+      "handler": "launch-rail.decision",
+      "permission": "launch-rail.decision",
+      "retry": { "max_attempts": 1 }
+    },
+    {
       "id": "write-energy-history",
       "handler": "state.energy-history-write",
       "permission": "state.energy-history-write",
@@ -117,10 +124,10 @@
     "creatorFid not provided: loop fails at entry condition",
     "Energy score computation error: escalate to operator"
   ],
-  "inputs": ["creatorFid (required)", "days (optional, default 7)", "priorScores (optional history array)"],
+  "inputs": ["creatorFid (required)", "days (optional, default 7)", "priorScores (optional history array)", "collaboratorCount (optional, default 1)", "splitIsFixed (optional, default true)", "recipientsMayChange (optional, default false)", "rebalanceExpected (optional, default false)"],
   "context_sources": ["neynar_api", "local_state"],
   "checks": ["creator_fid_provided"],
-  "evidence_outputs": ["energy_score", "recommendation", "component_scores", "trend"],
+  "evidence_outputs": ["energy_score", "recommendation", "component_scores", "trend", "launch_rail_decision"],
   "receipt_outputs": ["launch-recommendation-receipt.json"],
   "knowledge_state_outputs": ["energy-history:{creatorFid}"],
   "execution_trace_outputs": ["sparkz-launch-readiness.trace.json"],

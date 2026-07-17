@@ -13,8 +13,16 @@
       "farcaster-signal-reader",
       "energy-score-calculator",
       "momentum-tracker",
-      "launch-readiness-recommender"
+      "launch-readiness-recommender",
+      "launch-rail-decider"
     ],
+    "launch_rail_decision": {
+      "source": "clanker-v4-mechanics-doc-1094b",
+      "description": "Decision tree: clanker_native for fixed ≤7-way splits, zero_x_splits for adjustable/dynamic/growing splits. Read-only recommendation — no minting or wallet actions.",
+      "clanker_max_recipients": 7,
+      "clanker_percentages_immutable": true,
+      "clanker_wallets_can_change": true
+    },
     "energy_formula": {
       "follower_growth_weight": 0.25,
       "engagement_rate_weight": 0.35,
@@ -43,6 +51,7 @@
     "energy-score.compute",
     "energy-score.launch-recommendation",
     "energy-score.trend-analysis",
+    "launch-rail.decision",
     "state.energy-history-write",
     "receipt.launch-recommendation-write"
   ],
@@ -55,6 +64,7 @@
       "farcaster.channel-activity-read",
       "memory.read",
       "memory.write",
+      "launch-rail.decision",
       "receipt.local.write",
       "state.local.read",
       "state.local.write"
@@ -96,6 +106,6 @@
   "provenance": {
     "source": "https://github.com/bettercallzaal/zol",
     "ported_from": "ws/sparkz-launch-readiness (PR #17)",
-    "content_hash": "sha256:cdeda3e3123281a15767929a85e81d1424c16fb0af64bc0cd34c4363da6fe0ba"
+    "content_hash": "sha256:d9a5a2bedb0a6847bb7fcdb53c89c9695074b563d7da62efb14c17de955c77dd"
   }
 }
