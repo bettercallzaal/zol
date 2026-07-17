@@ -119,17 +119,36 @@ describe('CapsuleRegistry', () => {
     assert.equal(stored.status, 'disabled');
   });
 
-  // Test 8: list() returns array containing installed capsule
-  test('list() returns array containing installed capsule', async () => {
+  // Test 8: list() returns all installed capsules
+  test('list() returns all installed capsules', async () => {
     const store = makeMockStore();
     const registry = new CapsuleRegistry(store);
+
+    const capsule2 = { ...VALID_CAPSULE, capsule_id: 'test-capsule-v2', name: 'Test Capsule 2' };
     await registry.install(VALID_CAPSULE);
+    await registry.install(capsule2);
 
     const list = await registry.list();
 
     assert.ok(Array.isArray(list), 'list() should return an array');
-    assert.ok(list.length >= 1, 'list should contain at least one entry');
-    const found = list.find((c) => c.capsuleId === VALID_CAPSULE.capsule_id);
-    assert.ok(found, 'installed capsule should appear in list()');
+    assert.ok(list.length >= 2, 'list should contain both installed capsules');
+    const ids = list.map((c) => c.capsuleId);
+    assert.ok(ids.includes(VALID_CAPSULE.capsule_id), 'first capsule should be in list');
+    assert.ok(ids.includes(capsule2.capsule_id), 'second capsule should be in list');
+  });
+
+  // Test 9: rollback() with no history throws or returns error
+  test('rollback() with no history throws or returns error', async () => {
+    const store = makeMockStore();
+    const registry = new CapsuleRegistry(store);
+    await registry.install(VALID_CAPSULE);
+
+    await assert.rejects(
+      () => registry.rollback(VALID_CAPSULE.capsule_id, '0.9.0'),
+      (err) => {
+        assert.ok(err instanceof Error, 'should throw an Error');
+        return true;
+      }
+    );
   });
 });

@@ -46,7 +46,23 @@ describe('DreamLoopRegistry', () => {
     }
   });
 
-  // Test 1: validate() valid loop → {valid: true}
+  // Test 1: loadFromDirectory() loads JSON files from loops/ dir
+  test('loadFromDirectory() loads JSON files from loops/ dir', async () => {
+    const registry = new DreamLoopRegistry(makeMockStore());
+
+    const loopFile = path.join(tmpDir, 'my-loop.manifest.json');
+    await fs.promises.writeFile(loopFile, JSON.stringify(VALID_LOOP), 'utf8');
+
+    const loops = await registry.loadFromDirectory(tmpDir);
+
+    assert.ok(Array.isArray(loops), 'loadFromDirectory() should return an array');
+    assert.ok(loops.length >= 1, 'should load at least one loop');
+    const found = loops.find((l) => l.loop_id === VALID_LOOP.loop_id);
+    assert.ok(found, 'loaded loop should match written loop_id');
+    assert.equal(found.title, VALID_LOOP.title);
+  });
+
+  // Test 2: validate() valid loop → {valid: true}
   test('validate() valid loop → {valid: true}', () => {
     const registry = new DreamLoopRegistry(makeMockStore());
 
