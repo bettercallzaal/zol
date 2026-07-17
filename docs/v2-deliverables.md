@@ -405,8 +405,8 @@ zol-upgrade/
 ```
 npm run v2:test
 
-tests: 147
-pass:  147
+tests: 166
+pass:  166
 fail:  0
 duration: ~1800 ms
 
@@ -854,7 +854,7 @@ npm install
 # 4. Verify syntax
 npm run check
 
-# 5. Run v2 core tests (should see 147 pass, 0 fail)
+# 5. Run v2 core tests (should see 166 pass, 0 fail)
 npm run v2:test
 
 # 6. Run full DreamLoops test suite
@@ -1071,7 +1071,7 @@ Verification: output shows 23 capsules valid, 72 loops valid, 0 errors.
 ```bash
 npm run v2:test
 ```
-Verification: `pass: 51  fail: 0`.
+Verification: `pass: 166  fail: 0`.
 
 **Step 7 — Migrate state**
 ```bash
