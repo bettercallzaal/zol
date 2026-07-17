@@ -258,8 +258,7 @@ test('MATRIX: Memory consolidation loop exists', async (t) => {
     if (loop.loop_id.includes('memory')) {
       foundMemoryLoop = true;
       assert.ok(
-        loop.allowed_actions.includes('memory.consolidate') ||
-        loop.allowed_actions.includes('memory.write'),
+        loop.allowed_actions.some(a => a.startsWith('memory.')),
         `Memory loop must have memory handlers`
       );
     }

@@ -3,6 +3,7 @@
   "loop_id": "daily-private-brief-v1",
   "title": "Daily Private Brief",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

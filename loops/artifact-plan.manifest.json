@@ -3,6 +3,7 @@
   "loop_id": "artifact-plan-v1",
   "title": "Artifact Plan",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

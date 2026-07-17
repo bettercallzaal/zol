@@ -3,6 +3,7 @@
   "loop_id": "delegate-builder-v1",
   "title": "Delegate Builder",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

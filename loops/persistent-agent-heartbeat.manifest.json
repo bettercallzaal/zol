@@ -3,6 +3,7 @@
   "loop_id": "persistent-agent-heartbeat-v1",
   "title": "Persistent Agent Heartbeat",
   "version": "1.0.0",
+  "status": "active",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"

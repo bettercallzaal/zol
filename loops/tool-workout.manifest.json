@@ -3,6 +3,7 @@
   "loop_id": "tool-workout-v1",
   "title": "Tool Workout",
   "version": "1.0.0",
+  "status": "draft",
   "owner": "zolbot",
   "stewards": [
     "zaal"

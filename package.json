@@ -12,8 +12,8 @@
     "dl:test": "node --test vendor/dreamloops/runtime/tests/*.test.js src/__tests__/*.test.js src/handlers/__tests__/*.test.js",
     "v2:test": "node --test src/__tests__/capsule-registry.test.js src/__tests__/dreamloop-registry.test.js src/__tests__/receipt-journal.test.js src/__tests__/memory-weaver.test.js src/__tests__/work-router.test.js src/__tests__/model-gateway.test.js src/__tests__/tool-gateway.test.js src/__tests__/artifact-pipeline.test.js src/__tests__/proof-drop-adapter.test.js src/__tests__/toolgym-adapter.test.js src/__tests__/zictionary.test.js src/__tests__/zocuments.test.js src/__tests__/zikipedia.test.js src/__tests__/approval-bridge.test.js src/__tests__/v2-integration.test.js",
     "v2:check": "node --check src/capsule-registry.js src/dreamloop-registry.js src/memory-weaver.js src/model-gateway.js src/receipt-journal.js src/tool-gateway.js src/work-router.js src/artifact-pipeline.js src/agent-gateway.js src/adapters/proof-drop-adapter.js src/adapters/toolgym-adapter.js src/zictionary.js src/zocuments.js src/zikipedia.js src/approval-bridge.js",
-    "dl:validate": "node vendor/dreamloops/cli/src/cli.js validate-all capsules/ loops/",
-    "dl:secret-scan": "bash scripts/secret-scan.sh",
+    "dl:validate": "node vendor/dreamloops/cli/src/cli.js validate-all capsules/ && node vendor/dreamloops/cli/src/cli.js validate-all loops/",
+    "dl:secret-scan": "bash scripts/secret-scan.sh --all",
     "dl:state-migrate": "node scripts/dl-state-migrate.js",
     "dl:state-restore": "node scripts/dl-state-restore.js",
     "dl:dry-run": "node scripts/dl-dry-run.js"

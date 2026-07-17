@@ -194,7 +194,7 @@ describe('Idempotency', () => {
     assert.equal(matches.length, 1, 'registry must list the capsule only once');
   });
 
-  test('WorkRouter: completing a packet twice sets status done without error', async () => {
+  test('WorkRouter: completing a packet twice throws TERMINAL_STATUS', async () => {
     const store = makeMockStore();
     const router = new WorkRouter(store);
 
@@ -205,10 +205,14 @@ describe('Idempotency', () => {
     });
 
     await router.complete(packet.packetId, { ok: true });
-    // Complete again — must not throw
-    const result = await router.complete(packet.packetId, { ok: true, again: true });
-
-    assert.equal(result.status, 'completed', 'status must be completed');
+    // Second complete must throw — packet is already in a terminal state
+    await assert.rejects(
+      () => router.complete(packet.packetId, { ok: true, again: true }),
+      (err) => {
+        assert.equal(err.code, 'TERMINAL_STATUS', 'must throw TERMINAL_STATUS');
+        return true;
+      }
+    );
   });
 });
 
@@ -510,11 +514,13 @@ describe('Memory Privacy', () => {
 // ---------------------------------------------------------------------------
 
 describe('Secret Scanning', () => {
-  test('ReceiptJournal: 64-char hex in evidence is redacted', async () => {
+  test('ReceiptJournal: credential-format secret in evidence is redacted', async () => {
     const store = makeMockStore();
     const journal = new ReceiptJournal(store, { agentId: 'zolbot' });
 
-    const secretHex = makeHex64();
+    // Use a credential-format secret (sk- prefix) — always redacted regardless of field name.
+    // Bare 64-hex is NOT redacted (it may be a SHA-256 hash used as evidence).
+    const secretKey = 'sk-abcdefghijklmnopqrstuvwxyz012345';
 
     const receipt = await journal.append({
       loopId: 'loop-secret-test',
@@ -522,17 +528,16 @@ describe('Secret Scanning', () => {
       capsuleId: 'cap-1',
       action: 'memory.read',
       status: 'success',
-      evidence: { key: secretHex, description: 'a secret value' },
+      evidence: { key: secretKey, description: 'a secret value' },
     });
 
     const fetched = await journal.get(receipt.receiptId);
     assert.ok(fetched, 'receipt must be retrievable');
 
-    // Serialize evidence to check for raw hex
     const evidenceStr = JSON.stringify(fetched.evidence);
     assert.ok(
-      !evidenceStr.includes(secretHex),
-      'raw 64-char hex must not appear in stored evidence'
+      !evidenceStr.includes(secretKey),
+      'sk- API key must not appear in stored evidence'
     );
     assert.ok(
       evidenceStr.includes('[REDACTED]'),
@@ -540,13 +545,14 @@ describe('Secret Scanning', () => {
     );
   });
 
-  test('ArtifactPipeline: 64-char hex in content is redacted', async () => {
+  test('ArtifactPipeline: credential-format secret in content is redacted', async () => {
     const store = makeMockStore();
     const pipeline = new ArtifactPipeline(store, null, { agentId: 'zolbot' });
 
-    const secretHex = makeHex64();
+    // Use a credential-format secret (sk- prefix) — always redacted.
+    // Bare 64-hex is preserved (it is valid evidence, e.g. a SHA-256 content hash).
+    const secretKey = 'sk-abcdefghijklmnopqrstuvwxyz012345';
 
-    // Plan then build with secret content
     const artifact = await pipeline.plan({
       type: 'document',
       title: 'Secret Artifact',
@@ -554,7 +560,7 @@ describe('Secret Scanning', () => {
     });
 
     await pipeline.build(artifact.artifactId, {
-      body: `Private key is ${secretHex}`,
+      body: `Private key is ${secretKey}`,
     });
 
     const fetched = await pipeline.get(artifact.artifactId);
@@ -562,8 +568,8 @@ describe('Secret Scanning', () => {
 
     const contentStr = JSON.stringify(fetched.content);
     assert.ok(
-      !contentStr.includes(secretHex),
-      'raw 64-char hex must not appear in stored artifact content'
+      !contentStr.includes(secretKey),
+      'sk- API key must not appear in stored artifact content'
     );
     assert.ok(
       contentStr.includes('[REDACTED]'),
@@ -874,13 +880,15 @@ describe('Proof Drop Redaction', () => {
     return { artifactId, artifact, receipt, mockPipeline, mockJournal };
   }
 
-  test('ProofDropAdapter.export() redacts 64-char hex from receipt evidence', async () => {
-    const secretHex = makeHex64();
+  test('ProofDropAdapter.export() redacts credential-format secrets from receipt evidence', async () => {
+    // Use a credential-format secret (sk- prefix) — always redacted in proof-drop bundles.
+    // Bare 64-hex is preserved (it may be a SHA-256 hash used as verification evidence).
+    const secretKey = 'sk-abcdefghijklmnopqrstuvwxyz012345';
 
     const { artifactId, mockPipeline, mockJournal } = makeProofDropSetup({
       receiptEvidence: {
         artifactId: 'art_pd-test-001',
-        secretField: secretHex, // should be redacted
+        secretField: secretKey, // should be redacted by SECRET_PATTERNS
       },
     });
 
@@ -889,8 +897,8 @@ describe('Proof Drop Redaction', () => {
 
     const bundleStr = JSON.stringify(bundle);
     assert.ok(
-      !bundleStr.includes(secretHex),
-      'raw 64-char hex must not appear in exported bundle'
+      !bundleStr.includes(secretKey),
+      'sk- API key must not appear in exported bundle'
     );
     assert.ok(
       bundleStr.includes('[REDACTED]'),

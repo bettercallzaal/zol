@@ -3,6 +3,7 @@
   "loop_id": "release-assignment-v1",
   "title": "Release Assignment",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

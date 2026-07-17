@@ -3,6 +3,7 @@
   "loop_id": "mastery-receipt-v1",
   "title": "Mastery Receipt",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

@@ -3,6 +3,7 @@
   "loop_id": "relationship-lifecycle-update-v1",
   "title": "Relationship Lifecycle Update",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "community-crm-v1",
   "stewards": [
     "zaal"

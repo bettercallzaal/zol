@@ -3,6 +3,7 @@
   "loop_id": "artist-spotlight-v1",
   "title": "Artist Spotlight",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zol-artist-spotlight-v1",
   "stewards": [
     "zaal"

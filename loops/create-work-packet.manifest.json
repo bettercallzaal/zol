@@ -3,6 +3,7 @@
   "loop_id": "create-work-packet-v1",
   "title": "Create Work Packet",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

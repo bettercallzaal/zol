@@ -3,6 +3,7 @@
   "loop_id": "sync-trapper-v1",
   "title": "Sync Trapper",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

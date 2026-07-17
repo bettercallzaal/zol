@@ -3,6 +3,7 @@
   "loop_id": "evening-review-v1",
   "title": "Evening Review",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"

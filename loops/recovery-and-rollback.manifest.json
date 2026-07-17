@@ -3,6 +3,7 @@
   "loop_id": "recovery-and-rollback-v1",
   "title": "Recovery and Rollback",
   "version": "1.0.0",
+  "status": "active",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"

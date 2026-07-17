@@ -3,6 +3,7 @@
   "loop_id": "bootstrap-state-v1",
   "title": "Bootstrap State",
   "version": "1.0.0",
+  "status": "active",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -105,5 +106,13 @@
     "notify:owner",
     "log:error",
     "halt"
-  ]
+  ],
+  "inputs": [],
+  "context_sources": [],
+  "checks": [],
+  "evidence_outputs": [],
+  "receipt_outputs": [],
+  "knowledge_state_outputs": [],
+  "execution_trace_outputs": [],
+  "memory_routes": []
 }

@@ -3,6 +3,7 @@
   "loop_id": "package-trapper-v1",
   "title": "Package Trapper",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

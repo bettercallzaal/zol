@@ -100,8 +100,12 @@
       "relationship.local",
       "runtime.health"
     ],
-    "disallowed_wallets": ["*"],
-    "disallowed_signers": ["*"],
+    "disallowed_wallets": [
+      "*"
+    ],
+    "disallowed_signers": [
+      "*"
+    ],
     "disallowed_environments": []
   },
   "resource_limits": {
@@ -115,6 +119,6 @@
   },
   "provenance": {
     "source": "https://github.com/BrandonDucar/dreamloops",
-    "content_hash": "sha256:4c9282dad341d597b010734b9242f4a99e9469212c021d194c314dbc68e18ef4"
+    "content_hash": "sha256:cd93a57c5a3d2745cd585204c7272fd7f9e17183e2a9b56afad8ced6cce3d424"
   }
 }
