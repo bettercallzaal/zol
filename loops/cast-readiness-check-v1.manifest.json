@@ -1,0 +1,116 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "cast-readiness-check-v1",
+  "title": "Cast Readiness Check (outbound Farcaster pre-flight)",
+  "version": "1.0.0",
+  "status": "active",
+  "owner": "zolbot",
+  "stewards": ["zaal"],
+  "permission_tier": "local_draft_write",
+  "trigger": "before any casting loop; also on startup and every 4 hours",
+  "cooldown": "1800s",
+  "description": "Verifies the Pi's outbound Farcaster casting capability before any posting loop runs. Checks: (1) Neynar API key present, (2) Neynar API reachable (GET /v2/farcaster/user/bulk?fids=3338501 with <10s timeout), (3) Farcaster signer credentials file present at ~/.openclaw/farcaster-credentials.json. Writes a readiness state consumed by casting loops. If not ready, alerts via Telegram and halts the casting queue. Implements the MORNING DIRECTIVES 'verify Pi reach first, outbound' requirement.",
+  "allowed_actions": [
+    "farcaster.connectivity.check",
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write",
+    "telegram.approval.request"
+  ],
+  "blocked_actions": [
+    "cast.post.without_approval",
+    "cloud.mutate",
+    "deployment.production.write",
+    "farcaster.post",
+    "farcaster.reply",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "entry_conditions": [
+    "agent_running",
+    "state_readable"
+  ],
+  "exit_conditions": [
+    "readiness_state_written",
+    "receipt_recorded"
+  ],
+  "retry_limits": {
+    "max_retries": 2,
+    "backoff_ms": 5000
+  },
+  "escalation_rules": [
+    "notify:owner:telegram",
+    "log:error",
+    "halt_casting_queue"
+  ],
+  "limits": {
+    "max_wall_time_ms": 30000,
+    "max_steps": 4,
+    "max_retries_per_step": 2,
+    "connectivity_timeout_ms": 10000
+  },
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-17",
+  "steps": [
+    {
+      "id": "check-connectivity",
+      "handler": "farcaster.connectivity.check",
+      "permission": "farcaster.connectivity.check",
+      "with": {
+        "fid": 3338501,
+        "timeoutMs": 10000
+      },
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "write-readiness-state",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": { "key": "cast.readiness" },
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "alert-if-not-ready",
+      "handler": "telegram.approval.request",
+      "permission": "telegram.approval.request",
+      "with": {
+        "action_type": "cast.readiness.alert",
+        "conditional": "previous_step.ok === false",
+        "message": "ZOL cast readiness check failed. Casting loops halted. Check Neynar key and signer credentials.",
+        "timeout_ms": 0
+      },
+      "retry": { "max_attempts": 1 }
+    },
+    {
+      "id": "record-receipt",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {},
+      "retry": { "max_attempts": 2 }
+    }
+  ],
+  "lifecycle_state": "production-ready",
+  "failure_modes": [
+    "Neynar key missing: ok:false, neynar:'no-key' — alert fires, casting queue halted",
+    "Neynar API timeout: ok:false, neynar:'timeout' — alert fires, casting queue halted",
+    "Neynar HTTP error: ok:false, neynar:'error:...' — alert fires",
+    "Signer file missing: ok:false, signer:'missing' — alert fires",
+    "All checks pass: ok:true, readiness state written, downstream loops proceed"
+  ],
+  "inputs": ["fid override (optional, default 3338501)", "connectivity_timeout_ms (optional, default 10000)"],
+  "context_sources": ["local_state", "neynar_api", "local_filesystem"],
+  "checks": ["state_readable"],
+  "evidence_outputs": ["neynar_reachable", "creds_present", "readiness_ok"],
+  "receipt_outputs": ["cast-readiness-check.receipt.json"],
+  "knowledge_state_outputs": ["cast.readiness", "cast.readiness.last_check"],
+  "execution_trace_outputs": ["cast-readiness-check.trace.json"],
+  "memory_routes": [
+    "cast.readiness -> state.local",
+    "cast.readiness.last_check -> state.local"
+  ]
+}

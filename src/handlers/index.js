@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ork } = require('../zol-lib');
-const { getNeynarMentions, searchNeynarCasts, fetchCalendarICS, getDefaultCalendarUrl } = require('../integrations');
+const { getNeynarMentions, searchNeynarCasts, fetchCalendarICS, getDefaultCalendarUrl, fetchNeynarWithTimeout, getNeynarKey } = require('../integrations');
 
 // Lazy-initialized singletons (created on first real handler call)
 let _stateStore = null;
@@ -589,6 +589,55 @@ const handlers = {
   },
 
   // ===== CALENDAR HANDLER (PHASE 5) =====
+  // Cast readiness: verify outbound Farcaster/Neynar connectivity and local signer presence
+  // before any casting loop fires. Always returns a result — never throws.
+  'farcaster.connectivity.check': async function({ input, signal }) {
+    const timeoutMs = (input && input.timeoutMs) || 10000;
+    const fid = (input && input.fid) || 3338501;
+    const started = Date.now();
+
+    // Check 1: Neynar key present
+    const keyPresent = Boolean(getNeynarKey());
+
+    // Check 2: Neynar API reachable — lightweight user fetch
+    let neynar = 'unreachable';
+    let neynarLatencyMs = null;
+    if (keyPresent) {
+      const t0 = Date.now();
+      const result = await fetchNeynarWithTimeout(`/v2/farcaster/user/bulk?fids=${fid}`, {}, timeoutMs);
+      neynarLatencyMs = Date.now() - t0;
+      if (!result.error) {
+        neynar = 'reachable';
+      } else {
+        neynar = result.error === 'timeout' ? 'timeout' : `error:${result.error}`;
+      }
+    } else {
+      neynar = 'no-key';
+    }
+
+    // Check 3: Farcaster credentials file present and non-empty
+    let creds = 'missing';
+    try {
+      const os = require('os');
+      const credPath = path.join(os.homedir(), '.openclaw', 'farcaster-credentials.json');
+      const stat = fs.statSync(credPath);
+      creds = stat.size > 10 ? 'present' : 'empty';
+    } catch (_) {
+      creds = 'missing';
+    }
+
+    const ok = neynar === 'reachable' && creds === 'present';
+    return {
+      ok,
+      neynar,
+      creds,
+      keyPresent,
+      neynarLatencyMs,
+      totalMs: Date.now() - started,
+      timestamp: new Date().toISOString(),
+    };
+  },
+
   'calendar.read': async function({ input, state, signal }) {
     validateInput(input, {
       types: { dayCount: 'number', calendarUrl: 'string' }
