@@ -1,0 +1,150 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "zabal-channel-watch-v1",
+  "title": "ZABAL Gamez Channel Watch (DreamLoop v1)",
+  "version": "1.0.0",
+  "status": "active",
+  "owner": "zolbot",
+  "stewards": ["zaal"],
+  "permission_tier": "local_draft_write",
+  "trigger": "every 2 hours",
+  "cooldown": "7200s",
+  "description": "Polls the /zabal Farcaster channel for new top-level casts. Drafts a short, content-specific reply for each new cast (max 6 per day, 12h per-author cooldown). All replies are approval-gated via Telegram before sending. DreamLoop wrapper for the existing zol-zabal-watch.js behavior — safe for Pi-modern activation when DREAMLOOPS_ENABLED=1.",
+  "allowed_actions": [
+    "cast.draft",
+    "cast.read",
+    "model.completion",
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write",
+    "telegram.approval.request"
+  ],
+  "blocked_actions": [
+    "cast.post.without_approval",
+    "cloud.mutate",
+    "deployment.production.write",
+    "farcaster.post",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "entry_conditions": [
+    "agent_running",
+    "neynar_key_present",
+    "state_readable"
+  ],
+  "exit_conditions": [
+    "channel_polled",
+    "receipt_recorded"
+  ],
+  "retry_limits": {
+    "max_retries": 2,
+    "backoff_ms": 5000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "skip_cycle"
+  ],
+  "limits": {
+    "max_wall_time_ms": 120000,
+    "max_steps": 8,
+    "max_retries_per_step": 2,
+    "day_cap": 6,
+    "author_cooldown_ms": 43200000
+  },
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-17",
+  "steps": [
+    {
+      "id": "read-channel-state",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": { "key": "zabal-channel-watch.state" },
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "poll-zabal-channel",
+      "handler": "cast.read",
+      "permission": "cast.read",
+      "with": {
+        "channel_id": "zabal",
+        "limit": 25,
+        "with_replies": false
+      },
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "draft-replies",
+      "handler": "model.completion",
+      "permission": "model.completion",
+      "with": {
+        "role": "zabal-channel-host",
+        "max_tokens": 120,
+        "apply_filters": ["no_emojis", "no_hashtags", "no_em_dashes", "banned_words_zol"],
+        "max_length_chars": 200
+      },
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "request-approval",
+      "handler": "telegram.approval.request",
+      "permission": "telegram.approval.request",
+      "with": {
+        "action_type": "cast.reply",
+        "channel": "zabal",
+        "timeout_ms": 3600000
+      },
+      "retry": { "max_attempts": 1 }
+    },
+    {
+      "id": "save-drafts",
+      "handler": "cast.draft",
+      "permission": "cast.draft",
+      "with": {},
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "write-channel-state",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": { "key": "zabal-channel-watch.state" },
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "record-receipt",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {},
+      "retry": { "max_attempts": 2 }
+    }
+  ],
+  "lifecycle_state": "production-ready",
+  "failure_modes": [
+    "Neynar API unreachable (cycle skipped, state unchanged)",
+    "Model completion timeout (draft skipped for that cast)",
+    "Telegram approval timeout (draft discarded, not sent)",
+    "Day cap hit (remaining casts skipped, state saved)"
+  ],
+  "inputs": ["current date", "channel_id override (optional)"],
+  "context_sources": ["local_state", "neynar_channel_feed"],
+  "checks": [
+    "state_readable",
+    "neynar_key_present",
+    "day_cap_not_exceeded"
+  ],
+  "evidence_outputs": ["casts_seen", "drafts_created", "approvals_requested"],
+  "receipt_outputs": ["zabal-channel-watch.receipt.json"],
+  "knowledge_state_outputs": ["zabal-channel-watch.state"],
+  "execution_trace_outputs": ["zabal-channel-watch.trace.json"],
+  "memory_routes": [
+    "seenAuthors -> state.local",
+    "authorLast -> state.local",
+    "dayCount -> state.local",
+    "lastSeen -> state.local"
+  ]
+}

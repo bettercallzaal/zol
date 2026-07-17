@@ -12,20 +12,66 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-// Secret patterns that should never be persisted
-const SECRET_PATTERNS = [
-  /[0-9a-fA-F]{64}/, // 64-char hex (private keys)
-  /sk-[a-zA-Z0-9_-]+/, // OpenAI/OpenRouter keys
-  /ghp_[a-zA-Z0-9_-]+/, // GitHub personal access tokens
-  /PRIVATE\s*KEY/i, // PEM private key blocks
+// Field names that indicate the value is a credential, not evidence.
+// SHA-256 hashes stored as sha256, content_hash, commit_hash, idempotency_key, etc. are
+// evidence — not secrets — and must pass through so receipt chains verify correctly.
+const CREDENTIAL_FIELD_RE = /^(password|passwd|secret|api[_-]?key|private[_-]?key|priv[_-]?key|auth[_-]?token|access[_-]?token|refresh[_-]?token|credential|credentials|bearer|mnemonic|seed|wallet[_-]?key|signing[_-]?key|encryption[_-]?key)$/i;
+
+// Credential string patterns that are always rejected regardless of field context.
+const ALWAYS_SECRET_PATTERNS = [
+  /sk-[a-zA-Z0-9_-]{20,}/, // OpenAI / OpenRouter API keys
+  /ghp_[a-zA-Z0-9_-]{36,}/, // GitHub PATs
+  /github_pat_[a-zA-Z0-9_]+/, // GitHub PATs v2
+  /ghs_[a-zA-Z0-9_]+/, // GitHub Actions tokens
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/, // PEM private key blocks
 ];
 
-function shouldRejectValue(value) {
-  const str = JSON.stringify(value);
-  for (const pattern of SECRET_PATTERNS) {
-    if (pattern.test(str)) return true;
+function _containsAlwaysSecret(str) {
+  return ALWAYS_SECRET_PATTERNS.some((p) => p.test(str));
+}
+
+/**
+ * Walk value recursively. Reject if:
+ *  - Any string matches a known credential format (ALWAYS_SECRET_PATTERNS), OR
+ *  - A string inside a credential-named field contains a hex run of ≥32 chars.
+ *
+ * SHA-256 hashes, content hashes, commit SHAs, and idempotency keys stored in
+ * appropriately-named fields (sha256, content_hash, receipt_hash, commit_hash,
+ * idempotency_key) are EVIDENCE and must be preserved.
+ */
+function shouldRejectValue(value, _fieldName) {
+  if (value === null || value === undefined) return false;
+
+  if (typeof value === 'string') {
+    if (_containsAlwaysSecret(value)) return true;
+    if (_fieldName && CREDENTIAL_FIELD_RE.test(_fieldName) && /[0-9a-fA-F]{32,}/.test(value)) {
+      return true;
+    }
+    return false;
   }
+
+  if (Array.isArray(value)) {
+    return value.some((item) => shouldRejectValue(item));
+  }
+
+  if (typeof value === 'object') {
+    for (const [k, v] of Object.entries(value)) {
+      if (shouldRejectValue(v, k)) return true;
+    }
+    return false;
+  }
+
   return false;
+}
+
+// Typed error for factory initialization failures
+class StateStoreInitError extends Error {
+  constructor(backend, cause) {
+    super(`[StateAdapter] ${backend} backend failed to initialize: ${cause.message}`);
+    this.name = 'StateStoreInitError';
+    this.code = 'STATE_STORE_INIT_FAILED';
+    this.backend = backend;
+  }
 }
 
 // Atomic-file backend: write-to-temp-then-rename
@@ -63,8 +109,8 @@ class AtomicFileStore {
   }
 
   async put(key, value) {
-    // Guard: reject secret patterns
-    if (shouldRejectValue(JSON.stringify(value))) {
+    // Guard: reject credential values by format and field context
+    if (shouldRejectValue(value)) {
       throw new Error(`[SECURITY] Refusing to persist value with secret pattern for key: ${key}`);
     }
 
@@ -181,8 +227,8 @@ class SqliteWalStore {
   }
 
   async put(key, value) {
-    // Guard: reject secret patterns
-    if (shouldRejectValue(JSON.stringify(value))) {
+    // Guard: reject credential values by format and field context
+    if (shouldRejectValue(value)) {
       throw new Error(`[SECURITY] Refusing to persist value with secret pattern for key: ${key}`);
     }
 
@@ -243,8 +289,6 @@ class BonfireStore {
     this.maxBytes = maxBytes;
     this.name = 'bonfire';
     this.initialized = false;
-    // Use the same patterns as the other stores to ensure consistency
-    this.secretPatterns = SECRET_PATTERNS;
   }
 
   async initialize() {
@@ -255,11 +299,6 @@ class BonfireStore {
       );
     }
     this.initialized = true;
-  }
-
-  _containsSecret(text) {
-    const str = typeof text === 'string' ? text : JSON.stringify(text);
-    return this.secretPatterns.some((re) => re.test(str));
   }
 
   _episodeName(key) {
@@ -324,8 +363,8 @@ class BonfireStore {
   async put(key, value) {
     await this.initialize();
 
-    // Guard: reject secret patterns
-    if (this._containsSecret(JSON.stringify(value))) {
+    // Guard: reject credential values by format and field context
+    if (shouldRejectValue(value)) {
       throw new Error(`[SECURITY] Refusing to persist value with secret pattern for key: ${key}`);
     }
 
@@ -454,40 +493,63 @@ class BonfireStore {
   }
 }
 
-// Factory: select backend based on env and availability
-async function createStateStore(directory = null) {
-  const dir = directory || path.join(process.env.HOME || '/root', 'zol', 'state');
-  const backendEnv = process.env.ZOL_STATE_BACKEND || 'atomic-file';
+/**
+ * Create and initialize a state store.
+ *
+ * @param {string|object|null} directoryOrOpts
+ *   - string: directory path (uses ZOL_STATE_BACKEND env for backend selection)
+ *   - { directory, backend }: explicit options object
+ *   - null / undefined: use ~/zol/state + ZOL_STATE_BACKEND env
+ *
+ * Fails closed — if the requested backend fails to initialize, throws
+ * StateStoreInitError instead of silently falling back to another backend.
+ * Callers must await the result; the returned value is always an initialized store.
+ */
+async function createStateStore(directoryOrOpts = null) {
+  let dir, backendName;
 
-  let store;
-
-  if (backendEnv === 'bonfire') {
-    store = new BonfireStore();
-    try {
-      await store.initialize();
-      console.log(`[StateAdapter] Using Bonfire backend (${store.apiUrl})`);
-      return store;
-    } catch (e) {
-      console.warn(`[StateAdapter] Bonfire initialization failed: ${e.message}. Falling back to atomic-file.`);
-    }
+  if (typeof directoryOrOpts === 'string') {
+    dir = directoryOrOpts;
+    backendName = process.env.ZOL_STATE_BACKEND || 'atomic-file';
+  } else if (directoryOrOpts && typeof directoryOrOpts === 'object') {
+    dir = directoryOrOpts.directory;
+    backendName = directoryOrOpts.backend || process.env.ZOL_STATE_BACKEND || 'atomic-file';
+  } else {
+    backendName = process.env.ZOL_STATE_BACKEND || 'atomic-file';
   }
 
-  if (backendEnv === 'sqlite') {
-    store = new SqliteWalStore({ directory: dir });
-    try {
-      await store.initialize();
-      console.log(`[StateAdapter] Using SQLite-WAL backend at ${path.join(dir, 'zol-state.db')}`);
-      return store;
-    } catch (e) {
-      console.warn(`[StateAdapter] SQLite initialization failed: ${e.message}. Falling back to atomic-file.`);
-    }
+  if (!dir) {
+    dir = path.join(process.env.HOME || '/root', 'zol', 'state');
   }
 
-  // Fallback to atomic-file (always available)
-  store = new AtomicFileStore({ directory: dir });
-  await store.initialize();
-  console.log(`[StateAdapter] Using atomic-file backend at ${dir}/state/`);
+  if (backendName === 'bonfire') {
+    const store = new BonfireStore();
+    try {
+      await store.initialize();
+    } catch (e) {
+      throw new StateStoreInitError('bonfire', e);
+    }
+    return store;
+  }
+
+  if (backendName === 'sqlite') {
+    const store = new SqliteWalStore({ directory: dir });
+    try {
+      await store.initialize();
+    } catch (e) {
+      throw new StateStoreInitError('sqlite', e);
+    }
+    return store;
+  }
+
+  // atomic-file (default, always available)
+  const store = new AtomicFileStore({ directory: dir });
+  try {
+    await store.initialize();
+  } catch (e) {
+    throw new StateStoreInitError('atomic-file', e);
+  }
   return store;
 }
 
-module.exports = { createStateStore, AtomicFileStore, SqliteWalStore, BonfireStore, shouldRejectValue };
+module.exports = { createStateStore, AtomicFileStore, SqliteWalStore, BonfireStore, shouldRejectValue, StateStoreInitError };

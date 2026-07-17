@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Test, validate, and scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # --ignore-scripts skips native builds (@farcaster/hub-nodejs gRPC).
+      # All hub functions are lazy-loaded inside handlers, never at module
+      # top-level, so tests pass without the compiled binary.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Syntax check (v2 source files)
+        run: npm run v2:check
+
+      - name: Unit + integration tests (dl:test, 518 assertions)
+        run: npm run dl:test
+
+      - name: Validate 23 capsules and 72 DreamLoop manifests
+        run: npm run dl:validate
+
+      - name: Secret scan (must be clean)
+        run: npm run dl:secret-scan
+
+      - name: Dependency audit (moderate+)
+        run: npm audit --audit-level=moderate
