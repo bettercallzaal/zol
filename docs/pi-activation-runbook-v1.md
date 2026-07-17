@@ -56,7 +56,7 @@ npm run dl:test 2>&1 | tail -12
 Expected output (last lines):
 ```
 # tests 492
-# suites 69
+# suites 70
 # pass 492
 # fail 0
 # duration_ms ...
