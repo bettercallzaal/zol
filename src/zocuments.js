@@ -184,13 +184,30 @@ class Zocuments {
     if (allowed.permissions && !VALID_PERMISSIONS.includes(allowed.permissions)) {
       throw new Error(`Zocuments.edit: permissions must be one of: ${VALID_PERMISSIONS.join(', ')}`);
     }
+    if (allowed.status === 'approved') {
+      throw new Error('Zocuments.edit: cannot set status=approved via edit(); use approve() with verified authority.');
+    }
     if (allowed.status && !VALID_STATUSES.includes(allowed.status)) {
       throw new Error(`Zocuments.edit: status must be one of: ${VALID_STATUSES.join(', ')}`);
     }
 
     const now = new Date().toISOString();
     const changedFields = Object.keys(allowed).join(', ');
-    const changeEntry = { at: now, fields: changedFields || 'none', changedBy: changes.changedBy || 'operator' };
+
+    // Any edit on an approved document invalidates approval and returns it to draft.
+    // Re-approval requires a fresh call to approve() with verified authority.
+    const wasApproved = doc.status === 'approved';
+    if (wasApproved) {
+      allowed.status = 'draft';
+      allowed.approvedBy = null;
+    }
+
+    const changeEntry = {
+      at: now,
+      fields: changedFields || 'none',
+      changedBy: changes.changedBy || 'operator',
+      ...(wasApproved ? { note: 'approval invalidated — returned to draft' } : {}),
+    };
     const merged = {
       ...doc,
       ...allowed,

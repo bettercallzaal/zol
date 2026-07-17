@@ -1,7 +1,7 @@
 # ZOL Persistent Agent Upgrade v2 — Full Deliverables
 
 **Date:** 2026-07-16 (updated 2026-07-17)
-**Status:** COMPLETE — awaiting operator review and Pi activation (502 tests green, verification gate items 1-10 proven)
+**Status:** COMPLETE — awaiting operator review and Pi activation (508 tests green, verification gate items 1-10 proven)
 **Version:** zol@1.0.0 (package.json)
 
 ---
@@ -28,7 +28,8 @@ PRs in the v2 stack (merge in order):
 - **PR #39** (`ws/v2-migrations-test`) — Closes spec coverage gap: "Test … migrations" was claimed in the integration test header but had zero coverage. 4 new tests in new "Migrations" section #17 of v2-integration.test.js: (1) WorkRouter work packet survives to a fresh AtomicFileStore instance (cross-instance durability); (2) MemoryWeaver entry survives to a fresh AtomicFileStore instance; (3) fresh store returns `undefined` for unknown keys without throwing (fresh Pi / nothing-to-migrate scenario); (4) calling `initialize()` twice preserves existing state (idempotent re-initialization). Adds `os`, `path`, `AtomicFileStore` imports. Subtotal: 23 capsules, 72 loops, 496 tests (71 suites).
 - **PR #43** (`ws/v2-trapper-roundtrip-fix`) — Fixes 2 bugs in POST /trappers/import + createTrapperBundle lifecycle; adds Trapper round-trip real-backend test. Bug 1: `_handleTrappersImport` passed artifact object to `build()` instead of string ID (→ "artifact not found: [object Object]"). Bug 2: `createTrapperBundle` called `package()` directly after `build()` bypassing the `built→verified→packaged` lifecycle (→ invalid transition error). Fix: add `verify({passed:true, verifiedBy:'trapper-bundle-auto'})` before `package()`. New test 12 in real-backend.test.js: full export/import round trip on live AgentGateway (port 0) + fresh AtomicFileStore. Also corrects misleading test 8 comment (was "Trapper round trip", is CapsuleRegistry round trip). **Total: 23 capsules, 72 loops, 497 tests (71 suites).**
 - **PR #44** (`ws/v2-task-lease-ttl`) — Implements TTL-based board task lease (board task 1163). `CoworkTracker.claimWithLease()`: sets `leased_until = now + TTL` on claim; on primary collision, retries against tasks where `leased_until < now` (expired lease reclaim). `board.task.claim` handler uses `claimWithLease` when `COWORK_LEASE_ENABLED=1`, falls back to existing conditional-PATCH when disabled. Adds migration note for `leased_until timestamptz` column. Fixes handler count test (8→9, adds `board.task.claim`). 4 new tests. Subtotal: 23 capsules, 72 loops, 501 tests (71 suites).
-- **PR #45** (`ws/v2-runloop-status-fix`) — Fixes hardening-pass spec violation: `run_loop` MCP tool was returning `status:'queued'` even though nothing was enqueued. Changed to `status:'validated'` (loop confirmed in registry; execution requires DreamLoopRunner on Pi). Updated note to be accurate. Added test 13 in real-backend.test.js: asserts `validated ≠ queued` for a known loop and `unknown-loop` for a missing loopId. **Total: 23 capsules, 72 loops, 502 tests (71 suites).**
+- **PR #45** (`ws/v2-runloop-status-fix`) — Fixes hardening-pass spec violation: `run_loop` MCP tool was returning `status:'queued'` even though nothing was enqueued. Changed to `status:'validated'` (loop confirmed in registry; execution requires DreamLoopRunner on Pi). Updated note to be accurate. Added test 13 in real-backend.test.js: asserts `validated ≠ queued` for a known loop and `unknown-loop` for a missing loopId. Subtotal: 23 capsules, 72 loops, 502 tests (71 suites).
+- **PR #46** (`ws/v2-knowledge-approval-hardening`) — Hardens hardening-pass item 10 across all three knowledge products (Zictionary, Zocuments, Zikipedia). `edit()` now throws when caller passes `status:'approved'` (must use `approve()` with verified authority). Any `edit()` on an already-approved object immediately resets `status→'draft'` and clears `approvedBy`; history/changeLog records "approval invalidated". 6 new tests (2 per class). **Total: 23 capsules, 72 loops, 508 tests (71 suites).**
 
 Supplementary PRs (no merge dependency on main stack):
 - **PR #29** (`ws/v2-runner-gateway-design`) — Heterogeneous Runner Gateway design doc (design-only, no code)
@@ -404,8 +405,8 @@ zol-upgrade/
 ```
 npm run v2:test
 
-tests: 147
-pass:  147
+tests: 166
+pass:  166
 fail:  0
 duration: ~1800 ms
 
@@ -450,8 +451,8 @@ Coverage (src/handlers/__tests__/):
 ```
 npm run dl:test
 
-tests:  502
-pass:   502
+tests:  508
+pass:   508
 fail:   0
 duration: ~6000 ms
 ```
@@ -853,7 +854,7 @@ npm install
 # 4. Verify syntax
 npm run check
 
-# 5. Run v2 core tests (should see 147 pass, 0 fail)
+# 5. Run v2 core tests (should see 166 pass, 0 fail)
 npm run v2:test
 
 # 6. Run full DreamLoops test suite
@@ -1070,7 +1071,7 @@ Verification: output shows 23 capsules valid, 72 loops valid, 0 errors.
 ```bash
 npm run v2:test
 ```
-Verification: `pass: 51  fail: 0`.
+Verification: `pass: 166  fail: 0`.
 
 **Step 7 — Migrate state**
 ```bash
@@ -1101,7 +1102,7 @@ Verification: all 72 loops complete dry-run with no errors. No state changes wri
 ```bash
 npm run dl:test
 ```
-Verification: `pass: 502  fail: 0`.
+Verification: `pass: 508  fail: 0`.
 
 **Step 11 — (Optional) Start Agent Gateway**
 ```bash
