@@ -55,9 +55,9 @@ npm run dl:test 2>&1 | tail -12
 
 Expected output (last lines):
 ```
-# tests 422
-# suites 47
-# pass 422
+# tests 442
+# suites 51
+# pass 442
 # fail 0
 # duration_ms ...
 ```
@@ -65,7 +65,7 @@ Expected output (last lines):
 If any tests fail:
 - Check `node -v` matches what CI uses (v20.x)
 - Check that `~/.zao/private/` is readable by the running user
-- Do NOT proceed to Phase 3 until all 422 pass
+- Do NOT proceed to Phase 3 until all 442 pass
 
 ---
 

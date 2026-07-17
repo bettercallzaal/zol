@@ -1,7 +1,7 @@
 # ZOL Persistent Agent Upgrade v2 — Full Deliverables
 
 **Date:** 2026-07-16 (updated 2026-07-17)
-**Status:** COMPLETE — awaiting operator review and Pi activation (422 tests green, verification gate items 1-10 proven)
+**Status:** COMPLETE — awaiting operator review and Pi activation (442 tests green, verification gate items 1-10 proven)
 **Version:** zol@1.0.0 (package.json)
 
 ---
@@ -20,7 +20,8 @@ PRs in the v2 stack (merge in order):
 - **PR #31** (`ws/v2-board-integration`) — CoworkTracker + board.task handlers + nightly-triage DreamLoop; 3 gate-item-8 tests completing all 7 state-machine scenarios
 - **PR #32** (`ws/v2-api-response-shape`) — All AgentGateway REST success responses include `ok:true`; all errors include `ok:false`. MCP `/mcp/tools` raw array preserved. 3 new tests.
 - **PR #33** (`ws/v2-route-validation`) — Native `safeParse(jsonSchema, input)` validator (zero deps, mirrors Zod safeParse contract); applied to all body-receiving routes + per-tool MCP inputSchema lookup. 14 unit tests + 4 HTTP-level integration tests. Also: `farcaster.connectivity.check` handler, `cast-readiness-check-v1` loop, `zabal-channel-watch-v1`, `zabal-submissions-watch-v1` DreamLoops.
-- **PR #34** (`ws/v2-sparkz-wins`) — Ports unique content from stale PRs #17 (Sparkz launch-readiness) and #18 (Community Wins Spotter). 8 Sparkz energy-score handlers (read-only Farcaster signals, 0-100 score, launch_now/keep_building/insufficient_data output), community wins spotter handler (draft-only celebration casts, Bonfire deferred). 2 new capsules + 2 new loops. 30 new tests (14 Sparkz + 16 wins spotter). Total: 23 capsules, 72 loops, 422 tests.
+- **PR #34** (`ws/v2-sparkz-wins`) — Ports unique content from stale PRs #17 (Sparkz launch-readiness) and #18 (Community Wins Spotter). 8 Sparkz energy-score handlers (read-only Farcaster signals, 0-100 score, launch_now/keep_building/insufficient_data output), community wins spotter handler (draft-only celebration casts, Bonfire deferred). 2 new capsules + 2 new loops. 30 new tests (14 Sparkz + 16 wins spotter).
+- **PR #35** (`ws/v2-durable-execution`) — Fleet durable-execution hardening. `IdempotencyStore` (in-memory + atomic-file, 24h TTL default); ToolGateway `idempotencyKey` option (consequential write-tool dedup without re-executing handler); WorkRouter auto-generated `sideEffectKey` on every packet; `CoworkTracker.claimTask()` + `board.task.claim` handler with conditional Supabase PATCH (`?status=eq.todo`) to prevent shared-clone collisions. 20 new tests. Total: 23 capsules, 72 loops, 442 tests.
 
 Supplementary PRs (no merge dependency on main stack):
 - **PR #29** (`ws/v2-runner-gateway-design`) — Heterogeneous Runner Gateway design doc (design-only, no code)
@@ -344,10 +345,10 @@ Coverage:
 ```
 npm run dl:test
 
-tests:  422
-pass:   422
+tests:  442
+pass:   442
 fail:   0
-duration: ~4700 ms
+duration: ~7400 ms
 ```
 
 ---
@@ -995,7 +996,7 @@ Verification: all 69 loops complete dry-run with no errors. No state changes wri
 ```bash
 npm run dl:test
 ```
-Verification: `pass: 422  fail: 0`.
+Verification: `pass: 442  fail: 0`.
 
 **Step 11 — (Optional) Start Agent Gateway**
 ```bash
