@@ -1,7 +1,7 @@
 # ZOL Persistent Agent Upgrade v2 — Full Deliverables
 
 **Date:** 2026-07-16 (updated 2026-07-17)
-**Status:** COMPLETE — awaiting operator review and Pi activation (528 tests green, verification gate items 1-10 proven)
+**Status:** COMPLETE — awaiting operator review and Pi activation (532 tests green, verification gate items 1-10 proven)
 **Version:** zol@1.0.0 (package.json)
 
 ---
@@ -467,8 +467,8 @@ Coverage (src/handlers/__tests__/):
 ```
 npm run dl:test
 
-tests:  528
-pass:   528
+tests:  532
+pass:   532
 fail:   0
 duration: ~6000 ms
 ```
