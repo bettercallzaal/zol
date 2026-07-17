@@ -30,6 +30,9 @@ PRs in the v2 stack (merge in order):
 Supplementary PRs (no merge dependency on main stack):
 - **PR #29** (`ws/v2-runner-gateway-design`) — Heterogeneous Runner Gateway design doc (design-only, no code)
 - **PR #30** (`ws/fleet-standard-v0.1-expanded`) — Fleet Standard v0.1 operating constitution + conformance harness (72 checks)
+- **PR #40** (`ws/v2-keystone3-bridge-design`) — Keystone 3: ZOE→ZOL intent bridge design v1. Supabase board message bus (Option A) + SSH tunnel (Option B). Intent-router skeleton, board.zol-intent.claim handler, full API contract, 4 open Qs.
+- **PR #41** (`ws/v2-ci`) — GitHub Actions CI: full conformance gate (v2:check + dl:test 496 + dl:validate 23/72 + dl:secret-scan + npm audit) on every non-main push and PR to main. Node 22, `--ignore-scripts`, sqlite3 native binding probe. All CI runs green.
+- **PR #42** (`ws/v2-keystone4-fleet-design`) — Keystone 4: zaalcaster fleet page design v1. Supabase `fleet_state` relay: ZOL heartbeat writes snapshots, zaalcaster reads via anon REST. No Pi exposure. fleet.state.write handler, SQL migration, api/fleet.js, Fleet tab, 4 open Qs.
 
 ---
 
