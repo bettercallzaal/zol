@@ -1,7 +1,7 @@
 # ZOL Persistent Agent Upgrade v2 — Full Deliverables
 
 **Date:** 2026-07-16 (updated 2026-07-17)
-**Status:** COMPLETE — awaiting operator review and Pi activation (392 tests green, verification gate items 1-10 proven)
+**Status:** COMPLETE — awaiting operator review and Pi activation (422 tests green, verification gate items 1-10 proven)
 **Version:** zol@1.0.0 (package.json)
 
 ---
@@ -20,6 +20,7 @@ PRs in the v2 stack (merge in order):
 - **PR #31** (`ws/v2-board-integration`) — CoworkTracker + board.task handlers + nightly-triage DreamLoop; 3 gate-item-8 tests completing all 7 state-machine scenarios
 - **PR #32** (`ws/v2-api-response-shape`) — All AgentGateway REST success responses include `ok:true`; all errors include `ok:false`. MCP `/mcp/tools` raw array preserved. 3 new tests.
 - **PR #33** (`ws/v2-route-validation`) — Native `safeParse(jsonSchema, input)` validator (zero deps, mirrors Zod safeParse contract); applied to all body-receiving routes + per-tool MCP inputSchema lookup. 14 unit tests + 4 HTTP-level integration tests. Also: `farcaster.connectivity.check` handler, `cast-readiness-check-v1` loop, `zabal-channel-watch-v1`, `zabal-submissions-watch-v1` DreamLoops.
+- **PR #34** (`ws/v2-sparkz-wins`) — Ports unique content from stale PRs #17 (Sparkz launch-readiness) and #18 (Community Wins Spotter). 8 Sparkz energy-score handlers (read-only Farcaster signals, 0-100 score, launch_now/keep_building/insufficient_data output), community wins spotter handler (draft-only celebration casts, Bonfire deferred). 2 new capsules + 2 new loops. 30 new tests (14 Sparkz + 16 wins spotter). Total: 23 capsules, 72 loops, 422 tests.
 
 Supplementary PRs (no merge dependency on main stack):
 - **PR #29** (`ws/v2-runner-gateway-design`) — Heterogeneous Runner Gateway design doc (design-only, no code)
@@ -35,7 +36,7 @@ Supplementary PRs (no merge dependency on main stack):
 │                                                                      │
 │  ┌────────────────────────────────────────────────────────────────┐  │
 │  │                    DREAMLOOPS ENGINE                           │  │
-│  │   Capsule Registry (21 capsules) ↔ Loop Registry (52 loops)   │  │
+│  │   Capsule Registry (23 capsules) ↔ Loop Registry (54 loops)   │  │
 │  └──────────┬───────────────────────────────────┬────────────────┘  │
 │             │                                   │                    │
 │  ┌──────────▼──────────┐           ┌────────────▼──────────────┐    │
@@ -88,7 +89,7 @@ Supplementary PRs (no merge dependency on main stack):
 ```
 zol-upgrade/
 ├── package.json                              (v2 scripts added: v2:test, dl:validate, etc.)
-├── capsules/                                 (21 total — 11 original + 10 new zol-*)
+├── capsules/                                 (23 total — 11 original + 10 zol-* + 2 ported from #17/#18)
 │   ├── communication-and-approval-v1.json
 │   ├── community-crm-v1.json
 │   ├── creative-practice-v1.json
@@ -96,7 +97,9 @@ zol-upgrade/
 │   ├── evidence-gated-self-improvement-v1.json
 │   ├── knowledge-and-research-v1.json
 │   ├── persistent-agent-base-v1.json
+│   ├── sparkz-launch-readiness-v1.json       [NEW — PR #34]
 │   ├── warper-keeper-connector-v1.json
+│   ├── zao-wins-spotter-v1.json              [NEW — PR #34]
 │   ├── zol-artist-spotlight-v1.json           [NEW]
 │   ├── zol-builder-and-artifact-v1.json      [NEW]
 │   ├── zol-core-continuity-v1.json           [NEW]
@@ -110,7 +113,7 @@ zol-upgrade/
 │   ├── zol-warper-keeper-client-v1.json      [NEW]
 │   ├── zol-weekly-curator-v1.json            [NEW]
 │   └── zol-work-router-v1.json              [NEW]
-├── loops/                                    (69 total manifest files)
+├── loops/                                    (72 total manifest files)
 │   ├── accept-warper-assignment.manifest.json
 │   ├── artifact-plan.manifest.json
 │   ├── artist-context.manifest.json
@@ -188,8 +191,12 @@ zol-upgrade/
 │   │   ├── community-crm.js
 │   │   ├── component-radar.js
 │   │   ├── self-improvement-state-machine.js
+│   │   ├── sparkz-launch-readiness.js        [NEW — PR #34]
 │   │   ├── warper-keeper-handlers.js
-│   │   └── weekly-curator.js
+│   │   ├── weekly-curator.js
+│   │   └── wins-spotter.js                   [NEW — PR #34]
+│   │   └── __tests__/
+│   │       └── sparkz.test.js                [NEW — PR #34, 14 tests]
 │   └── __tests__/
 │       ├── capsule-registry.test.js
 │       ├── dreamloop-registry.test.js
@@ -200,6 +207,7 @@ zol-upgrade/
 │       ├── self-improvement.test.js
 │       ├── state-adapter.test.js
 │       ├── tool-gateway.test.js
+│       └── wins-spotter.test.js              [NEW — PR #34, 16 tests]
 │       └── work-router.test.js
 ├── scripts/
 │   ├── dl-dry-run.js
@@ -239,6 +247,8 @@ zol-upgrade/
 | zol-warper-keeper-client-v1 | 1 | disabled | warper.accept (disabled by default) |
 | zol-weekly-curator-v1 | 1 | active | artifact.write, cast.draft |
 | zol-work-router-v1 | 1 | active | task.read, task.write, work.route |
+| sparkz-launch-readiness-v1 | 1 | prototype | farcaster.*-read (no posting, no wallet) |
+| zao-wins-spotter-v1 | 1 | prototype | community.wins.spot, artifact.draft.write (draft-only) |
 
 ---
 
@@ -300,8 +310,10 @@ zol-upgrade/
 | warper-keeper-work-cycle | 5 | warper.cycle | disabled (WK off) |
 | weave-memory | 3 | memory.weave | PASS |
 | weekly-curator-v1 | 5 | weekly-cron | PASS |
+| sparkz-launch-readiness-v1 | 8 | on-demand/weekly | PASS (dry-run) |
+| community-wins-spotlight-v1 | 5 | daily at 6:30am | PASS (dry-run) |
 
-66 loops: PASS | 3 loops: disabled (Warper Keeper — off by default, correct behavior)
+68 loops: PASS | 3 loops: disabled (Warper Keeper — off by default, correct behavior)
 
 ---
 
@@ -332,10 +344,10 @@ Coverage:
 ```
 npm run dl:test
 
-tests:  392
-pass:   392
+tests:  422
+pass:   422
 fail:   0
-duration: ~2200 ms
+duration: ~4700 ms
 ```
 
 ---
@@ -946,7 +958,7 @@ Verification: output ends with `all scripts OK`.
 ```bash
 npm run dl:validate
 ```
-Verification: output shows 21 capsules valid, 69 loops valid, 0 errors.
+Verification: output shows 23 capsules valid, 72 loops valid, 0 errors.
 
 **Step 6 — Run v2 test suite**
 ```bash
@@ -983,14 +995,14 @@ Verification: all 69 loops complete dry-run with no errors. No state changes wri
 ```bash
 npm run dl:test
 ```
-Verification: `pass: 392  fail: 0`.
+Verification: `pass: 422  fail: 0`.
 
 **Step 11 — (Optional) Start Agent Gateway**
 ```bash
 node src/agent-gateway.js &
 curl http://localhost:8089/health
 ```
-Verification: health endpoint returns `{"ok":true,"status":"ok","capsules":21,"loops":69}`.
+Verification: health endpoint returns `{"ok":true,"status":"ok","capsules":23,"loops":72}`.
 
 **Step 12 — Enable and verify first live run**
 ```bash
