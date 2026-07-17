@@ -36,7 +36,7 @@
     "handler error"
   ],
   "promotion_path": "rehearsed -> active_local -> live_guarded",
-  "last_reviewed": "2026-07-16",
+  "last_reviewed": "2026-07-17",
   "limits": {
     "max_wall_time_ms": 60000,
     "max_steps": 6,
@@ -106,11 +106,25 @@
     "notify:owner",
     "log:error"
   ],
-  "inputs": [],
-  "context_sources": [],
-  "checks": [],
-  "evidence_outputs": [],
-  "receipt_outputs": [],
+  "inputs": [
+    "approval_request_payload"
+  ],
+  "context_sources": [
+    "approval request payload (state store)",
+    "pending approvals queue",
+    "Telegram approval bridge config"
+  ],
+  "checks": [
+    "approval_request_formed",
+    "telegram_message_queued",
+    "approval_receipt_written"
+  ],
+  "evidence_outputs": [
+    "approval_request_record"
+  ],
+  "receipt_outputs": [
+    "request-approval-receipt"
+  ],
   "knowledge_state_outputs": [],
   "execution_trace_outputs": [],
   "memory_routes": []

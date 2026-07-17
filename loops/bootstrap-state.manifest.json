@@ -36,7 +36,7 @@
     "handler error"
   ],
   "promotion_path": "rehearsed -> active_local -> live_guarded",
-  "last_reviewed": "2026-07-16",
+  "last_reviewed": "2026-07-17",
   "limits": {
     "max_wall_time_ms": 60000,
     "max_steps": 6,
@@ -107,12 +107,29 @@
     "log:error",
     "halt"
   ],
-  "inputs": [],
-  "context_sources": [],
-  "checks": [],
-  "evidence_outputs": [],
-  "receipt_outputs": [],
-  "knowledge_state_outputs": [],
+  "inputs": [
+    "identity_profile",
+    "capsule_registry_path"
+  ],
+  "context_sources": [
+    "identity profile (Farcaster FID 3338501)",
+    "capsule registry on disk",
+    "SQLite WAL state store"
+  ],
+  "checks": [
+    "capsule_registry_loaded",
+    "state_store_initialized",
+    "default_memories_seeded"
+  ],
+  "evidence_outputs": [
+    "bootstrap_receipt"
+  ],
+  "receipt_outputs": [
+    "bootstrap-state-receipt"
+  ],
+  "knowledge_state_outputs": [
+    "agent_identity_state"
+  ],
   "execution_trace_outputs": [],
   "memory_routes": []
 }

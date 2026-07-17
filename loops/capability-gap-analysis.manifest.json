@@ -37,7 +37,7 @@
     "handler error"
   ],
   "promotion_path": "rehearsed -> active_local -> live_guarded",
-  "last_reviewed": "2026-07-16",
+  "last_reviewed": "2026-07-17",
   "limits": {
     "max_wall_time_ms": 60000,
     "max_steps": 6,
@@ -108,12 +108,31 @@
     "log:error",
     "halt"
   ],
-  "inputs": [],
-  "context_sources": [],
-  "checks": [],
-  "evidence_outputs": [],
-  "receipt_outputs": [],
-  "knowledge_state_outputs": [],
+  "inputs": [
+    "recent_work_packets",
+    "tool_health_snapshot"
+  ],
+  "context_sources": [
+    "recent work packet history (state store)",
+    "tool gateway health records",
+    "receipt journal (last 7 days)",
+    "component-watch alert queue"
+  ],
+  "checks": [
+    "work_packets_scanned",
+    "failure_patterns_identified",
+    "missing_tools_catalogued",
+    "improvement_proposal_queued_or_skipped"
+  ],
+  "evidence_outputs": [
+    "gap_analysis_report"
+  ],
+  "receipt_outputs": [
+    "capability-gap-receipt"
+  ],
+  "knowledge_state_outputs": [
+    "identified_gaps"
+  ],
   "execution_trace_outputs": [],
   "memory_routes": []
 }
