@@ -5,36 +5,48 @@
 
 const crypto = require('crypto');
 
-// Secret patterns to strip from evidence before persisting
+// Credential patterns to strip from evidence before persisting.
+// SHA-256 hashes, content hashes, commit SHAs, and idempotency keys are evidence
+// and must NOT be redacted — they are needed to verify receipt chains.
 const SECRET_PATTERNS = [
-  /[0-9a-fA-F]{64}/g,      // 64-char hex (private keys, hashes that look like keys)
-  /sk-[a-zA-Z0-9_-]+/g,    // OpenAI / OpenRouter API keys
-  /ghp_[a-zA-Z0-9_-]+/g,   // GitHub personal access tokens
+  /sk-[a-zA-Z0-9_-]{20,}/g,   // OpenAI / OpenRouter API keys
+  /ghp_[a-zA-Z0-9_-]{4,}/g,   // GitHub personal access tokens
+  /github_pat_[a-zA-Z0-9_]+/g, // GitHub PATs v2
+  /ghs_[a-zA-Z0-9_]+/g,        // GitHub Actions tokens
   /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, // PEM blocks
 ];
 
+// Field names whose values should be redacted regardless of format
+const CREDENTIAL_FIELD_RE = /^(password|passwd|secret|api[_-]?key|private[_-]?key|priv[_-]?key|auth[_-]?token|access[_-]?token|refresh[_-]?token|credential|credentials|bearer|mnemonic|seed|wallet[_-]?key|signing[_-]?key|encryption[_-]?key)$/i;
+
 /**
- * Recursively walk an object and replace secret-matching string values
- * with the placeholder "[REDACTED]".
+ * Recursively sanitize an object for evidence storage.
+ * - Redacts strings matching known credential formats (sk-, ghp_, PEM blocks).
+ * - Redacts hex strings of ≥32 chars in credential-named fields.
+ * - Preserves SHA-256 hashes, commit SHAs, and content hashes in non-credential fields.
  */
-function sanitizeEvidence(obj) {
+function sanitizeEvidence(obj, _fieldName) {
   if (obj === null || obj === undefined) return obj;
   if (typeof obj === 'string') {
     let result = obj;
+    // Apply always-reject patterns
     for (const pattern of SECRET_PATTERNS) {
-      // Reset lastIndex for global patterns before each test
       pattern.lastIndex = 0;
       result = result.replace(pattern, '[REDACTED]');
+    }
+    // Redact hex strings in credential-named fields
+    if (_fieldName && CREDENTIAL_FIELD_RE.test(_fieldName) && /[0-9a-fA-F]{32,}/.test(result)) {
+      return '[REDACTED]';
     }
     return result;
   }
   if (Array.isArray(obj)) {
-    return obj.map(sanitizeEvidence);
+    return obj.map((item) => sanitizeEvidence(item));
   }
   if (typeof obj === 'object') {
     const out = {};
     for (const [k, v] of Object.entries(obj)) {
-      out[k] = sanitizeEvidence(v);
+      out[k] = sanitizeEvidence(v, k);
     }
     return out;
   }
@@ -43,14 +55,15 @@ function sanitizeEvidence(obj) {
 
 /**
  * Compute the SHA-256 digest of the canonical receipt payload.
- * Keys are sorted alphabetically: receiptId, idempotencyKey, previousReceiptId,
- * loopId, runId, stepId, capsuleId, agentId, action, status, startedAt, evidence.
+ * Keys are sorted to keep the hash stable across Node versions.
+ * previousReceiptHash binds this receipt to the prior one in the chain.
  */
 function computeSha256(fields) {
   const canonical = JSON.stringify({
     receiptId: fields.receiptId,
     idempotencyKey: fields.idempotencyKey,
     previousReceiptId: fields.previousReceiptId,
+    previousReceiptHash: fields.previousReceiptHash,
     loopId: fields.loopId,
     runId: fields.runId,
     stepId: fields.stepId,
@@ -173,9 +186,14 @@ class ReceiptJournal {
       return this.get(existingId);
     }
 
-    // Determine chain link
+    // Determine chain link: previousReceiptId and its hash for chain verification
     const receiptIds = this._index.receiptIds;
     const previousReceiptId = receiptIds.length > 0 ? receiptIds[receiptIds.length - 1] : null;
+    let previousReceiptHash = null;
+    if (previousReceiptId) {
+      const prev = await this.get(previousReceiptId);
+      previousReceiptHash = prev ? (prev.sha256 || null) : null;
+    }
 
     // Build receipt (finishedAt / durationMs not set at append time for pending;
     // for success/failure we treat the append call as the completion moment)
@@ -191,6 +209,7 @@ class ReceiptJournal {
       receiptId,
       idempotencyKey,
       previousReceiptId,
+      previousReceiptHash,
       loopId,
       runId,
       stepId,
@@ -221,10 +240,11 @@ class ReceiptJournal {
       version: 'v1',
     };
 
-    // Persist individual receipt
+    // Atomic append: persist receipt FIRST, then update index.
+    // If the index write fails, the receipt is still readable by ID; the index
+    // will be rebuilt on next load (receiptIds won't reference a missing receipt).
     await this._store.put(`receipt:${receiptId}`, receipt);
 
-    // Update and persist index
     this._index.receiptIds.push(receiptId);
     this._index.byIdempotencyKey[idempotencyKey] = receiptId;
     await this._saveIndex();
@@ -291,6 +311,70 @@ class ReceiptJournal {
     const ids = this._index.receiptIds;
     if (ids.length === 0) return null;
     return this.get(ids[ids.length - 1]);
+  }
+
+  /**
+   * Verify the integrity of the receipt chain.
+   *
+   * Checks:
+   *  - Each receipt referenced by the index is readable.
+   *  - Each receipt's sha256 matches a fresh recompute of its own fields.
+   *  - Each receipt's previousReceiptId links to the actual prior entry.
+   *  - Each receipt's previousReceiptHash matches the prior receipt's sha256.
+   *
+   * @returns {Promise<{ valid: boolean, errors: string[], checked: number }>}
+   */
+  async verifyChain() {
+    await this._loadIndex();
+    const ids = this._index.receiptIds;
+    const errors = [];
+    let prevReceipt = null;
+
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const receipt = await this.get(id);
+
+      if (!receipt) {
+        errors.push(`receipt ${id} (index position ${i}) is missing from store`);
+        prevReceipt = null;
+        continue;
+      }
+
+      // Recompute hash and verify integrity
+      const recomputed = computeSha256(receipt);
+      if (recomputed !== receipt.sha256) {
+        errors.push(
+          `receipt ${id} sha256 mismatch: stored=${receipt.sha256} recomputed=${recomputed}`
+        );
+      }
+
+      // Verify chain link
+      const expectedPrevId = prevReceipt ? prevReceipt.receiptId : null;
+      if (receipt.previousReceiptId !== expectedPrevId) {
+        errors.push(
+          `receipt ${id} previousReceiptId mismatch: ` +
+          `expected=${expectedPrevId} stored=${receipt.previousReceiptId}`
+        );
+      }
+
+      // Verify previousReceiptHash matches prior receipt's sha256
+      if (prevReceipt !== null) {
+        if (receipt.previousReceiptHash !== prevReceipt.sha256) {
+          errors.push(
+            `receipt ${id} previousReceiptHash mismatch: ` +
+            `expected=${prevReceipt.sha256} stored=${receipt.previousReceiptHash}`
+          );
+        }
+      } else if (receipt.previousReceiptHash !== null) {
+        errors.push(
+          `receipt ${id} is first in chain but has non-null previousReceiptHash: ${receipt.previousReceiptHash}`
+        );
+      }
+
+      prevReceipt = receipt;
+    }
+
+    return { valid: errors.length === 0, errors, checked: ids.length };
   }
 }
 

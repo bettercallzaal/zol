@@ -1,10 +1,17 @@
 'use strict';
 
 // work-router.js - Layer 6: Work Router for ZOL Persistent Agent Upgrade v2
+// Ownership/fencing fields added per hardening pass Phase 1 item 5.
 // Distinguishes conversation from real work, clarifies incomplete requests,
 // creates work packets, routes tasks, resumes after restart, closes with evidence.
 
 const crypto = require('crypto');
+
+// Terminal statuses — once a packet reaches one of these, no further transitions allowed.
+const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
+
+// Default lease duration: 10 minutes
+const DEFAULT_LEASE_TTL_MS = 10 * 60 * 1000;
 
 // Default route map by work type (also handles 'auto' routing in route())
 const DEFAULT_ROUTES = {
@@ -209,10 +216,10 @@ class WorkRouter {
 
   /**
    * Create a new work packet.
-   * @param {{ title, description, type, priority?, requestedBy?, inputs?, tags[] }} fields
+   * @param {{ title, description, type, priority?, requestedBy?, inputs?, tags[], sideEffectKey? }} fields
    * @returns {object} The created packet
    */
-  async createPacket({ title, description, type, priority = 'medium', requestedBy = 'operator', inputs = {}, tags = [] } = {}) {
+  async createPacket({ title, description, type, priority = 'medium', requestedBy = 'operator', inputs = {}, tags = [], sideEffectKey = null } = {}) {
     validatePacketFields({ title, description, type });
 
     const now = new Date().toISOString();
@@ -226,6 +233,12 @@ class WorkRouter {
       status: 'pending',
       priority,
       requestedBy,
+      // Ownership/fencing fields (hardening pass Phase 1, item 5)
+      owner: null,         // identity of the agent holding the lease
+      attemptId: null,     // unique ID per lease acquisition; changes on re-acquire
+      fencingEpoch: 0,     // monotonically increasing; reject stale writers
+      leaseExpiry: null,   // ISO timestamp; null when not in_progress
+      sideEffectKey,       // caller-supplied idempotency key for side-effecting actions
       assignedTo: null,
       createdAt: now,
       updatedAt: now,
@@ -293,27 +306,57 @@ class WorkRouter {
   }
 
   /**
-   * Assign a route to the packet and set status to in_progress.
-   * Pass route='auto' to apply default route rules based on packet type.
+   * Assign a route to the packet, acquire a lease, and set status to in_progress.
+   *
    * @param {string} packetId
    * @param {string} route - Route identifier, or 'auto' for type-based default
-   * @returns {object} Updated packet
+   * @param {object} [opts]
+   * @param {string} [opts.owner]      - Identity of the acquiring agent
+   * @param {number} [opts.leaseTtlMs] - Lease duration in ms (default: 10 min)
+   * @param {string} [opts.expectedStatus] - CAS guard: only route if current status matches
+   * @returns {object} Updated packet with lease fields
    */
-  async route(packetId, route) {
+  async route(packetId, route, { owner = 'operator', leaseTtlMs = DEFAULT_LEASE_TTL_MS, expectedStatus } = {}) {
     const packet = await this._getPacket(packetId);
     if (!packet) throw new Error(`WorkRouter.route: packet not found: ${packetId}`);
 
-    // Lease guard (verification-gate invariant #2): reject duplicate assignment.
-    // Irreversible tasks (type=reply, type=post, or any in_progress packet) must
-    // not be dispatched to two workers. A second route() call on the same packet
-    // while it is in_progress is refused with LEASE_ALREADY_HELD.
-    if (packet.status === 'in_progress') {
+    // Terminal status check: cannot re-route a terminated packet
+    if (TERMINAL_STATUSES.has(packet.status)) {
       const err = new Error(
-        `WorkRouter.route: lease already held by "${packet.assignedTo}" for packet ${packetId}`
+        `WorkRouter.route: packet ${packetId} is in terminal status "${packet.status}" — cannot re-route`
       );
-      err.code = 'LEASE_ALREADY_HELD';
-      err.assignedTo = packet.assignedTo;
+      err.code = 'TERMINAL_STATUS';
+      err.status = packet.status;
       throw err;
+    }
+
+    // CAS guard: if expectedStatus is set, reject if current status doesn't match
+    if (expectedStatus !== undefined && packet.status !== expectedStatus) {
+      const err = new Error(
+        `WorkRouter.route: CAS failed for ${packetId} — expected "${expectedStatus}", got "${packet.status}"`
+      );
+      err.code = 'CAS_MISMATCH';
+      err.expected = expectedStatus;
+      err.actual = packet.status;
+      throw err;
+    }
+
+    // Lease guard (verification-gate invariant #2): reject duplicate assignment
+    // unless the existing lease has expired.
+    if (packet.status === 'in_progress') {
+      const now = Date.now();
+      const expiry = packet.leaseExpiry ? new Date(packet.leaseExpiry).getTime() : 0;
+      if (now < expiry) {
+        const err = new Error(
+          `WorkRouter.route: lease already held by "${packet.assignedTo}" for packet ${packetId} ` +
+          `(expires ${packet.leaseExpiry})`
+        );
+        err.code = 'LEASE_ALREADY_HELD';
+        err.assignedTo = packet.assignedTo;
+        err.leaseExpiry = packet.leaseExpiry;
+        throw err;
+      }
+      // Lease is expired — allow re-acquisition (fencing epoch will increment)
     }
 
     const resolvedRoute =
@@ -321,10 +364,43 @@ class WorkRouter {
         ? DEFAULT_ROUTES[packet.type] || DEFAULT_ROUTES.other
         : route;
 
+    const now = new Date();
     packet.route = resolvedRoute;
     packet.assignedTo = resolvedRoute;
+    packet.owner = owner;
+    packet.attemptId = 'attempt_' + crypto.randomUUID();
+    packet.fencingEpoch = (packet.fencingEpoch || 0) + 1;
+    packet.leaseExpiry = new Date(now.getTime() + leaseTtlMs).toISOString();
     packet.status = 'in_progress';
 
+    return this._savePacket(packet);
+  }
+
+  /**
+   * Renew a held lease, extending the expiry by leaseTtlMs.
+   * The caller must supply the current attemptId to prove they still hold the lease.
+   *
+   * @param {string} packetId
+   * @param {string} attemptId - The attemptId returned when the lease was acquired
+   * @param {number} [leaseTtlMs]
+   * @returns {object} Updated packet
+   */
+  async renewLease(packetId, attemptId, leaseTtlMs = DEFAULT_LEASE_TTL_MS) {
+    const packet = await this._getPacket(packetId);
+    if (!packet) throw new Error(`WorkRouter.renewLease: packet not found: ${packetId}`);
+    if (packet.status !== 'in_progress') {
+      throw new Error(`WorkRouter.renewLease: packet ${packetId} is not in_progress (status: ${packet.status})`);
+    }
+    if (packet.attemptId !== attemptId) {
+      const err = new Error(
+        `WorkRouter.renewLease: stale lease for packet ${packetId} — ` +
+        `caller attemptId="${attemptId}" but current="${packet.attemptId}" (fencing epoch ${packet.fencingEpoch})`
+      );
+      err.code = 'STALE_LEASE';
+      err.fencingEpoch = packet.fencingEpoch;
+      throw err;
+    }
+    packet.leaseExpiry = new Date(Date.now() + leaseTtlMs).toISOString();
     return this._savePacket(packet);
   }
 
@@ -354,17 +430,31 @@ class WorkRouter {
 
   /**
    * Mark the packet as completed with evidence.
+   * The caller should supply their attemptId to guard against stale writers.
    * @param {string} packetId
    * @param {object} evidence
+   * @param {object} [opts]
+   * @param {string} [opts.attemptId] - Guard: reject if packet's attemptId doesn't match
    * @returns {object} Updated packet
    */
-  async complete(packetId, evidence) {
+  async complete(packetId, evidence, { attemptId } = {}) {
     const packet = await this._getPacket(packetId);
     if (!packet) throw new Error(`WorkRouter.complete: packet not found: ${packetId}`);
+    if (TERMINAL_STATUSES.has(packet.status)) {
+      const err = new Error(`WorkRouter.complete: packet ${packetId} is already in terminal status "${packet.status}"`);
+      err.code = 'TERMINAL_STATUS';
+      throw err;
+    }
+    if (attemptId !== undefined && packet.attemptId !== attemptId) {
+      const err = new Error(`WorkRouter.complete: stale writer for ${packetId} — attemptId mismatch`);
+      err.code = 'STALE_LEASE';
+      throw err;
+    }
 
     packet.status = 'completed';
     packet.evidence = evidence || null;
     packet.completedAt = new Date().toISOString();
+    packet.leaseExpiry = null;
 
     return this._savePacket(packet);
   }
@@ -373,14 +463,27 @@ class WorkRouter {
    * Mark the packet as failed; stores reason in evidence.
    * @param {string} packetId
    * @param {string} reason
+   * @param {object} [opts]
+   * @param {string} [opts.attemptId]
    * @returns {object} Updated packet
    */
-  async fail(packetId, reason) {
+  async fail(packetId, reason, { attemptId } = {}) {
     const packet = await this._getPacket(packetId);
     if (!packet) throw new Error(`WorkRouter.fail: packet not found: ${packetId}`);
+    if (TERMINAL_STATUSES.has(packet.status)) {
+      const err = new Error(`WorkRouter.fail: packet ${packetId} is already in terminal status "${packet.status}"`);
+      err.code = 'TERMINAL_STATUS';
+      throw err;
+    }
+    if (attemptId !== undefined && packet.attemptId !== attemptId) {
+      const err = new Error(`WorkRouter.fail: stale writer for ${packetId} — attemptId mismatch`);
+      err.code = 'STALE_LEASE';
+      throw err;
+    }
 
     packet.status = 'failed';
     packet.evidence = { reason };
+    packet.leaseExpiry = null;
 
     return this._savePacket(packet);
   }
@@ -393,8 +496,14 @@ class WorkRouter {
   async cancel(packetId) {
     const packet = await this._getPacket(packetId);
     if (!packet) throw new Error(`WorkRouter.cancel: packet not found: ${packetId}`);
+    if (TERMINAL_STATUSES.has(packet.status)) {
+      const err = new Error(`WorkRouter.cancel: packet ${packetId} is already in terminal status "${packet.status}"`);
+      err.code = 'TERMINAL_STATUS';
+      throw err;
+    }
 
     packet.status = 'cancelled';
+    packet.leaseExpiry = null;
 
     return this._savePacket(packet);
   }
