@@ -125,7 +125,7 @@
       }
     }
   ],
-  "lifecycle_state": "specification-only",
+  "lifecycle_state": "dry-run",
   "entry_conditions": [
     "warper_assignment_available",
     "keeper_available"
