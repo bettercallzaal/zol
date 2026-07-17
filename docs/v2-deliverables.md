@@ -1,7 +1,7 @@
 # ZOL Persistent Agent Upgrade v2 — Full Deliverables
 
-**Date:** 2026-07-16
-**Status:** COMPLETE — awaiting operator review and Pi activation
+**Date:** 2026-07-16 (updated 2026-07-17)
+**Status:** COMPLETE — awaiting operator review and Pi activation (359 tests green, verification gate items 1-10 proven)
 **Version:** zol@1.0.0 (package.json)
 
 ---
@@ -10,14 +10,18 @@
 
 | Item | Value |
 |------|-------|
-| Base branch | `ws/v2-core-layers` → PR #26 (Layers 1-2, 5-8, 11) |
-| This branch | `ws/v2-layer-9-12-gateway` (stacked on #26) |
-| This PR | Layers 9, 12, 14-15, and all Knowledge Products |
+| Base branch | `main` |
 | Merge target | `main` |
 
-PRs in the v2 stack:
-- **PR #26** — Capsule Registry, DreamLoop Registry, Receipt Journal, Memory Weaver, Work Router, Model Gateway, Tool Gateway (Layers 1-2, 5-8, 11)
-- **This PR** — Agent Gateway, Zictionary, Artifact Pipeline, Proof Drop Adapter, ToolGym Adapter, Knowledge Products (Layers 9, 12, 14-15)
+PRs in the v2 stack (merge in order):
+- **PR #26** (`ws/v2-core-layers`) — Capsule Registry, DreamLoop Registry, Receipt Journal, Memory Weaver, Work Router, Model Gateway, Tool Gateway (Layers 1-2, 5-8, 11); 10 capsules, 31 loops
+- **PR #27** (`ws/v2-layer-9-12-gateway`) — Agent Gateway, Zictionary, Artifact Pipeline, Proof Drop Adapter, ToolGym Adapter, Knowledge Products (Layers 9, 12, 14-15)
+- **PR #28** (`ws/v2-integration-loops`) — Layer 10 ApprovalBridge, ToolGateway+AgentGateway wiring, 10 new DreamLoops, real-backend durability tests (8 tests)
+- **PR #31** (`ws/v2-board-integration`) — CoworkTracker + board.task handlers + nightly-triage DreamLoop; 3 gate-item-8 tests completing all 7 state-machine scenarios
+
+Supplementary PRs (no merge dependency on main stack):
+- **PR #29** (`ws/v2-runner-gateway-design`) — Heterogeneous Runner Gateway design doc (design-only, no code)
+- **PR #30** (`ws/fleet-standard-v0.1-expanded`) — Fleet Standard v0.1 operating constitution + conformance harness (72 checks)
 
 ---
 
