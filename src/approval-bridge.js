@@ -389,12 +389,81 @@ class ApprovalBridge {
   }
 
   /**
+   * One-use consume gate: atomically verify status='approved' and mark as
+   * 'consumed'. Subsequent consume() calls on the same requestId throw
+   * ALREADY_CONSUMED. Fails-closed on any error, missing request, or
+   * non-approved status.
+   *
+   * This is the correct check to use before executing any approved action.
+   * Use gate() only for non-consuming status inspections.
+   *
+   * @param {string} requestId
+   * @returns {Promise<object>} the consumed approval record
+   * @throws with code ALREADY_CONSUMED if already consumed
+   * @throws with code GATE_DENIED for any other non-approved status
+   */
+  async consume(requestId) {
+    let req;
+    try {
+      req = await this._loadRequest(requestId);
+    } catch (err) {
+      const e = new Error(`ApprovalBridge.consume: store error for ${requestId}: ${err.message} — DENIED`);
+      e.code = 'GATE_DENIED';
+      e.reason = 'store_error';
+      throw e;
+    }
+
+    if (!req) {
+      const e = new Error(`ApprovalBridge.consume: request ${requestId} not found — DENIED`);
+      e.code = 'GATE_DENIED';
+      e.reason = 'not_found';
+      throw e;
+    }
+
+    if (req.status === 'consumed') {
+      const e = new Error(`ApprovalBridge.consume: request ${requestId} was already consumed — replay rejected`);
+      e.code = 'ALREADY_CONSUMED';
+      e.reason = 'consumed';
+      e.requestId = requestId;
+      throw e;
+    }
+
+    if (req.status !== 'approved') {
+      const reason = req.status === 'pending' ? 'pending'
+        : req.status === 'timeout'   ? 'timeout'
+        : req.status === 'denied'    ? 'denied'
+        : req.status === 'cancelled' ? 'cancelled'
+        : 'unknown';
+
+      const e = new Error(
+        `ApprovalBridge.consume: request ${requestId} is ${req.status} — DENIED. ` +
+        `Action: ${req.action}`
+      );
+      e.code = 'GATE_DENIED';
+      e.reason = reason;
+      e.status = req.status;
+      e.requestId = requestId;
+      throw e;
+    }
+
+    // Atomically mark consumed
+    req.status = 'consumed';
+    req.consumedAt = new Date().toISOString();
+    await this._saveRequest(req);
+
+    return req;
+  }
+
+  /**
    * Fails-closed gate check (verification-gate invariant #3).
    *
    * Returns true if the given requestId has status='approved'.
    * Throws GateDeniedError on any other status or if the request is not found.
    * On ANY error (store failure, missing request, timeout, deny, ambiguity)
    * the action is DENIED — not allowed. There is no implicit allow.
+   *
+   * NOTE: gate() does not consume the approval. Use consume() for one-use
+   * approval enforcement before executing an approved action.
    *
    * @param {string} requestId
    * @returns {Promise<true>}

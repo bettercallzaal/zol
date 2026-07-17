@@ -262,6 +262,7 @@ class AgentGateway {
     toolGateway,
     memoryWeaver,
     proofDropAdapter,
+    approvalBridge,
     port,
     bindAddress,
     authToken,
@@ -274,6 +275,7 @@ class AgentGateway {
     this._toolGateway = toolGateway;
     this._memoryWeaver = memoryWeaver || null;
     this._proofDropAdapter = proofDropAdapter || null;
+    this._approvalBridge = approvalBridge || null;
 
     // Port: explicit arg > env var > default
     this._port = port != null
@@ -646,19 +648,19 @@ class AgentGateway {
       }
 
       case 'request_approval': {
-        const { action, context } = input;
+        const { action, context, requestedBy, idempotencyKey } = input;
         if (!action) {
           return sendError(res, 400, 'Bad Request: action is required');
         }
-        // Record the approval request as a receipt
-        const approvalId = 'approval_' + crypto.randomUUID();
-        result = {
-          approvalId,
+        if (!this._approvalBridge) {
+          return sendError(res, 503, 'ApprovalBridge not configured');
+        }
+        result = await this._approvalBridge.request({
           action,
           context: context || {},
-          status: 'pending',
-          requestedAt: new Date().toISOString(),
-        };
+          requestedBy: requestedBy || 'agent-gateway',
+          idempotencyKey,
+        });
         break;
       }
 

@@ -115,4 +115,65 @@ describe('ApprovalBridge', () => {
     assert.equal(updated.status, 'timeout');
     assert.ok(typeof updated.decidedAt === 'string');
   });
+
+  test('consume() on approved request marks it consumed and returns record', async () => {
+    const bridge = new ApprovalBridge(makeMockStore(), makeMockJournal());
+
+    const req = await bridge.request({ action: 'deploy.staging' });
+    await bridge.decide(req.requestId, 'approved', { decidedBy: 'operator' });
+
+    const consumed = await bridge.consume(req.requestId);
+
+    assert.equal(consumed.status, 'consumed', 'status must be consumed');
+    assert.ok(consumed.consumedAt, 'consumedAt must be set');
+    assert.equal(consumed.requestId, req.requestId);
+  });
+
+  test('consume() on already-consumed request throws ALREADY_CONSUMED', async () => {
+    const bridge = new ApprovalBridge(makeMockStore(), makeMockJournal());
+
+    const req = await bridge.request({ action: 'deploy.staging' });
+    await bridge.decide(req.requestId, 'approved', { decidedBy: 'operator' });
+
+    await bridge.consume(req.requestId);
+
+    await assert.rejects(
+      () => bridge.consume(req.requestId),
+      (err) => {
+        assert.equal(err.code, 'ALREADY_CONSUMED');
+        return true;
+      }
+    );
+  });
+
+  test('consume() on denied request throws GATE_DENIED', async () => {
+    const bridge = new ApprovalBridge(makeMockStore(), makeMockJournal());
+
+    const req = await bridge.request({ action: 'deploy.prod' });
+    await bridge.decide(req.requestId, 'denied', { decidedBy: 'operator' });
+
+    await assert.rejects(
+      () => bridge.consume(req.requestId),
+      (err) => {
+        assert.equal(err.code, 'GATE_DENIED');
+        return true;
+      }
+    );
+  });
+
+  test('consume() on pending request throws GATE_DENIED', async () => {
+    const bridge = new ApprovalBridge(makeMockStore(), makeMockJournal());
+
+    const req = await bridge.request({ action: 'deploy.prod' });
+    // No decide() call — still pending
+
+    await assert.rejects(
+      () => bridge.consume(req.requestId),
+      (err) => {
+        assert.equal(err.code, 'GATE_DENIED');
+        assert.equal(err.reason, 'pending');
+        return true;
+      }
+    );
+  });
 });

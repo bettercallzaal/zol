@@ -30,6 +30,7 @@ const { ToolGateway, ApprovalRequiredError, PermissionDeniedError } = require('.
 const { ArtifactPipeline } = require('../artifact-pipeline');
 const { createWarperKeeperAdapter } = require('../adapters/warper-keeper-adapter');
 const { ProofDropAdapter } = require('../adapters/proof-drop-adapter');
+const { ApprovalBridge } = require('../approval-bridge');
 const { AgentGateway } = require('../agent-gateway');
 
 // ---------------------------------------------------------------------------
@@ -423,6 +424,74 @@ describe('Approval Gates', () => {
         ),
       (err) => {
         assert.ok(err instanceof ApprovalRequiredError, 'must be ApprovalRequiredError');
+        return true;
+      }
+    );
+  });
+
+  test('ToolGateway + ApprovalBridge: approved once succeeds; replay rejected', async () => {
+    const store = makeMockStore();
+    const journal = { async append(f) { return { receiptId: 'r_' + Date.now(), ...f }; } };
+    const bridge = new ApprovalBridge(store, journal);
+    const gateway = new ToolGateway(store, null, { agentId: 'zolbot', approvalBridge: bridge });
+
+    gateway.register({
+      toolId: 'guarded.action',
+      name: 'guarded.action',
+      requiredPermission: 'guarded.action',
+      requiresApproval: true,
+      isConsequential: true,
+      handler: async () => ({ executed: true }),
+    });
+
+    // Create and approve a request
+    const req = await bridge.request({ action: 'guarded.action', requestedBy: 'test-loop' });
+    await bridge.decide(req.requestId, 'approved', { decidedBy: 'operator' });
+
+    // First execution: succeeds (consumes the approval)
+    const { output } = await gateway.execute('guarded.action', {}, {
+      grantedPermissions: ['guarded.action'],
+      executionMode: 'live',
+      approvalId: req.requestId,
+    });
+    assert.equal(output.executed, true, 'first execution must succeed');
+
+    // Second execution with same approvalId: replay rejected (ALREADY_CONSUMED)
+    await assert.rejects(
+      () => gateway.execute('guarded.action', {}, {
+        grantedPermissions: ['guarded.action'],
+        executionMode: 'live',
+        approvalId: req.requestId,
+      }),
+      (err) => {
+        assert.ok(err instanceof ApprovalRequiredError, 'must be ApprovalRequiredError');
+        assert.equal(err.approvalCode, 'ALREADY_CONSUMED', 'must surface ALREADY_CONSUMED');
+        return true;
+      }
+    );
+  });
+
+  test('ToolGateway + ApprovalBridge: execute without approvalId throws ApprovalRequiredError', async () => {
+    const store = makeMockStore();
+    const bridge = new ApprovalBridge(store, { async append() {} });
+    const gateway = new ToolGateway(store, null, { agentId: 'zolbot', approvalBridge: bridge });
+
+    gateway.register({
+      toolId: 'guarded.nokey',
+      name: 'guarded.nokey',
+      requiredPermission: 'guarded.nokey',
+      requiresApproval: true,
+      handler: async () => ({}),
+    });
+
+    await assert.rejects(
+      () => gateway.execute('guarded.nokey', {}, {
+        grantedPermissions: ['guarded.nokey'],
+        executionMode: 'live',
+        // no approvalId
+      }),
+      (err) => {
+        assert.ok(err instanceof ApprovalRequiredError);
         return true;
       }
     );
