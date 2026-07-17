@@ -387,6 +387,68 @@ class ApprovalBridge {
 
     return count;
   }
+
+  /**
+   * Fails-closed gate check (verification-gate invariant #3).
+   *
+   * Returns true if the given requestId has status='approved'.
+   * Throws GateDeniedError on any other status or if the request is not found.
+   * On ANY error (store failure, missing request, timeout, deny, ambiguity)
+   * the action is DENIED — not allowed. There is no implicit allow.
+   *
+   * @param {string} requestId
+   * @returns {Promise<true>}
+   * @throws {GateDeniedError}
+   */
+  async gate(requestId) {
+    let req;
+    try {
+      req = await this._loadRequest(requestId);
+    } catch (err) {
+      const e = new Error(`ApprovalBridge.gate: store error for ${requestId}: ${err.message} — DENIED (fails-closed)`);
+      e.code = 'GATE_DENIED';
+      e.reason = 'store_error';
+      throw e;
+    }
+
+    if (!req) {
+      const e = new Error(`ApprovalBridge.gate: request ${requestId} not found — DENIED (fails-closed)`);
+      e.code = 'GATE_DENIED';
+      e.reason = 'not_found';
+      throw e;
+    }
+
+    if (req.status === 'approved') {
+      return true;
+    }
+
+    const reason =
+      req.status === 'pending'    ? 'pending' :
+      req.status === 'timeout'    ? 'timeout' :
+      req.status === 'denied'     ? 'denied' :
+      req.status === 'cancelled'  ? 'cancelled' :
+      'unknown';
+
+    const e = new Error(
+      `ApprovalBridge.gate: request ${requestId} is ${req.status} — DENIED (fails-closed). ` +
+      `Action: ${req.action}, requestedBy: ${req.requestedBy}`
+    );
+    e.code = 'GATE_DENIED';
+    e.reason = reason;
+    e.status = req.status;
+    e.requestId = requestId;
+    throw e;
+  }
 }
 
-module.exports = { ApprovalBridge };
+// GateDeniedError sentinel — callers can check err.code === 'GATE_DENIED'
+class GateDeniedError extends Error {
+  constructor(msg, reason) {
+    super(msg);
+    this.name = 'GateDeniedError';
+    this.code = 'GATE_DENIED';
+    this.reason = reason;
+  }
+}
+
+module.exports = { ApprovalBridge, GateDeniedError };
