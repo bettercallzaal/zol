@@ -353,5 +353,40 @@
       "stubs_wired": 6,
       "stubs_remaining": 10
     }
+  },
+  "gap_report_cycle6": {
+    "cycle": 6,
+    "date": "2026-07-17",
+    "work_packets_scanned": "28 open PRs (#24, #26-#52); 515/515 tests; 10 stub handlers after cycle 5",
+    "failure_patterns_identified": [
+      {
+        "id": "artist-spotlight-handlers-unwired",
+        "severity": "medium",
+        "description": "All 5 artist-spotlight.* handlers were stubs. Pi-specific credentials are NOT required — all are wireable to local AtomicFileStore + ModelGateway: filter uses spotlight history for cooldown, select uses rotation state, compose uses ModelGateway.complete(), stage uses ApprovalBridge, record appends to spotlight-history.",
+        "affected_loops": ["artist-spotlight-v1"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle6",
+        "note": "compose-spotlight-draft uses mock provider in CI (no ANTHROPIC_API_KEY); returns non-empty text either way. filter-eligible-artists accepts input.candidates for candidate injection."
+      }
+    ],
+    "missing_tools_catalogued": [
+      {
+        "id": "stub-phase-complete",
+        "description": "All wireable stubs have been wired across cycles 1-6. Remaining 5 stubs are correct-as-stubs: cast.draft + farcaster.dm-send (security invariant — draft-only), artifact.draft.write (pending design decision in improvement-proposal.manifest.json), bonfire.delve-recall (blocked on dream-net PRs #1559/#1560), toolgym.workout.run (input shape mismatch — design decision needed).",
+        "actionable": false,
+        "blocked_on": "Human decisions: artifact storage backend (Zaal), toolgym shape mapping (design), dream-net upstream (Brandon)."
+      }
+    ],
+    "improvement_proposal": {
+      "id": "wire-artist-spotlight-all-5-handlers",
+      "title": "Wire all 5 artist-spotlight.* handlers (Phase 5, cycle 6 — FINAL STUB WIRING CYCLE)",
+      "status": "implemented",
+      "pr": "ws/v2-capability-gap-cycle6",
+      "test_delta": "+3 tests (518 total)",
+      "stubs_wired": 5,
+      "stubs_remaining": 5,
+      "note": "All wireable stubs complete. Remaining 5 are permanent or human-gated."
+    }
   }
 }
