@@ -196,7 +196,7 @@ test('MATRIX: Loop memory routes support relationship tracking', async (t) => {
     const filePath = path.join(loopDir, file);
     const loop = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
-    if (loop.loop_id.includes('relationship') || loop.context_sources.some(s => s.includes('relationship'))) {
+    if (loop.loop_id.includes('relationship') || (Array.isArray(loop.context_sources) && loop.context_sources.some(s => s.includes('relationship')))) {
       foundRelationshipLoop = true;
       // Verify it has proper handlers
       assert.ok(
