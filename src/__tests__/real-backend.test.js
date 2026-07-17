@@ -464,3 +464,141 @@ test('CapsuleRegistry install → get round trip preserves capsule_id and proven
     rmDir(dir);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Test 9: partial completion — checkpoint survives restart (gate item 8)
+// ---------------------------------------------------------------------------
+
+test('partial completion: checkpoint survives restart and packet can be resumed', async () => {
+  const dir = makeTmpDir('t9-partial');
+  try {
+    // Stage 1: create packet, route to worker, checkpoint partial state
+    const store1 = await freshStore(dir);
+    const router1 = new WorkRouter(store1);
+
+    const packet = await router1.createPacket({
+      title: 'Long Research Task',
+      description: 'Simulates partial completion across restart',
+      type: 'research',
+    });
+
+    const routed = await router1.route(packet.packetId, 'worker-a', {
+      owner: 'worker-a',
+      leaseTtlMs: 60 * 60 * 1000,
+    });
+
+    await router1.checkpoint(packet.packetId, {
+      stepsDone: ['step-1', 'step-2'],
+      stepsRemaining: ['step-3'],
+      partialResult: { found: 3, reviewed: 2 },
+    });
+
+    const attemptIdBeforeRestart = routed.attemptId;
+
+    // Stage 2: new store + router (restart)
+    const store2 = await freshStore(dir);
+    const router2 = new WorkRouter(store2);
+
+    const resumed = await router2.resume(packet.packetId);
+
+    assert.ok(resumed, 'packet should be retrievable after restart');
+    assert.equal(resumed.packetId, packet.packetId, 'packetId must be preserved');
+    assert.equal(resumed.status, 'in_progress', 'packet must still be in_progress');
+    assert.deepEqual(
+      resumed.resumeCheckpoint.stepsDone,
+      ['step-1', 'step-2'],
+      'checkpoint stepsDone must survive restart'
+    );
+    assert.deepEqual(
+      resumed.resumeCheckpoint.stepsRemaining,
+      ['step-3'],
+      'checkpoint stepsRemaining must survive restart'
+    );
+    assert.equal(resumed.attemptId, attemptIdBeforeRestart, 'attemptId must be preserved');
+  } finally {
+    rmDir(dir);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Test 10: approval timeout — expired request is GATE_DENIED (gate item 8)
+// ---------------------------------------------------------------------------
+
+test('approval timeout: expired request yields GATE_DENIED on consume()', async () => {
+  const dir = makeTmpDir('t10-timeout');
+  try {
+    const store = await freshStore(dir);
+    const journal = new ReceiptJournal(store, { agentId: 'test-agent' });
+    const bridge = new ApprovalBridge(store, journal, { defaultTimeoutMs: 1 });
+
+    const req = await bridge.request({
+      action: 'deploy-production',
+      context: { env: 'prod' },
+      requestedBy: 'loop-deploy',
+    });
+
+    // Poll expirePending until the 1ms TTL expires
+    let expired = 0;
+    const deadline = Date.now() + 2000;
+    while (expired === 0 && Date.now() < deadline) {
+      expired = await bridge.expirePending();
+      if (expired === 0) await new Promise(r => setTimeout(r, 10));
+    }
+    assert.ok(expired > 0, 'expirePending() should have expired at least one request');
+
+    await assert.rejects(
+      () => bridge.consume(req.requestId),
+      (err) => {
+        assert.equal(err.code, 'GATE_DENIED', `expected GATE_DENIED, got ${err.code}`);
+        assert.equal(err.reason, 'timeout', `expected reason=timeout, got ${err.reason}`);
+        return true;
+      },
+      'consume() on timed-out request must throw GATE_DENIED(timeout)'
+    );
+  } finally {
+    rmDir(dir);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Test 11: stale lease auto-expiry — expired lease allows new owner (gate item 8)
+// ---------------------------------------------------------------------------
+
+test('stale lease auto-expiry: expired lease allows a new worker to acquire', async () => {
+  const dir = makeTmpDir('t11-stale-lease');
+  try {
+    const store = await freshStore(dir);
+    const router = new WorkRouter(store);
+
+    const packet = await router.createPacket({
+      title: 'Short-Leased Task',
+      description: 'Lease expires so a second worker can claim',
+      type: 'research',
+    });
+
+    // Worker A acquires with a 1ms lease (effectively already expired)
+    await router.route(packet.packetId, 'worker-a-init', {
+      owner: 'worker-a',
+      leaseTtlMs: 1,
+    });
+
+    // Let the lease expire
+    await new Promise(r => setTimeout(r, 10));
+
+    // Worker B can now claim the expired lease
+    const acquired = await router.route(packet.packetId, 'worker-b-reclaim', {
+      owner: 'worker-b',
+      leaseTtlMs: 60 * 60 * 1000,
+    });
+
+    assert.equal(acquired.owner, 'worker-b', 'worker-b should own the reclaimed lease');
+
+    const final = await router.resume(packet.packetId);
+    assert.ok(
+      final.fencingEpoch >= 1,
+      `fencingEpoch should be >= 1 after re-acquisition, got ${final.fencingEpoch}`
+    );
+  } finally {
+    rmDir(dir);
+  }
+});

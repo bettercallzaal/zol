@@ -658,12 +658,16 @@ if (process.env.DREAMLOOPS_ENABLED === 'true') {
 // These are ALWAYS available (mode controls actual behavior)
 const { handlers: warperKeeperHandlers } = require('./warper-keeper-handlers');
 
+// Board integration handlers (board.task.* — always available, fire-and-forget safe)
+const { handlers: boardHandlers } = require('./board-handlers');
+
 // Merge all handlers
 const allHandlers = {
   ...handlers,
   ...selfImprovementHandlers,
   ...radarHandlers,
   ...warperKeeperHandlers,
+  ...boardHandlers,
 };
 
 // Export all handlers
