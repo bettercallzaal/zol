@@ -222,6 +222,45 @@ function sendError(res, code, message) {
 }
 
 /**
+ * Validate input against a JSON Schema subset (required fields + property types).
+ * Mirrors the Zod safeParse(schema, input) => { ok, data?, issues? } contract
+ * without introducing a runtime dependency.
+ *
+ * Supports: type:'object', required:[], properties:{ field: { type } }.
+ * Arrays are typed as 'array'; nested objects are not recursively validated.
+ *
+ * @param {object} schema - JSON Schema (type:'object', required, properties)
+ * @param {any} input
+ * @returns {{ ok: boolean, data?: object, issues?: Array<{field:string, message:string}> }}
+ */
+function safeParse(schema, input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return { ok: false, issues: [{ field: '$root', message: 'input must be an object' }] };
+  }
+  const issues = [];
+  for (const field of (schema.required || [])) {
+    if (input[field] === undefined || input[field] === null) {
+      issues.push({ field, message: `${field} is required` });
+    }
+  }
+  for (const [field, def] of Object.entries(schema.properties || {})) {
+    const val = input[field];
+    if (val === undefined || val === null) continue;
+    const expected = def.type;
+    if (!expected) continue;
+    const actual = Array.isArray(val) ? 'array' : typeof val;
+    if (actual !== expected) {
+      issues.push({ field, message: `${field} must be ${expected}, got ${actual}` });
+    }
+    if (expected === 'string' && def.enum && !def.enum.includes(val)) {
+      issues.push({ field, message: `${field} must be one of: ${def.enum.join(', ')}` });
+    }
+  }
+  if (issues.length) return { ok: false, issues };
+  return { ok: true, data: input };
+}
+
+/**
  * Extract the remote IP from the request (accounting for loopback).
  * @param {http.IncomingMessage} req
  * @returns {string}
@@ -531,11 +570,22 @@ class AgentGateway {
       return sendError(res, 400, 'Bad Request');
     }
 
-    const { title, description, type, priority, requestedBy } = body;
-    if (!title || !description || !type) {
-      return sendError(res, 400, 'Bad Request: title, description, and type are required');
+    const parsed = safeParse({
+      type: 'object',
+      required: ['title', 'description', 'type'],
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        type: { type: 'string' },
+        priority: { type: 'string' },
+        requestedBy: { type: 'string' },
+      },
+    }, body);
+    if (!parsed.ok) {
+      return sendError(res, 400, `Validation error: ${parsed.issues.map(i => i.message).join('; ')}`);
     }
 
+    const { title, description, type, priority, requestedBy } = parsed.data;
     const packet = await this._workRouter.createPacket({ title, description, type, priority, requestedBy });
     sendJson(res, 200, { ok: true, task: packet, created: true });
   }
@@ -572,11 +622,16 @@ class AgentGateway {
       return sendError(res, 400, 'Bad Request');
     }
 
-    const { bundle } = body;
-    if (!bundle || typeof bundle !== 'object') {
-      return sendError(res, 400, 'Bad Request: bundle is required and must be an object');
+    const parsed = safeParse({
+      type: 'object',
+      required: ['bundle'],
+      properties: { bundle: { type: 'object' } },
+    }, body);
+    if (!parsed.ok) {
+      return sendError(res, 400, `Validation error: ${parsed.issues.map(i => i.message).join('; ')}`);
     }
 
+    const { bundle } = parsed.data;
     const plan = await this._artifactPipeline.plan(bundle);
     const artifact = await this._artifactPipeline.build(plan);
     const artifactId = artifact.artifactId || artifact.id || crypto.randomUUID();
@@ -614,9 +669,27 @@ class AgentGateway {
       return sendError(res, 400, 'Bad Request');
     }
 
+    const bodyParsed = safeParse({
+      type: 'object',
+      required: ['tool'],
+      properties: { tool: { type: 'string' }, input: { type: 'object' } },
+    }, body);
+    if (!bodyParsed.ok) {
+      return sendError(res, 400, `Validation error: ${bodyParsed.issues.map(i => i.message).join('; ')}`);
+    }
+
     const { tool, input = {} } = body;
     if (!tool || typeof tool !== 'string') {
       return sendError(res, 400, 'Bad Request: tool is required');
+    }
+
+    // Validate input against the registered tool's inputSchema (safeParse pattern)
+    const toolDef = MCP_TOOLS.find(t => t.name === tool);
+    if (toolDef && toolDef.inputSchema) {
+      const inputParsed = safeParse(toolDef.inputSchema, input);
+      if (!inputParsed.ok) {
+        return sendError(res, 400, `Validation error for tool '${tool}': ${inputParsed.issues.map(i => i.message).join('; ')}`);
+      }
     }
 
     let result;
@@ -717,7 +790,7 @@ class AgentGateway {
   }
 }
 
-module.exports = { AgentGateway };
+module.exports = { AgentGateway, safeParse };
 
 // ---------------------------------------------------------------------------
 // Standalone entry point
