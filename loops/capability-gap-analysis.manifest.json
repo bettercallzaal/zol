@@ -246,5 +246,58 @@
       "stubs_wired": 4,
       "stubs_remaining": 20
     }
+  },
+  "gap_report_cycle4": {
+    "cycle": 4,
+    "date": "2026-07-17",
+    "work_packets_scanned": "26 open PRs (#24, #26-#50); 513/513 tests passing; 20 stub handlers after cycle 3",
+    "failure_patterns_identified": [
+      {
+        "id": "toolgym-mastery-record-stub",
+        "severity": "low",
+        "description": "toolgym.mastery.record returned mock shape. Mastery scores not persisted to state store despite AtomicFileStore available.",
+        "affected_loops": ["mastery-receipt"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle4",
+        "note": "AtomicFileStore key: toolgym-mastery-records, capped at 200. Degrades gracefully."
+      },
+      {
+        "id": "circle-relationship-status-stub",
+        "severity": "low",
+        "description": "circle.relationship-status-read always returned found:false; write returned mock without persisting. Local AtomicFileStore used as a local-first store (fid-keyed map). Circle API integration is future work.",
+        "affected_loops": ["relationship-lifecycle-update"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle4",
+        "note": "Map capped at 1000 FIDs; evicts oldest by updatedAt on overflow."
+      },
+      {
+        "id": "farcaster-recent-casts-parse-parse-only",
+        "severity": "low",
+        "description": "farcaster.recent-casts-parse was already a pure function but only returned bare text summaries. Enriched with music keyword detection (16 keywords), channel extraction, likes, and musicCasts filter.",
+        "affected_loops": ["zabal-channel-watch-v1", "zabal-submissions-watch-v1"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle4"
+      }
+    ],
+    "missing_tools_catalogued": [
+      {
+        "id": "toolgym-workout-run-input-mismatch",
+        "description": "toolgym.workout.run loop manifest sends {workout:string} but ToolGymAdapter.runWorkout() needs {toolId, inputs, maxRounds}. Requires a shape-mapping layer or loop manifest change — design decision needed.",
+        "actionable": false,
+        "blocked_on": "Input shape design decision: map workout name → toolId + inputs, or change loop manifest."
+      }
+    ],
+    "improvement_proposal": {
+      "id": "wire-toolgym-mastery-circle-status-casts-parse",
+      "title": "Wire toolgym.mastery.record, circle.relationship-status-*, farcaster.recent-casts-parse (Phase 5, cycle 4)",
+      "status": "implemented",
+      "pr": "ws/v2-capability-gap-cycle4",
+      "test_delta": "+2 tests (515 total)",
+      "stubs_wired": 4,
+      "stubs_remaining": 16
+    }
   }
 }
