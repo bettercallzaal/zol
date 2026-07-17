@@ -361,8 +361,13 @@ advisory(
     const lines = source.split("\n");
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      // Top-level: line does not start with whitespace and contains the require
-      const isTopLevel = line.length > 0 && !/^[\s]/.test(line);
+      // Top-level: line has no leading whitespace AND is not a function/class/arrow
+      // definition (a single-line "function f() { require(...) }" starts at col 0
+      // but the require is inside the function body, not at module scope).
+      const isTopLevel = line.length > 0
+        && !/^[\s]/.test(line)
+        && !/^(?:async\s+)?function\s/.test(line)
+        && !/^(?:const|let|var)\s+\w+\s*=\s*(?:async\s*)?\(/.test(line);
       if (isTopLevel && line.includes("require('@farcaster/hub-nodejs')")) {
         throw new Error(
           `line ${i + 1}: top-level require('@farcaster/hub-nodejs') found. ` +
