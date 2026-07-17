@@ -3,7 +3,6 @@
   "loop_id": "relationship-lifecycle-update-v1",
   "title": "Relationship Lifecycle Update",
   "version": "1.0.0",
-  "status": "draft",
   "owner": "community-crm-v1",
   "stewards": [
     "zaal"
@@ -249,5 +248,23 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "experimental",
+  "entry_conditions": [
+    "relationship_event_detected",
+    "relationship_record_exists"
+  ],
+  "exit_conditions": [
+    "lifecycle_state_updated",
+    "update_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

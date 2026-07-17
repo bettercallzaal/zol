@@ -3,7 +3,6 @@
   "loop_id": "lint-memory-v1",
   "title": "Lint Memory",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -118,5 +117,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "schedule:periodic",
+    "memory_accessible"
+  ],
+  "exit_conditions": [
+    "memory_linted",
+    "lint_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

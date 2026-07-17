@@ -3,7 +3,6 @@
   "loop_id": "release-research-v1",
   "title": "Release Research",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -116,5 +115,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "release_research_triggered",
+    "target_release_defined"
+  ],
+  "exit_conditions": [
+    "research_artifact_written",
+    "research_receipt_logged"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

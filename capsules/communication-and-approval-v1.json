@@ -32,7 +32,24 @@
       "self.modify.live",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "draft-communication",
+      "request-approval",
+      "inbox-triage"
+    ],
+    "allowed_tools": [
+      "state.read",
+      "receipt.write"
+    ],
+    "allowed_data": [
+      "receipt.local",
+      "memory.local",
+      "inbox.local"
+    ],
+    "disallowed_wallets": ["*"],
+    "disallowed_signers": ["*"],
+    "disallowed_environments": []
   },
   "resource_limits": {
     "max_wall_time_ms": 600000,

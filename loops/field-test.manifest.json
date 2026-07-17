@@ -3,7 +3,6 @@
   "loop_id": "field-test-v1",
   "title": "Field Test",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -123,5 +122,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "field_test_scheduled",
+    "test_target_defined"
+  ],
+  "exit_conditions": [
+    "field_test_complete",
+    "test_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

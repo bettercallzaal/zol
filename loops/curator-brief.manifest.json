@@ -3,7 +3,6 @@
   "loop_id": "curator-brief-v1",
   "title": "Curator Brief",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -134,5 +133,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "schedule:periodic",
+    "curation_sources_available"
+  ],
+  "exit_conditions": [
+    "brief_artifact_written",
+    "brief_receipt_logged"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

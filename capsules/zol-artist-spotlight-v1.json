@@ -68,7 +68,25 @@
       "secret.value.read",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "artist-spotlight-rotate",
+      "artist-spotlight-draft",
+      "artist-spotlight-stage"
+    ],
+    "allowed_tools": [
+      "farcaster.read",
+      "state.read",
+      "state.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "farcaster.public",
+      "bonfire.recall"
+    ],
+    "disallowed_wallets": ["*"],
+    "disallowed_signers": ["*"],
+    "disallowed_environments": []
   },
   "resource_limits": {
     "max_wall_time_ms": 45000,

@@ -1,26 +1,22 @@
 {
   "schema": "dreamnet.dreamloop.v1",
-  "loop_id": "prune-stale-memory-v1",
-  "title": "Prune Stale Memory",
+  "loop_id": "capability-gap-analysis-v1",
+  "title": "Capability Gap Analysis",
   "version": "1.0.0",
   "owner": "zolbot",
   "stewards": [
     "zaal"
   ],
   "permission_tier": "local_draft_write",
-  "trigger": "weekly or operator request",
-  "inputs": [
-    "full memory store",
-    "memory age metadata"
-  ],
-  "context_sources": [
-    "all memory entries",
-    "memory timestamps"
-  ],
+  "trigger": "weekly or when a task fails due to missing capability",
+  "cooldown": "604800s",
+  "description": "Scan recent work packets for patterns of failure or missing tools, identify capability gaps, and draft an improvement proposal.",
   "allowed_actions": [
-    "memory.expire",
     "memory.read",
-    "receipt.local.write"
+    "memory.write",
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write"
   ],
   "blocked_actions": [
     "cloud.mutate",
@@ -33,27 +29,6 @@
     "signer.change",
     "wallet.sign"
   ],
-  "checks": [
-    "memory readable",
-    "expiry safe to execute"
-  ],
-  "evidence_outputs": [
-    "memory-entries-scanned",
-    "entries-expired"
-  ],
-  "receipt_outputs": [
-    "prune-stale-memory receipt"
-  ],
-  "knowledge_state_outputs": [
-    "stale memory entries expired"
-  ],
-  "execution_trace_outputs": [
-    "prune-stale-memory execution trace"
-  ],
-  "memory_routes": [
-    "expiry log in memory store"
-  ],
-  "cooldown": "604800s",
   "failure_modes": [
     "budget exceeded",
     "timeout",
@@ -69,34 +44,46 @@
   },
   "steps": [
     {
-      "id": "read-memory",
+      "id": "scan-work-history",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "read-tool-health",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "identify-gaps",
       "handler": "memory.read",
       "permission": "memory.read",
-      "with": {
-        "scope": "full"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "expire-stale",
-      "handler": "memory.expire",
-      "permission": "memory.expire",
-      "with": {
-        "policy": "stale"
-      },
+      "id": "draft-proposal",
+      "handler": "memory.write",
+      "permission": "memory.write",
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "record-receipt",
+      "id": "record-gap-analysis",
       "handler": "receipt.local.write",
       "permission": "receipt.local.write",
-      "with": {
-        "receiptType": "prune-stale-memory"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
@@ -104,12 +91,12 @@
   ],
   "lifecycle_state": "dry-run",
   "entry_conditions": [
-    "schedule:periodic",
-    "stale_memory_candidates_exist"
+    "work_packets_available",
+    "failure_patterns_detectable"
   ],
   "exit_conditions": [
-    "stale_entries_pruned OR none_found",
-    "prune_receipt_written"
+    "gap_report_drafted",
+    "improvement_proposal_queued OR skipped"
   ],
   "retry_limits": {
     "max_retries": 3,

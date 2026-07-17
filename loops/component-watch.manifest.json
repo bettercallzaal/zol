@@ -1,25 +1,19 @@
 {
   "schema": "dreamnet.dreamloop.v1",
-  "loop_id": "detect-work-intent-v1",
-  "title": "Detect Work Intent",
+  "loop_id": "component-watch-v1",
+  "title": "Component Watch",
   "version": "1.0.0",
   "owner": "zolbot",
   "stewards": [
     "zaal"
   ],
   "permission_tier": "local_draft_write",
-  "trigger": "on new message or mention",
-  "inputs": [
-    "incoming message",
-    "message metadata"
-  ],
-  "context_sources": [
-    "inbox",
-    "local state"
-  ],
+  "trigger": "weekly or after gap analysis produces new candidates",
+  "cooldown": "604800s",
+  "description": "Monitor external components and tools for new versions, security patches, or capability improvements. Report findings without installing.",
   "allowed_actions": [
-    "inbox.read",
-    "message.classify",
+    "memory.read",
+    "memory.write",
     "receipt.local.write",
     "state.local.read",
     "state.local.write"
@@ -35,29 +29,6 @@
     "signer.change",
     "wallet.sign"
   ],
-  "checks": [
-    "inbox readable",
-    "classification handler available",
-    "state writable"
-  ],
-  "evidence_outputs": [
-    "message-id",
-    "intent-classification",
-    "confidence-score"
-  ],
-  "receipt_outputs": [
-    "detect-work-intent receipt"
-  ],
-  "knowledge_state_outputs": [
-    "intent classification written to state"
-  ],
-  "execution_trace_outputs": [
-    "detect-work-intent execution trace"
-  ],
-  "memory_routes": [
-    "intent classification in local state"
-  ],
-  "cooldown": "60s",
   "failure_modes": [
     "budget exceeded",
     "timeout",
@@ -73,45 +44,46 @@
   },
   "steps": [
     {
-      "id": "read-message",
-      "handler": "inbox.read",
-      "permission": "inbox.read",
-      "with": {
-        "scope": "latest"
-      },
+      "id": "load-watch-list",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "classify-intent",
-      "handler": "message.classify",
-      "permission": "message.classify",
-      "with": {
-        "classificationTarget": "work-intent"
-      },
+      "id": "scan-components",
+      "handler": "memory.read",
+      "permission": "memory.read",
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "write-classification",
+      "id": "detect-updates",
+      "handler": "memory.write",
+      "permission": "memory.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "flag-security",
       "handler": "state.local.write",
       "permission": "state.local.write",
-      "with": {
-        "stateKey": "zol-work-intent-classification"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "record-receipt",
+      "id": "record-watch",
       "handler": "receipt.local.write",
       "permission": "receipt.local.write",
-      "with": {
-        "receiptType": "detect-work-intent"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
@@ -119,12 +91,12 @@
   ],
   "lifecycle_state": "dry-run",
   "entry_conditions": [
-    "operator_input_received",
-    "context_loaded"
+    "schedule:periodic",
+    "component_sources_accessible"
   ],
   "exit_conditions": [
-    "intent_classified",
-    "intent_receipt_written"
+    "watch_report_written OR no_updates_found",
+    "watch_receipt_logged"
   ],
   "retry_limits": {
     "max_retries": 3,

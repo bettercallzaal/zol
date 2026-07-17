@@ -36,7 +36,28 @@
       "self.modify.live",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "heartbeat",
+      "health-check",
+      "restart-recovery",
+      "bootstrap-state",
+      "daily-private-brief"
+    ],
+    "allowed_tools": [
+      "state.read",
+      "state.write",
+      "receipt.read",
+      "receipt.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "receipt.local",
+      "runtime.health"
+    ],
+    "disallowed_wallets": ["*"],
+    "disallowed_signers": ["*"],
+    "disallowed_environments": []
   },
   "resource_limits": {
     "max_wall_time_ms": 600000,

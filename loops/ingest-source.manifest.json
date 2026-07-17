@@ -1,25 +1,18 @@
 {
   "schema": "dreamnet.dreamloop.v1",
-  "loop_id": "detect-work-intent-v1",
-  "title": "Detect Work Intent",
+  "loop_id": "ingest-source-v1",
+  "title": "Ingest Source",
   "version": "1.0.0",
   "owner": "zolbot",
   "stewards": [
     "zaal"
   ],
   "permission_tier": "local_draft_write",
-  "trigger": "on new message or mention",
-  "inputs": [
-    "incoming message",
-    "message metadata"
-  ],
-  "context_sources": [
-    "inbox",
-    "local state"
-  ],
+  "trigger": "when new source material is provided by operator or discovered",
+  "cooldown": "300s",
   "allowed_actions": [
     "inbox.read",
-    "message.classify",
+    "memory.write",
     "receipt.local.write",
     "state.local.read",
     "state.local.write"
@@ -35,29 +28,6 @@
     "signer.change",
     "wallet.sign"
   ],
-  "checks": [
-    "inbox readable",
-    "classification handler available",
-    "state writable"
-  ],
-  "evidence_outputs": [
-    "message-id",
-    "intent-classification",
-    "confidence-score"
-  ],
-  "receipt_outputs": [
-    "detect-work-intent receipt"
-  ],
-  "knowledge_state_outputs": [
-    "intent classification written to state"
-  ],
-  "execution_trace_outputs": [
-    "detect-work-intent execution trace"
-  ],
-  "memory_routes": [
-    "intent classification in local state"
-  ],
-  "cooldown": "60s",
   "failure_modes": [
     "budget exceeded",
     "timeout",
@@ -73,34 +43,37 @@
   },
   "steps": [
     {
-      "id": "read-message",
+      "id": "read-source",
       "handler": "inbox.read",
       "permission": "inbox.read",
-      "with": {
-        "scope": "latest"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "classify-intent",
-      "handler": "message.classify",
-      "permission": "message.classify",
-      "with": {
-        "classificationTarget": "work-intent"
-      },
+      "id": "validate-source",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "write-classification",
+      "id": "store-document",
       "handler": "state.local.write",
       "permission": "state.local.write",
-      "with": {
-        "stateKey": "zol-work-intent-classification"
-      },
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "weave-initial-memory",
+      "handler": "memory.write",
+      "permission": "memory.write",
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
@@ -109,9 +82,7 @@
       "id": "record-receipt",
       "handler": "receipt.local.write",
       "permission": "receipt.local.write",
-      "with": {
-        "receiptType": "detect-work-intent"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
@@ -119,12 +90,12 @@
   ],
   "lifecycle_state": "dry-run",
   "entry_conditions": [
-    "operator_input_received",
-    "context_loaded"
+    "source_url_or_file_provided",
+    "ingest_target_defined"
   ],
   "exit_conditions": [
-    "intent_classified",
-    "intent_receipt_written"
+    "source_ingested",
+    "ingest_receipt_written"
   ],
   "retry_limits": {
     "max_retries": 3,

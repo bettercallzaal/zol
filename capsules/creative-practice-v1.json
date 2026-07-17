@@ -33,7 +33,26 @@
       "self.modify.live",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "creative-draft",
+      "creative-review",
+      "creative-version"
+    ],
+    "allowed_tools": [
+      "state.read",
+      "state.write",
+      "artifact.write",
+      "receipt.write"
+    ],
+    "allowed_data": [
+      "artifact.local",
+      "receipt.local",
+      "project.local"
+    ],
+    "disallowed_wallets": ["*"],
+    "disallowed_signers": ["*"],
+    "disallowed_environments": []
   },
   "resource_limits": {
     "max_wall_time_ms": 600000,

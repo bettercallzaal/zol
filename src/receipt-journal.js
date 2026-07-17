@@ -121,19 +121,37 @@ class ReceiptJournal {
   /**
    * Append a new receipt.
    *
+   * Required fields form the minimum viable receipt. Optional linking fields
+   * (verification-gate invariant #4) form a complete chain:
+   *   directive_id  → task_id → evidence → model_calls → tool_calls →
+   *   approvals → outputs → state_transition → commit_hash
+   *
    * @param {object} fields
    * @param {string}  fields.loopId
    * @param {string}  fields.runId
    * @param {string}  [fields.stepId]
    * @param {string}  fields.capsuleId
    * @param {string}  fields.action
-   * @param {string}  fields.status   "success" | "failure" | "pending"
+   * @param {string}  fields.status        "success" | "failure" | "pending"
    * @param {object}  [fields.evidence]
    * @param {string}  [fields.idempotencyKey]
+   * — Linking chain (invariant #4) —
+   * @param {string}  [fields.directive_id]    - source directive that triggered this loop
+   * @param {string}  [fields.task_id]         - work-router packetId this receipt covers
+   * @param {Array}   [fields.model_calls]     - [{provider,model,tokens,cost},...] model invocations
+   * @param {Array}   [fields.tool_calls]      - [{toolId,status,durationMs},...] tool invocations
+   * @param {Array}   [fields.approvals]       - [{requestId,decision,decidedAt},...] approval records
+   * @param {object}  [fields.outputs]         - structured outputs produced (e.g. {artifactId,...})
+   * @param {string}  [fields.state_transition] - "pending→in_progress", "in_progress→done", etc.
+   * @param {string}  [fields.commit_hash]     - git commit SHA of resulting deployment/change
    * @returns {Promise<object>} receipt
    */
   async append(fields) {
-    const { loopId, runId, stepId = null, capsuleId, action, status, evidence = null } = fields;
+    const {
+      loopId, runId, stepId = null, capsuleId, action, status, evidence = null,
+      directive_id = null, task_id = null, model_calls = null, tool_calls = null,
+      approvals = null, outputs = null, state_transition = null, commit_hash = null,
+    } = fields;
 
     if (!loopId) throw new Error('ReceiptJournal.append: loopId is required');
     if (!runId) throw new Error('ReceiptJournal.append: runId is required');
@@ -184,6 +202,15 @@ class ReceiptJournal {
       finishedAt,
       durationMs,
       evidence: sanitizedEvidence,
+      // Linking chain fields (verification-gate invariant #4)
+      directive_id,
+      task_id,
+      model_calls: model_calls !== null ? sanitizeEvidence(model_calls) : null,
+      tool_calls: tool_calls !== null ? sanitizeEvidence(tool_calls) : null,
+      approvals: approvals !== null ? sanitizeEvidence(approvals) : null,
+      outputs: outputs !== null ? sanitizeEvidence(outputs) : null,
+      state_transition,
+      commit_hash,
     };
 
     const sha256 = computeSha256(partial);

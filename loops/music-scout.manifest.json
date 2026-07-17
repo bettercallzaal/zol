@@ -3,7 +3,6 @@
   "loop_id": "music-scout-v1",
   "title": "Music Scout",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -130,5 +129,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "schedule:weekly",
+    "source_available"
+  ],
+  "exit_conditions": [
+    "candidates_queued OR no_new_artists",
+    "scout_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

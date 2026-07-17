@@ -1,27 +1,21 @@
 {
   "schema": "dreamnet.dreamloop.v1",
-  "loop_id": "route-work-v1",
-  "title": "Route Work",
+  "loop_id": "heartbeat-v1",
+  "title": "Heartbeat",
   "version": "1.0.0",
   "owner": "zolbot",
   "stewards": [
     "zaal"
   ],
   "permission_tier": "local_draft_write",
-  "trigger": "after work packet created",
-  "inputs": [
-    "work packet",
-    "priority context"
-  ],
-  "context_sources": [
-    "local state"
-  ],
+  "trigger": "every 30 minutes",
+  "cooldown": "1800s",
+  "description": "Check agent health, record liveness receipt, update last-seen timestamp in state.",
   "allowed_actions": [
-    "priority.plan",
+    "budget.read",
     "receipt.local.write",
     "state.local.read",
-    "state.local.write",
-    "task.plan"
+    "state.local.write"
   ],
   "blocked_actions": [
     "cloud.mutate",
@@ -34,29 +28,6 @@
     "signer.change",
     "wallet.sign"
   ],
-  "checks": [
-    "work packet readable",
-    "priority plan available",
-    "route writable"
-  ],
-  "evidence_outputs": [
-    "work-packet-id",
-    "priority-score",
-    "assigned-route"
-  ],
-  "receipt_outputs": [
-    "route-work receipt"
-  ],
-  "knowledge_state_outputs": [
-    "route assignment written to state"
-  ],
-  "execution_trace_outputs": [
-    "route-work execution trace"
-  ],
-  "memory_routes": [
-    "route assignment in local state"
-  ],
-  "cooldown": "60s",
   "failure_modes": [
     "budget exceeded",
     "timeout",
@@ -72,60 +43,53 @@
   },
   "steps": [
     {
-      "id": "read-packet",
+      "id": "read-health",
       "handler": "state.local.read",
       "permission": "state.local.read",
-      "with": {
-        "stateKey": "zol-work-packet"
-      },
-      "retry": {
-        "max_attempts": 2
-      }
-    },
-    {
-      "id": "prioritize",
-      "handler": "priority.plan",
-      "permission": "priority.plan",
       "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "assign-route",
-      "handler": "state.local.write",
-      "permission": "state.local.write",
-      "with": {
-        "stateKey": "zol-work-route"
-      },
+      "id": "check-budget",
+      "handler": "budget.read",
+      "permission": "budget.read",
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "record-receipt",
+      "id": "write-liveness",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-heartbeat",
       "handler": "receipt.local.write",
       "permission": "receipt.local.write",
-      "with": {
-        "receiptType": "route-work"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     }
   ],
-  "lifecycle_state": "dry-run",
+  "lifecycle_state": "production-ready",
   "entry_conditions": [
-    "work_packet_created",
-    "routing_rules_available"
+    "agent_running"
   ],
   "exit_conditions": [
-    "work_routed",
-    "routing_receipt_written"
+    "heartbeat_recorded",
+    "last_seen_updated"
   ],
   "retry_limits": {
-    "max_retries": 3,
-    "backoff_ms": 1000
+    "max_retries": 1,
+    "backoff_ms": 500
   },
   "escalation_rules": [
     "notify:owner",

@@ -1,25 +1,18 @@
 {
   "schema": "dreamnet.dreamloop.v1",
-  "loop_id": "detect-work-intent-v1",
-  "title": "Detect Work Intent",
+  "loop_id": "resume-work-v1",
+  "title": "Resume Work",
   "version": "1.0.0",
   "owner": "zolbot",
   "stewards": [
     "zaal"
   ],
   "permission_tier": "local_draft_write",
-  "trigger": "on new message or mention",
-  "inputs": [
-    "incoming message",
-    "message metadata"
-  ],
-  "context_sources": [
-    "inbox",
-    "local state"
-  ],
+  "trigger": "after restart or when checkpoint detected for in-progress work packet",
+  "cooldown": "30s",
+  "description": "Load a suspended work packet from its last checkpoint, restore context, and re-enter the work lifecycle.",
   "allowed_actions": [
-    "inbox.read",
-    "message.classify",
+    "memory.read",
     "receipt.local.write",
     "state.local.read",
     "state.local.write"
@@ -35,29 +28,6 @@
     "signer.change",
     "wallet.sign"
   ],
-  "checks": [
-    "inbox readable",
-    "classification handler available",
-    "state writable"
-  ],
-  "evidence_outputs": [
-    "message-id",
-    "intent-classification",
-    "confidence-score"
-  ],
-  "receipt_outputs": [
-    "detect-work-intent receipt"
-  ],
-  "knowledge_state_outputs": [
-    "intent classification written to state"
-  ],
-  "execution_trace_outputs": [
-    "detect-work-intent execution trace"
-  ],
-  "memory_routes": [
-    "intent classification in local state"
-  ],
-  "cooldown": "60s",
   "failure_modes": [
     "budget exceeded",
     "timeout",
@@ -73,45 +43,46 @@
   },
   "steps": [
     {
-      "id": "read-message",
-      "handler": "inbox.read",
-      "permission": "inbox.read",
-      "with": {
-        "scope": "latest"
-      },
+      "id": "load-checkpoint",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "classify-intent",
-      "handler": "message.classify",
-      "permission": "message.classify",
-      "with": {
-        "classificationTarget": "work-intent"
-      },
+      "id": "restore-context",
+      "handler": "memory.read",
+      "permission": "memory.read",
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "write-classification",
+      "id": "re-enter-lifecycle",
       "handler": "state.local.write",
       "permission": "state.local.write",
-      "with": {
-        "stateKey": "zol-work-intent-classification"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "record-receipt",
+      "id": "notify-resumed",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-resume",
       "handler": "receipt.local.write",
       "permission": "receipt.local.write",
-      "with": {
-        "receiptType": "detect-work-intent"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
@@ -119,12 +90,12 @@
   ],
   "lifecycle_state": "dry-run",
   "entry_conditions": [
-    "operator_input_received",
-    "context_loaded"
+    "suspended_work_packet_exists",
+    "checkpoint_readable"
   ],
   "exit_conditions": [
-    "intent_classified",
-    "intent_receipt_written"
+    "work_context_restored",
+    "work_resumed"
   ],
   "retry_limits": {
     "max_retries": 3,

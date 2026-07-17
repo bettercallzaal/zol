@@ -35,7 +35,28 @@
       "self.modify.live",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "artifact-plan",
+      "delegate-builder",
+      "verify-artifact",
+      "package-trapper",
+      "deliver-and-receipt"
+    ],
+    "allowed_tools": [
+      "state.read",
+      "state.write",
+      "receipt.write",
+      "artifact.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "receipt.local",
+      "artifact.local"
+    ],
+    "disallowed_wallets": ["*"],
+    "disallowed_signers": ["*"],
+    "disallowed_environments": []
   },
   "resource_limits": {
     "max_wall_time_ms": 600000,

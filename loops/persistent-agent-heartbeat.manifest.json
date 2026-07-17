@@ -3,7 +3,6 @@
   "loop_id": "persistent-agent-heartbeat-v1",
   "title": "Persistent Agent Heartbeat",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"
@@ -121,5 +120,23 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "production-ready",
+  "entry_conditions": [
+    "agent_running",
+    "schedule_tick"
+  ],
+  "exit_conditions": [
+    "heartbeat_recorded",
+    "liveness_confirmed"
+  ],
+  "retry_limits": {
+    "max_retries": 1,
+    "backoff_ms": 500
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

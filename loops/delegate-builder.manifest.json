@@ -3,7 +3,6 @@
   "loop_id": "delegate-builder-v1",
   "title": "Delegate Builder",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -126,5 +125,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "delegation_request_received",
+    "delegate_spec_defined"
+  ],
+  "exit_conditions": [
+    "delegate_artifact_built",
+    "build_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

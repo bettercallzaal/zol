@@ -3,7 +3,6 @@
   "loop_id": "weave-memory-v1",
   "title": "Weave Memory",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -131,5 +130,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "weave_trigger_received",
+    "memory_sources_accessible"
+  ],
+  "exit_conditions": [
+    "memory_woven",
+    "weave_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

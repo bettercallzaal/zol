@@ -37,7 +37,25 @@
       "self.modify.live",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "capability-gap-analysis",
+      "improvement-proposal",
+      "evidence-gated-self-improvement",
+      "curiosity-scan"
+    ],
+    "allowed_tools": [
+      "state.read",
+      "state.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "artifact.local",
+      "receipt.local"
+    ],
+    "disallowed_wallets": ["*"],
+    "disallowed_signers": ["*"],
+    "disallowed_environments": []
   },
   "resource_limits": {
     "max_wall_time_ms": 600000,

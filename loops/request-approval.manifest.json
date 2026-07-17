@@ -1,27 +1,21 @@
 {
   "schema": "dreamnet.dreamloop.v1",
-  "loop_id": "route-work-v1",
-  "title": "Route Work",
+  "loop_id": "request-approval-v1",
+  "title": "Request Approval",
   "version": "1.0.0",
   "owner": "zolbot",
   "stewards": [
     "zaal"
   ],
   "permission_tier": "local_draft_write",
-  "trigger": "after work packet created",
-  "inputs": [
-    "work packet",
-    "priority context"
-  ],
-  "context_sources": [
-    "local state"
-  ],
+  "trigger": "before any consequential action that requires human gate",
+  "cooldown": "30s",
+  "description": "Submit an approval request to the human authority (Telegram). Wait for acknowledgement before proceeding. Never bypass this gate.",
   "allowed_actions": [
-    "priority.plan",
+    "approval.request",
     "receipt.local.write",
     "state.local.read",
-    "state.local.write",
-    "task.plan"
+    "state.local.write"
   ],
   "blocked_actions": [
     "cloud.mutate",
@@ -34,29 +28,6 @@
     "signer.change",
     "wallet.sign"
   ],
-  "checks": [
-    "work packet readable",
-    "priority plan available",
-    "route writable"
-  ],
-  "evidence_outputs": [
-    "work-packet-id",
-    "priority-score",
-    "assigned-route"
-  ],
-  "receipt_outputs": [
-    "route-work receipt"
-  ],
-  "knowledge_state_outputs": [
-    "route assignment written to state"
-  ],
-  "execution_trace_outputs": [
-    "route-work execution trace"
-  ],
-  "memory_routes": [
-    "route assignment in local state"
-  ],
-  "cooldown": "60s",
   "failure_modes": [
     "budget exceeded",
     "timeout",
@@ -72,43 +43,46 @@
   },
   "steps": [
     {
-      "id": "read-packet",
+      "id": "prepare-request",
       "handler": "state.local.read",
       "permission": "state.local.read",
-      "with": {
-        "stateKey": "zol-work-packet"
-      },
-      "retry": {
-        "max_attempts": 2
-      }
-    },
-    {
-      "id": "prioritize",
-      "handler": "priority.plan",
-      "permission": "priority.plan",
       "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "assign-route",
-      "handler": "state.local.write",
-      "permission": "state.local.write",
-      "with": {
-        "stateKey": "zol-work-route"
-      },
+      "id": "submit-approval",
+      "handler": "approval.request",
+      "permission": "approval.request",
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "record-receipt",
+      "id": "wait-for-gate",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-gate-result",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "write-receipt",
       "handler": "receipt.local.write",
       "permission": "receipt.local.write",
-      "with": {
-        "receiptType": "route-work"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
@@ -116,20 +90,19 @@
   ],
   "lifecycle_state": "dry-run",
   "entry_conditions": [
-    "work_packet_created",
-    "routing_rules_available"
+    "approval_required",
+    "request_payload_ready"
   ],
   "exit_conditions": [
-    "work_routed",
-    "routing_receipt_written"
+    "approval_granted OR approval_denied"
   ],
   "retry_limits": {
     "max_retries": 3,
-    "backoff_ms": 1000
+    "backoff_ms": 5000
   },
   "escalation_rules": [
+    "deny:action",
     "notify:owner",
-    "log:error",
-    "halt"
+    "log:error"
   ]
 }

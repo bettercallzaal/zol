@@ -34,7 +34,26 @@
       "self.modify.live",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "toolgym-workout-run",
+      "toolgym-mastery-record",
+      "toolgym-manifest-export"
+    ],
+    "allowed_tools": [
+      "state.read",
+      "state.write",
+      "receipt.write",
+      "artifact.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "receipt.local",
+      "artifact.local"
+    ],
+    "disallowed_wallets": ["*"],
+    "disallowed_signers": ["*"],
+    "disallowed_environments": ["production"]
   },
   "resource_limits": {
     "max_wall_time_ms": 600000,

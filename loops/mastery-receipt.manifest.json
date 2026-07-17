@@ -3,7 +3,6 @@
   "loop_id": "mastery-receipt-v1",
   "title": "Mastery Receipt",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -123,5 +122,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "mastery_event_detected",
+    "skill_record_updatable"
+  ],
+  "exit_conditions": [
+    "mastery_receipt_written",
+    "skill_record_updated"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

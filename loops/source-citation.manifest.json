@@ -1,26 +1,22 @@
 {
   "schema": "dreamnet.dreamloop.v1",
-  "loop_id": "prune-stale-memory-v1",
-  "title": "Prune Stale Memory",
+  "loop_id": "source-citation-v1",
+  "title": "Source Citation",
   "version": "1.0.0",
   "owner": "zolbot",
   "stewards": [
     "zaal"
   ],
   "permission_tier": "local_draft_write",
-  "trigger": "weekly or operator request",
-  "inputs": [
-    "full memory store",
-    "memory age metadata"
-  ],
-  "context_sources": [
-    "all memory entries",
-    "memory timestamps"
-  ],
+  "trigger": "when a claim, research finding, or knowledge product entry requires a source citation",
+  "cooldown": "60s",
+  "description": "Find, validate, and record a source citation for a knowledge claim. Sources must be approved Zocuments.",
   "allowed_actions": [
-    "memory.expire",
     "memory.read",
-    "receipt.local.write"
+    "memory.write",
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write"
   ],
   "blocked_actions": [
     "cloud.mutate",
@@ -33,27 +29,6 @@
     "signer.change",
     "wallet.sign"
   ],
-  "checks": [
-    "memory readable",
-    "expiry safe to execute"
-  ],
-  "evidence_outputs": [
-    "memory-entries-scanned",
-    "entries-expired"
-  ],
-  "receipt_outputs": [
-    "prune-stale-memory receipt"
-  ],
-  "knowledge_state_outputs": [
-    "stale memory entries expired"
-  ],
-  "execution_trace_outputs": [
-    "prune-stale-memory execution trace"
-  ],
-  "memory_routes": [
-    "expiry log in memory store"
-  ],
-  "cooldown": "604800s",
   "failure_modes": [
     "budget exceeded",
     "timeout",
@@ -69,34 +44,46 @@
   },
   "steps": [
     {
-      "id": "read-memory",
+      "id": "read-claim",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "search-sources",
       "handler": "memory.read",
       "permission": "memory.read",
-      "with": {
-        "scope": "full"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "expire-stale",
-      "handler": "memory.expire",
-      "permission": "memory.expire",
-      "with": {
-        "policy": "stale"
-      },
+      "id": "validate-source",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "record-receipt",
+      "id": "record-citation",
+      "handler": "memory.write",
+      "permission": "memory.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "write-receipt",
       "handler": "receipt.local.write",
       "permission": "receipt.local.write",
-      "with": {
-        "receiptType": "prune-stale-memory"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
@@ -104,12 +91,12 @@
   ],
   "lifecycle_state": "dry-run",
   "entry_conditions": [
-    "schedule:periodic",
-    "stale_memory_candidates_exist"
+    "citation_request_received",
+    "approved_sources_accessible"
   ],
   "exit_conditions": [
-    "stale_entries_pruned OR none_found",
-    "prune_receipt_written"
+    "citation_validated_and_recorded",
+    "citation_receipt_written"
   ],
   "retry_limits": {
     "max_retries": 3,

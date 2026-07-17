@@ -303,6 +303,19 @@ class WorkRouter {
     const packet = await this._getPacket(packetId);
     if (!packet) throw new Error(`WorkRouter.route: packet not found: ${packetId}`);
 
+    // Lease guard (verification-gate invariant #2): reject duplicate assignment.
+    // Irreversible tasks (type=reply, type=post, or any in_progress packet) must
+    // not be dispatched to two workers. A second route() call on the same packet
+    // while it is in_progress is refused with LEASE_ALREADY_HELD.
+    if (packet.status === 'in_progress') {
+      const err = new Error(
+        `WorkRouter.route: lease already held by "${packet.assignedTo}" for packet ${packetId}`
+      );
+      err.code = 'LEASE_ALREADY_HELD';
+      err.assignedTo = packet.assignedTo;
+      throw err;
+    }
+
     const resolvedRoute =
       route === 'auto'
         ? DEFAULT_ROUTES[packet.type] || DEFAULT_ROUTES.other

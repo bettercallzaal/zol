@@ -3,7 +3,6 @@
   "loop_id": "accept-warper-assignment-v1",
   "title": "Accept Warper Assignment",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -124,5 +123,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "specification-only",
+  "entry_conditions": [
+    "warper_assignment_available",
+    "keeper_available"
+  ],
+  "exit_conditions": [
+    "assignment_accepted",
+    "contract_recorded"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

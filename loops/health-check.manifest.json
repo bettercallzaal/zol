@@ -1,26 +1,19 @@
 {
   "schema": "dreamnet.dreamloop.v1",
-  "loop_id": "detect-work-intent-v1",
-  "title": "Detect Work Intent",
+  "loop_id": "health-check-v1",
+  "title": "Health Check",
   "version": "1.0.0",
   "owner": "zolbot",
   "stewards": [
     "zaal"
   ],
   "permission_tier": "local_draft_write",
-  "trigger": "on new message or mention",
-  "inputs": [
-    "incoming message",
-    "message metadata"
-  ],
-  "context_sources": [
-    "inbox",
-    "local state"
-  ],
+  "trigger": "on startup, after restart, and every 4 hours",
+  "cooldown": "14400s",
   "allowed_actions": [
-    "inbox.read",
-    "message.classify",
+    "budget.read",
     "receipt.local.write",
+    "runtime.health.read",
     "state.local.read",
     "state.local.write"
   ],
@@ -35,29 +28,6 @@
     "signer.change",
     "wallet.sign"
   ],
-  "checks": [
-    "inbox readable",
-    "classification handler available",
-    "state writable"
-  ],
-  "evidence_outputs": [
-    "message-id",
-    "intent-classification",
-    "confidence-score"
-  ],
-  "receipt_outputs": [
-    "detect-work-intent receipt"
-  ],
-  "knowledge_state_outputs": [
-    "intent classification written to state"
-  ],
-  "execution_trace_outputs": [
-    "detect-work-intent execution trace"
-  ],
-  "memory_routes": [
-    "intent classification in local state"
-  ],
-  "cooldown": "60s",
   "failure_modes": [
     "budget exceeded",
     "timeout",
@@ -73,34 +43,37 @@
   },
   "steps": [
     {
-      "id": "read-message",
-      "handler": "inbox.read",
-      "permission": "inbox.read",
-      "with": {
-        "scope": "latest"
-      },
+      "id": "check-budget",
+      "handler": "budget.read",
+      "permission": "budget.read",
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "classify-intent",
-      "handler": "message.classify",
-      "permission": "message.classify",
-      "with": {
-        "classificationTarget": "work-intent"
-      },
+      "id": "read-state",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "write-classification",
+      "id": "check-tools",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "write-health",
       "handler": "state.local.write",
       "permission": "state.local.write",
-      "with": {
-        "stateKey": "zol-work-intent-classification"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
@@ -109,25 +82,22 @@
       "id": "record-receipt",
       "handler": "receipt.local.write",
       "permission": "receipt.local.write",
-      "with": {
-        "receiptType": "detect-work-intent"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     }
   ],
-  "lifecycle_state": "dry-run",
+  "lifecycle_state": "production-ready",
   "entry_conditions": [
-    "operator_input_received",
-    "context_loaded"
+    "scheduler_tick"
   ],
   "exit_conditions": [
-    "intent_classified",
-    "intent_receipt_written"
+    "all_units_checked",
+    "health_receipt_written"
   ],
   "retry_limits": {
-    "max_retries": 3,
+    "max_retries": 2,
     "backoff_ms": 1000
   },
   "escalation_rules": [

@@ -3,7 +3,6 @@
   "loop_id": "legacy-capsule-v1",
   "title": "Legacy Capsule Migration",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -123,5 +122,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "legacy_capsule_detected",
+    "migration_target_defined"
+  ],
+  "exit_conditions": [
+    "capsule_migrated_or_archived",
+    "migration_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

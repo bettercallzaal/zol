@@ -32,7 +32,25 @@
       "self.modify.live",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "research-collect",
+      "research-synthesize",
+      "research-cite",
+      "ingest-source"
+    ],
+    "allowed_tools": [
+      "state.read",
+      "artifact.write"
+    ],
+    "allowed_data": [
+      "artifact.local",
+      "source.local",
+      "source.public"
+    ],
+    "disallowed_wallets": ["*"],
+    "disallowed_signers": ["*"],
+    "disallowed_environments": []
   },
   "resource_limits": {
     "max_wall_time_ms": 600000,

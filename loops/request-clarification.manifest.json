@@ -3,7 +3,6 @@
   "loop_id": "request-clarification-v1",
   "title": "Request Clarification",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -103,5 +102,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "ambiguity_detected",
+    "clarification_recipient_available"
+  ],
+  "exit_conditions": [
+    "clarification_sent",
+    "response_received OR timeout"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

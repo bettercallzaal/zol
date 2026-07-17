@@ -3,7 +3,6 @@
   "loop_id": "artist-context-v1",
   "title": "Artist Context",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -119,5 +118,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "artist_id_provided",
+    "context_sources_available"
+  ],
+  "exit_conditions": [
+    "artist_context_loaded",
+    "context_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

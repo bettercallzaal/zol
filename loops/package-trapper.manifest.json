@@ -3,7 +3,6 @@
   "loop_id": "package-trapper-v1",
   "title": "Package Trapper",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -123,5 +122,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "trapper_work_complete",
+    "package_spec_defined"
+  ],
+  "exit_conditions": [
+    "package_artifact_written",
+    "package_receipt_recorded"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

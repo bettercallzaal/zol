@@ -100,7 +100,29 @@
       "secret.value.read",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "relationship-discover",
+      "relationship-engage",
+      "relationship-coordinate",
+      "relationship-escalate",
+      "relationship-nurture",
+      "inbox-triage"
+    ],
+    "allowed_tools": [
+      "farcaster.read",
+      "state.read",
+      "state.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "relationship.local",
+      "farcaster.public",
+      "circle.member"
+    ],
+    "disallowed_wallets": ["*"],
+    "disallowed_signers": ["*"],
+    "disallowed_environments": []
   },
   "resource_limits": {
     "max_wall_time_ms": 30000,

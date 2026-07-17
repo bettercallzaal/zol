@@ -30,7 +30,25 @@
       "self.modify.live",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "receipt-sanitize",
+      "evidence-bundle",
+      "proof-drop-export"
+    ],
+    "allowed_tools": [
+      "state.read",
+      "receipt.read",
+      "artifact.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "receipt.local",
+      "artifact.local"
+    ],
+    "disallowed_wallets": ["*"],
+    "disallowed_signers": ["*"],
+    "disallowed_environments": ["production"]
   },
   "resource_limits": {
     "max_wall_time_ms": 600000,

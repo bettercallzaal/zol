@@ -113,7 +113,42 @@
       "self.modify.live",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "heartbeat",
+      "health-check",
+      "restart-recovery",
+      "bootstrap-state",
+      "daily-private-brief",
+      "conversation-follow-up",
+      "relationship-sync",
+      "inbox-triage",
+      "music-scout",
+      "artist-context",
+      "release-research",
+      "curator-brief",
+      "source-citation"
+    ],
+    "allowed_tools": [
+      "farcaster.read",
+      "state.read",
+      "state.write",
+      "receipt.read",
+      "receipt.write",
+      "memory.write",
+      "artifact.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "receipt.local",
+      "memory.local",
+      "farcaster.public",
+      "artifact.local",
+      "relationship.local"
+    ],
+    "disallowed_wallets": ["*"],
+    "disallowed_signers": ["*"],
+    "disallowed_environments": []
   },
   "resource_limits": {
     "max_wall_time_ms": 3600000,

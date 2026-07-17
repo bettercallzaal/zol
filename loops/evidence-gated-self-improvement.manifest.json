@@ -3,7 +3,6 @@
   "loop_id": "evidence-gated-self-improvement-v1",
   "title": "Evidence-Gated Self Improvement",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"
@@ -132,5 +131,23 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "improvement_proposal_approved",
+    "evidence_threshold_met"
+  ],
+  "exit_conditions": [
+    "improvement_applied_or_staged",
+    "improvement_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

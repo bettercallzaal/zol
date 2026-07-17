@@ -3,7 +3,6 @@
   "loop_id": "conversation-follow-up-v1",
   "title": "Conversation Follow-Up",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -119,5 +118,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "open_conversation_exists",
+    "follow_up_due"
+  ],
+  "exit_conditions": [
+    "follow_up_drafted",
+    "follow_up_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

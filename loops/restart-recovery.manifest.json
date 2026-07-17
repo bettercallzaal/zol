@@ -1,27 +1,20 @@
 {
   "schema": "dreamnet.dreamloop.v1",
-  "loop_id": "route-work-v1",
-  "title": "Route Work",
+  "loop_id": "restart-recovery-v1",
+  "title": "Restart Recovery",
   "version": "1.0.0",
   "owner": "zolbot",
   "stewards": [
     "zaal"
   ],
   "permission_tier": "local_draft_write",
-  "trigger": "after work packet created",
-  "inputs": [
-    "work packet",
-    "priority context"
-  ],
-  "context_sources": [
-    "local state"
-  ],
+  "trigger": "on daemon restart, after crash or SIGTERM, or when resume-work finds checkpoint",
+  "cooldown": "60s",
+  "description": "Detect interrupted work packets, resume from last checkpoint, re-queue failed tasks, and emit recovery receipt.",
   "allowed_actions": [
-    "priority.plan",
     "receipt.local.write",
     "state.local.read",
-    "state.local.write",
-    "task.plan"
+    "state.local.write"
   ],
   "blocked_actions": [
     "cloud.mutate",
@@ -34,29 +27,6 @@
     "signer.change",
     "wallet.sign"
   ],
-  "checks": [
-    "work packet readable",
-    "priority plan available",
-    "route writable"
-  ],
-  "evidence_outputs": [
-    "work-packet-id",
-    "priority-score",
-    "assigned-route"
-  ],
-  "receipt_outputs": [
-    "route-work receipt"
-  ],
-  "knowledge_state_outputs": [
-    "route assignment written to state"
-  ],
-  "execution_trace_outputs": [
-    "route-work execution trace"
-  ],
-  "memory_routes": [
-    "route assignment in local state"
-  ],
-  "cooldown": "60s",
   "failure_modes": [
     "budget exceeded",
     "timeout",
@@ -72,60 +42,63 @@
   },
   "steps": [
     {
-      "id": "read-packet",
+      "id": "read-checkpoint",
       "handler": "state.local.read",
       "permission": "state.local.read",
-      "with": {
-        "stateKey": "zol-work-packet"
-      },
-      "retry": {
-        "max_attempts": 2
-      }
-    },
-    {
-      "id": "prioritize",
-      "handler": "priority.plan",
-      "permission": "priority.plan",
       "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "assign-route",
-      "handler": "state.local.write",
-      "permission": "state.local.write",
-      "with": {
-        "stateKey": "zol-work-route"
-      },
+      "id": "detect-interrupted",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "record-receipt",
+      "id": "resume-packets",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "re-queue-failed",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "emit-recovery",
       "handler": "receipt.local.write",
       "permission": "receipt.local.write",
-      "with": {
-        "receiptType": "route-work"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     }
   ],
-  "lifecycle_state": "dry-run",
+  "lifecycle_state": "production-ready",
   "entry_conditions": [
-    "work_packet_created",
-    "routing_rules_available"
+    "agent_restart_detected",
+    "interrupted_work_exists"
   ],
   "exit_conditions": [
-    "work_routed",
-    "routing_receipt_written"
+    "work_resumed_or_requeued",
+    "recovery_receipt_written"
   ],
   "retry_limits": {
-    "max_retries": 3,
-    "backoff_ms": 1000
+    "max_retries": 2,
+    "backoff_ms": 2000
   },
   "escalation_rules": [
     "notify:owner",

@@ -69,7 +69,40 @@
       "self.modify.live",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "heartbeat",
+      "health-check",
+      "restart-recovery",
+      "bootstrap-state",
+      "daily-private-brief",
+      "inbox-triage",
+      "task-capture",
+      "evening-review"
+    ],
+    "allowed_tools": [
+      "state.read",
+      "state.write",
+      "receipt.read",
+      "receipt.write",
+      "memory.write",
+      "artifact.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "receipt.local",
+      "memory.local",
+      "artifact.local",
+      "calendar.local",
+      "inbox.local",
+      "task.local",
+      "project.local",
+      "relationship.local",
+      "runtime.health"
+    ],
+    "disallowed_wallets": ["*"],
+    "disallowed_signers": ["*"],
+    "disallowed_environments": []
   },
   "resource_limits": {
     "max_wall_time_ms": 600000,

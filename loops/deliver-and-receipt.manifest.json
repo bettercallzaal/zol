@@ -3,7 +3,6 @@
   "loop_id": "deliver-and-receipt-v1",
   "title": "Deliver and Receipt",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -136,5 +135,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "work_packet_complete",
+    "approval_granted"
+  ],
+  "exit_conditions": [
+    "artifact_delivered",
+    "receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 2000
+  },
+  "escalation_rules": [
+    "deny:action",
+    "notify:owner",
+    "log:error"
   ]
 }

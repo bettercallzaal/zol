@@ -3,7 +3,6 @@
   "loop_id": "checkpoint-work-v1",
   "title": "Checkpoint Work",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -105,5 +104,23 @@
         "max_attempts": 2
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "work_packet_active",
+    "checkpoint_interval_reached"
+  ],
+  "exit_conditions": [
+    "checkpoint_written",
+    "checkpoint_receipt_recorded"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

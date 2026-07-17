@@ -3,7 +3,6 @@
   "loop_id": "daily-private-brief-v1",
   "title": "Daily Private Brief",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
@@ -132,5 +131,23 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "schedule:daily_06:00",
+    "state_readable"
+  ],
+  "exit_conditions": [
+    "brief_artifact_written",
+    "receipt_logged"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

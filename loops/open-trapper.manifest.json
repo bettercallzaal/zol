@@ -1,25 +1,18 @@
 {
   "schema": "dreamnet.dreamloop.v1",
-  "loop_id": "detect-work-intent-v1",
-  "title": "Detect Work Intent",
+  "loop_id": "open-trapper-v1",
+  "title": "Open Trapper",
   "version": "1.0.0",
   "owner": "zolbot",
   "stewards": [
     "zaal"
   ],
   "permission_tier": "local_draft_write",
-  "trigger": "on new message or mention",
-  "inputs": [
-    "incoming message",
-    "message metadata"
-  ],
-  "context_sources": [
-    "inbox",
-    "local state"
-  ],
+  "trigger": "when a new Trapper assignment arrives or operator initiates a new bounded work contract",
+  "cooldown": "60s",
+  "description": "Open a new Trapper work contract: create the work packet, record the assignment, set initial checkpoint, and emit open receipt.",
   "allowed_actions": [
     "inbox.read",
-    "message.classify",
     "receipt.local.write",
     "state.local.read",
     "state.local.write"
@@ -35,29 +28,6 @@
     "signer.change",
     "wallet.sign"
   ],
-  "checks": [
-    "inbox readable",
-    "classification handler available",
-    "state writable"
-  ],
-  "evidence_outputs": [
-    "message-id",
-    "intent-classification",
-    "confidence-score"
-  ],
-  "receipt_outputs": [
-    "detect-work-intent receipt"
-  ],
-  "knowledge_state_outputs": [
-    "intent classification written to state"
-  ],
-  "execution_trace_outputs": [
-    "detect-work-intent execution trace"
-  ],
-  "memory_routes": [
-    "intent classification in local state"
-  ],
-  "cooldown": "60s",
   "failure_modes": [
     "budget exceeded",
     "timeout",
@@ -73,45 +43,46 @@
   },
   "steps": [
     {
-      "id": "read-message",
+      "id": "receive-assignment",
       "handler": "inbox.read",
       "permission": "inbox.read",
-      "with": {
-        "scope": "latest"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "classify-intent",
-      "handler": "message.classify",
-      "permission": "message.classify",
-      "with": {
-        "classificationTarget": "work-intent"
-      },
-      "retry": {
-        "max_attempts": 2
-      }
-    },
-    {
-      "id": "write-classification",
+      "id": "create-work-packet",
       "handler": "state.local.write",
       "permission": "state.local.write",
-      "with": {
-        "stateKey": "zol-work-intent-classification"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "record-receipt",
+      "id": "record-assignment",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "set-checkpoint",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "emit-open-receipt",
       "handler": "receipt.local.write",
       "permission": "receipt.local.write",
-      "with": {
-        "receiptType": "detect-work-intent"
-      },
+      "with": {},
       "retry": {
         "max_attempts": 2
       }
@@ -119,12 +90,12 @@
   ],
   "lifecycle_state": "dry-run",
   "entry_conditions": [
-    "operator_input_received",
-    "context_loaded"
+    "trapper_assignment_received",
+    "work_packet_creatable"
   ],
   "exit_conditions": [
-    "intent_classified",
-    "intent_receipt_written"
+    "trapper_open_receipt_written",
+    "assignment_contract_recorded"
   ],
   "retry_limits": {
     "max_retries": 3,

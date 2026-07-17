@@ -1,26 +1,22 @@
 {
   "schema": "dreamnet.dreamloop.v1",
-  "loop_id": "detect-work-intent-v1",
-  "title": "Detect Work Intent",
+  "loop_id": "relationship-sync-v1",
+  "title": "Relationship Sync",
   "version": "1.0.0",
   "owner": "zolbot",
   "stewards": [
     "zaal"
   ],
   "permission_tier": "local_draft_write",
-  "trigger": "on new message or mention",
-  "inputs": [
-    "incoming message",
-    "message metadata"
-  ],
-  "context_sources": [
-    "inbox",
-    "local state"
-  ],
+  "trigger": "after inbox-triage, after a new mention or follow event, or on operator request",
+  "cooldown": "300s",
+  "description": "Sync relationship state with memory: read current relationship data, reconcile with stored relationship memory, update the relationship index, and record a sync receipt.",
   "allowed_actions": [
-    "inbox.read",
-    "message.classify",
+    "memory.read",
+    "memory.write",
     "receipt.local.write",
+    "relationship.read",
+    "relationship.write",
     "state.local.read",
     "state.local.write"
   ],
@@ -35,37 +31,14 @@
     "signer.change",
     "wallet.sign"
   ],
-  "checks": [
-    "inbox readable",
-    "classification handler available",
-    "state writable"
-  ],
-  "evidence_outputs": [
-    "message-id",
-    "intent-classification",
-    "confidence-score"
-  ],
-  "receipt_outputs": [
-    "detect-work-intent receipt"
-  ],
-  "knowledge_state_outputs": [
-    "intent classification written to state"
-  ],
-  "execution_trace_outputs": [
-    "detect-work-intent execution trace"
-  ],
-  "memory_routes": [
-    "intent classification in local state"
-  ],
-  "cooldown": "60s",
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-16",
   "failure_modes": [
     "budget exceeded",
     "timeout",
     "state corruption",
     "handler error"
   ],
-  "promotion_path": "rehearsed -> active_local -> live_guarded",
-  "last_reviewed": "2026-07-16",
   "limits": {
     "max_wall_time_ms": 60000,
     "max_steps": 6,
@@ -73,44 +46,56 @@
   },
   "steps": [
     {
-      "id": "read-message",
-      "handler": "inbox.read",
-      "permission": "inbox.read",
+      "id": "read-relationship-state",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
       "with": {
-        "scope": "latest"
+        "stateKey": "zol-relationship-index"
       },
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "classify-intent",
-      "handler": "message.classify",
-      "permission": "message.classify",
+      "id": "read-relationship-memory",
+      "handler": "memory.read",
+      "permission": "memory.read",
       "with": {
-        "classificationTarget": "work-intent"
+        "type": "relationship"
       },
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "write-classification",
+      "id": "reconcile-and-write",
+      "handler": "memory.write",
+      "permission": "memory.write",
+      "with": {
+        "type": "relationship",
+        "mergeStrategy": "timestamp-latest"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "update-index",
       "handler": "state.local.write",
       "permission": "state.local.write",
       "with": {
-        "stateKey": "zol-work-intent-classification"
+        "stateKey": "zol-relationship-index"
       },
       "retry": {
         "max_attempts": 2
       }
     },
     {
-      "id": "record-receipt",
+      "id": "record-sync-receipt",
       "handler": "receipt.local.write",
       "permission": "receipt.local.write",
       "with": {
-        "receiptType": "detect-work-intent"
+        "receiptType": "relationship-sync"
       },
       "retry": {
         "max_attempts": 2
@@ -119,12 +104,12 @@
   ],
   "lifecycle_state": "dry-run",
   "entry_conditions": [
-    "operator_input_received",
-    "context_loaded"
+    "relationship_event_detected",
+    "relationship_memory_accessible"
   ],
   "exit_conditions": [
-    "intent_classified",
-    "intent_receipt_written"
+    "relationship_index_updated",
+    "sync_receipt_written"
   ],
   "retry_limits": {
     "max_retries": 3,

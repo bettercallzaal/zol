@@ -3,7 +3,6 @@
   "loop_id": "task-capture-and-plan-v1",
   "title": "Task Capture and Plan",
   "version": "1.0.0",
-  "status": "rehearsed",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"
@@ -122,5 +121,23 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "task_input_received",
+    "planning_context_available"
+  ],
+  "exit_conditions": [
+    "task_captured",
+    "plan_artifact_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }
