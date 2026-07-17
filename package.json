@@ -16,7 +16,8 @@
     "dl:secret-scan": "bash scripts/secret-scan.sh --all",
     "dl:state-migrate": "node scripts/dl-state-migrate.js",
     "dl:state-restore": "node scripts/dl-state-restore.js",
-    "dl:dry-run": "node scripts/dl-dry-run.js"
+    "dl:dry-run": "node scripts/dl-dry-run.js",
+    "dl:dry-run:board": "node scripts/dl-dry-run-board-triage.js"
   },
   "dependencies": {
     "@farcaster/hub-nodejs": "^0.15.9",
