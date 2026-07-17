@@ -3,6 +3,7 @@
   "loop_id": "artist-context-v1",
   "title": "Artist Context",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

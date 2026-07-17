@@ -3,6 +3,7 @@
   "loop_id": "morning-plan-v1",
   "title": "Morning Plan",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"

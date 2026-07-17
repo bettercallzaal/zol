@@ -3,6 +3,7 @@
   "loop_id": "project-continuity-resume-v1",
   "title": "Project Continuity Resume",
   "version": "1.0.0",
+  "status": "active",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"

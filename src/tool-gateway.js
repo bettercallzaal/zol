@@ -93,6 +93,7 @@ class ToolGateway {
     this._store = stateStore;
     this._journal = receiptJournal || null;
     this._agentId = (opts && opts.agentId) || 'zolbot';
+    this._approvalBridge = (opts && opts.approvalBridge) || null;
 
     // Tool registry: toolId -> toolDef
     this._tools = new Map();
@@ -347,6 +348,7 @@ class ToolGateway {
       runId = 'unknown',
       loopId = 'unknown',
       capsuleId = 'unknown',
+      approvalId,
     } = opts;
 
     // Step 1: Get tool
@@ -365,9 +367,26 @@ class ToolGateway {
 
     // Step 3: Approval gate (skip in mock mode)
     if (tool.requiresApproval && executionMode !== 'mock') {
-      throw new ApprovalRequiredError(
-        `ApprovalRequired: tool "${toolId}" requires explicit approval before execution`
-      );
+      if (!approvalId) {
+        throw new ApprovalRequiredError(
+          `ApprovalRequired: tool "${toolId}" requires explicit approval before execution`
+        );
+      }
+      if (!this._approvalBridge) {
+        throw new ApprovalRequiredError(
+          `ApprovalRequired: tool "${toolId}" requires approval but no ApprovalBridge is configured`
+        );
+      }
+      // Atomically consume the one-use approval (throws if not approved or already consumed)
+      try {
+        await this._approvalBridge.consume(approvalId);
+      } catch (err) {
+        const e = new ApprovalRequiredError(
+          `ApprovalRequired: tool "${toolId}" approval rejected — ${err.message}`
+        );
+        e.approvalCode = err.code;
+        throw e;
+      }
     }
 
     // Step 4: Call the handler

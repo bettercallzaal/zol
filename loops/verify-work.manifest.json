@@ -3,6 +3,7 @@
   "loop_id": "verify-work-v1",
   "title": "Verify Work",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

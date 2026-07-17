@@ -3,6 +3,7 @@
   "loop_id": "curiosity-scan-v1",
   "title": "Curiosity Scan",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

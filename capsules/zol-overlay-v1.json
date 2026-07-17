@@ -146,8 +146,12 @@
       "artifact.local",
       "relationship.local"
     ],
-    "disallowed_wallets": ["*"],
-    "disallowed_signers": ["*"],
+    "disallowed_wallets": [
+      "*"
+    ],
+    "disallowed_signers": [
+      "*"
+    ],
     "disallowed_environments": []
   },
   "resource_limits": {
@@ -161,6 +165,6 @@
   },
   "provenance": {
     "source": "https://github.com/bettercallzaal/zol",
-    "content_hash": "sha256:0766c78273438e27b4de0771e1d0cf144521161373e648ba7806ffbad6381156"
+    "content_hash": "sha256:cac0088885cac7551e854af7b587bab079d2b1e4f56319932252ef689bfaa9f2"
   }
 }

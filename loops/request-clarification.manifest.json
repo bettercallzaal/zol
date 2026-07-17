@@ -3,6 +3,7 @@
   "loop_id": "request-clarification-v1",
   "title": "Request Clarification",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

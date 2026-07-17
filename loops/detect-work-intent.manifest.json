@@ -3,6 +3,7 @@
   "loop_id": "detect-work-intent-v1",
   "title": "Detect Work Intent",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

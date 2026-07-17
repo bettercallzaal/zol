@@ -96,8 +96,12 @@
       "farcaster.public",
       "bonfire.recall"
     ],
-    "disallowed_wallets": ["*"],
-    "disallowed_signers": ["*"],
+    "disallowed_wallets": [
+      "*"
+    ],
+    "disallowed_signers": [
+      "*"
+    ],
     "disallowed_environments": []
   },
   "resource_limits": {
@@ -115,6 +119,6 @@
   },
   "provenance": {
     "source": "https://github.com/bettercallzaal/zol",
-    "content_hash": "sha256:draft-weekly-curator-v1"
+    "content_hash": "sha256:f4c35bd639b6574e776a51bd3819abfa8639c57221d4283ba17a5e55c716825a"
   }
 }

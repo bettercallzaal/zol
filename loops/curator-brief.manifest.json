@@ -3,6 +3,7 @@
   "loop_id": "curator-brief-v1",
   "title": "Curator Brief",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

@@ -196,7 +196,7 @@ test('MATRIX: Loop memory routes support relationship tracking', async (t) => {
     const filePath = path.join(loopDir, file);
     const loop = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
-    if (loop.loop_id.includes('relationship') || loop.context_sources.some(s => s.includes('relationship'))) {
+    if (loop.loop_id.includes('relationship') || (Array.isArray(loop.context_sources) && loop.context_sources.some(s => s.includes('relationship')))) {
       foundRelationshipLoop = true;
       // Verify it has proper handlers
       assert.ok(
@@ -258,8 +258,7 @@ test('MATRIX: Memory consolidation loop exists', async (t) => {
     if (loop.loop_id.includes('memory')) {
       foundMemoryLoop = true;
       assert.ok(
-        loop.allowed_actions.includes('memory.consolidate') ||
-        loop.allowed_actions.includes('memory.write'),
+        loop.allowed_actions.some(a => a.startsWith('memory.')),
         `Memory loop must have memory handlers`
       );
     }

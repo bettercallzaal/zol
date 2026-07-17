@@ -3,6 +3,7 @@
   "loop_id": "release-research-v1",
   "title": "Release Research",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

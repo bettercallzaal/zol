@@ -3,6 +3,7 @@
   "loop_id": "music-scout-v1",
   "title": "Music Scout",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

@@ -3,6 +3,7 @@
   "loop_id": "warper-keeper-work-cycle-v1",
   "title": "Warper Keeper Work Cycle",
   "version": "1.0.0",
+  "status": "draft",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"

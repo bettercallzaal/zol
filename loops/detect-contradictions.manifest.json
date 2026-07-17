@@ -3,6 +3,7 @@
   "loop_id": "detect-contradictions-v1",
   "title": "Detect Memory Contradictions",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

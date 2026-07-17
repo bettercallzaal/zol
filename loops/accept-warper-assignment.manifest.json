@@ -3,6 +3,7 @@
   "loop_id": "accept-warper-assignment-v1",
   "title": "Accept Warper Assignment",
   "version": "1.0.0",
+  "status": "draft",
   "owner": "zolbot",
   "stewards": [
     "zaal"

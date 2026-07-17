@@ -3,6 +3,7 @@
   "loop_id": "memory-consolidation-and-forgetting-v1",
   "title": "Memory Consolidation and Forgetting",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"

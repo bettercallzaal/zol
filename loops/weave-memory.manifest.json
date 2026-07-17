@@ -3,6 +3,7 @@
   "loop_id": "weave-memory-v1",
   "title": "Weave Memory",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

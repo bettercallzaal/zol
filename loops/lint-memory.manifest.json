@@ -3,6 +3,7 @@
   "loop_id": "lint-memory-v1",
   "title": "Lint Memory",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"

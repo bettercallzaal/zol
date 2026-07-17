@@ -58,8 +58,12 @@
       "receipt.local",
       "task.local"
     ],
-    "disallowed_wallets": ["*"],
-    "disallowed_signers": ["*"],
+    "disallowed_wallets": [
+      "*"
+    ],
+    "disallowed_signers": [
+      "*"
+    ],
     "disallowed_environments": []
   },
   "resource_limits": {
@@ -73,6 +77,6 @@
   },
   "provenance": {
     "source": "https://github.com/BrandonDucar/dreamloops",
-    "content_hash": "sha256:pending"
+    "content_hash": "sha256:02819ab42ad8319d8d5f246ba5f33e1cb927046b4d31a56816b6f42f69807a63"
   }
 }

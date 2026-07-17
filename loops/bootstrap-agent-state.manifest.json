@@ -3,6 +3,7 @@
   "loop_id": "bootstrap-agent-state-v1",
   "title": "Bootstrap Agent State",
   "version": "1.0.0",
+  "status": "active",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"

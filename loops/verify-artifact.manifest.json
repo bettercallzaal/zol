@@ -3,6 +3,7 @@
   "loop_id": "verify-artifact-v1",
   "title": "Verify Artifact",
   "version": "1.0.0",
+  "status": "rehearsed",
   "owner": "zolbot",
   "stewards": [
     "zaal"
