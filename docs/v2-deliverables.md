@@ -393,7 +393,7 @@ zol-upgrade/
 | resume-work | 5 | after restart / checkpoint | PASS (rehearsed) |
 | source-citation | 5 | when citation required | PASS (rehearsed) |
 
-61 loops: PASS | 8 loops: PASS (rehearsed/dry-run) | 3 loops: disabled (Warper Keeper — off by default, correct behavior)
+59 loops: PASS | 10 loops: PASS (rehearsed/dry-run) | 3 loops: disabled (Warper Keeper — off by default, correct behavior)
 
 ---
 
@@ -1070,7 +1070,7 @@ Verification: output shows 23 capsules valid, 72 loops valid, 0 errors.
 ```bash
 npm run v2:test
 ```
-Verification: `pass: 51  fail: 0`.
+Verification: `pass: 147  fail: 0`.
 
 **Step 7 — Migrate state**
 ```bash
