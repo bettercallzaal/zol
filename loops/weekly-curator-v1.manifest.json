@@ -3,7 +3,7 @@
   "loop_id": "weekly-curator-v1",
   "title": "Weekly Curator Recap",
   "version": "1.0.0",
-  "status": "draft",
+  "status": "active_local",
   "owner": "zol-weekly-curator-v1",
   "stewards": [
     "zaal"
