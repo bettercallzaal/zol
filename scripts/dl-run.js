@@ -53,6 +53,8 @@ async function runDreamLoopsDaily() {
       'morning-plan',
       'inbox-triage',
       'task-capture-and-plan',
+      'weekly-curator-v1',
+      'artist-spotlight-v1',
       'evening-review'
     ];
 
