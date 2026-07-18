@@ -266,19 +266,101 @@ const handlers = {
     }
   },
 
+  // Launch rail (doc 1098 Iman dogfood fix + doc 1094b Clanker v4 mechanics):
+  //   0xSplits-first is the SAFE DEFAULT. Clanker v4 rewardBps are immutable at deploy —
+  //   routing through a mutable 0xSplits contract as the sole Clanker recipient lets the
+  //   creator rebalance splits after launch without a token redeploy. Clanker native is
+  //   only correct when the split is small, fixed, and will never need to change.
+  //   Wizard default = zero_x_splits (splitIsFixed not provided → false → 0xSplits).
+  'launch-rail.decision': async function({ input, signal }) {
+    validateInput(input, {
+      required: ['creatorFid'],
+      types: {
+        creatorFid: 'number',
+        collaboratorCount: 'number',
+      },
+    });
+    try {
+      const {
+        creatorFid,
+        collaboratorCount = 1,
+        splitIsFixed = false,
+        recipientsMayChange = false,
+        rebalanceExpected = false,
+      } = input;
+
+      const CLANKER_MAX_RECIPIENTS = 7;
+      const needsDynamic = rebalanceExpected || recipientsMayChange || collaboratorCount > CLANKER_MAX_RECIPIENTS;
+
+      let rail;
+      let reasoning;
+      const constraints = [];
+
+      if (collaboratorCount > CLANKER_MAX_RECIPIENTS) {
+        rail = 'zero_x_splits';
+        reasoning = `${collaboratorCount} collaborators exceeds Clanker's ${CLANKER_MAX_RECIPIENTS}-recipient limit. Use 0xSplits.`;
+        constraints.push(`Clanker v4: max ${CLANKER_MAX_RECIPIENTS} recipients at deploy`);
+      } else if (rebalanceExpected) {
+        rail = 'zero_x_splits';
+        reasoning = 'Split percentages may need rebalancing. 0xSplits enables adjustable allocation; Clanker percentages are immutable at deploy.';
+        constraints.push('Clanker v4: percentages immutable at deploy');
+      } else if (recipientsMayChange) {
+        rail = 'zero_x_splits';
+        reasoning = 'New recipients may be added later (growing team or leaderboard). 0xSplits handles dynamic membership; Clanker recipient list is fixed at deploy.';
+        constraints.push('Clanker v4: recipient list fixed at deploy');
+      } else if (splitIsFixed && collaboratorCount <= CLANKER_MAX_RECIPIENTS) {
+        rail = 'clanker_native';
+        reasoning = `${collaboratorCount} collaborator(s) with fixed percentages and stable membership. Use Clanker native recipients — no Splits contract needed. Each admin can update their wallet address if it changes.`;
+        constraints.push('Clanker v4: percentages immutable; wallet per-recipient can change');
+      } else {
+        // 0xSplits-first doctrine (doc 1098): when splitIsFixed is not confirmed, always
+        // default to 0xSplits. Clanker v4 rewardBps are immutable — routing through a
+        // mutable Splits contract lets the creator rebalance without a token redeploy.
+        rail = 'zero_x_splits';
+        reasoning = 'Default rail: 0xSplits-first (doc 1098). Clanker v4 rewardBps are immutable at deploy — deploy a mutable 0xSplits contract first, set it as the sole Clanker fee recipient, then adjust the real split anytime via the Splits controller without a token redeploy.';
+        constraints.push('Clanker v4: rewardBps immutable at deploy — 0xSplits is the safe default (doc 1098)');
+      }
+
+      // Legal guardrail (doc 1108): 0xSplits routes to CONTRIBUTORS (the workers doing the
+      // work), never to token HOLDERS as a "hold-and-earn" reward. A split that pays creators
+      // for participation is NOT the same as promising holders price appreciation or revenue.
+      // Never add "hold $TOKEN and earn fees" mechanics — that reintroduces Howey prongs 3-4.
+      // Confirm with counsel before any live launch. (ref: doc 1108, research only — not legal advice)
+      const legalNote = rail === 'zero_x_splits'
+        ? 'DESIGN GUARDRAIL (doc 1108): 0xSplits must route fees to contributors/collaborators (the workers), NOT to token holders. Never promise holders they will receive revenue or treasury yield — "hold and earn" mechanics reintroduce Howey prongs 3-4. Keep rewards participation/energy-based, not holding-based. Confirm framing with counsel before live launch.'
+        : 'DESIGN GUARDRAIL (doc 1108): Clanker native recipients = collaborators who contributed work, not token holders earning passive yield. Keep reward mechanics participation/energy-based. Confirm with counsel before live launch.';
+
+      return {
+        creatorFid,
+        rail,
+        reasoning,
+        constraints,
+        inputs: { collaboratorCount, splitIsFixed, recipientsMayChange, rebalanceExpected },
+        clankerNativeEligible: splitIsFixed && !needsDynamic && collaboratorCount <= CLANKER_MAX_RECIPIENTS,
+        legalNote,
+        timestamp: new Date().toISOString(),
+        source: 'clanker-v4-mechanics-doc-1094b-doc-1098',
+      };
+    } catch (err) {
+      if (signal?.aborted) throw new Error('launch-rail.decision timed out');
+      throw err;
+    }
+  },
+
   'receipt.launch-recommendation-write': async function({ input, signal }) {
     validateInput(input, {
       required: ['creatorFid', 'energyScore', 'recommendation'],
       types: { creatorFid: 'number', energyScore: 'number', recommendation: 'string' },
     });
     try {
-      const { creatorFid, energyScore, recommendation, reasoning } = input;
+      const { creatorFid, energyScore, recommendation, reasoning, railDecision } = input;
       return {
         receiptId: `launch-rec_${creatorFid}_${Date.now()}`,
         creatorFid,
         energyScore,
         recommendation,
         reasoning: (reasoning || '').substring(0, 500),
+        railDecision: railDecision || null,
         timestamp: new Date().toISOString(),
         type: 'launch_recommendation',
       };

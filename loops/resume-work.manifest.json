@@ -36,7 +36,7 @@
     "handler error"
   ],
   "promotion_path": "rehearsed -> active_local -> live_guarded",
-  "last_reviewed": "2026-07-16",
+  "last_reviewed": "2026-07-17",
   "limits": {
     "max_wall_time_ms": 60000,
     "max_steps": 6,
@@ -107,11 +107,25 @@
     "log:error",
     "halt"
   ],
-  "inputs": [],
-  "context_sources": [],
-  "checks": [],
-  "evidence_outputs": [],
-  "receipt_outputs": [],
+  "inputs": [
+    "suspended_work_packet_id"
+  ],
+  "context_sources": [
+    "work packet store",
+    "checkpoint store",
+    "task context memory"
+  ],
+  "checks": [
+    "work_packet_loaded",
+    "checkpoint_restored",
+    "context_reinstated"
+  ],
+  "evidence_outputs": [
+    "resumed_work_packet"
+  ],
+  "receipt_outputs": [
+    "resume-work-receipt"
+  ],
   "knowledge_state_outputs": [],
   "execution_trace_outputs": [],
   "memory_routes": []

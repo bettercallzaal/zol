@@ -688,6 +688,316 @@ const handlers = {
         timestamp: new Date().toISOString()
       };
     }
+  },
+
+  // ===== STUB HANDLERS (PHASE 5 wiring) =====
+
+  'telegram.approval.request': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { message: 'string', context: 'string', timeout_ms: 'number' }
+    });
+    // PHASE 5: route to Telegram approval bridge
+    return {
+      requested: true,
+      channel: 'telegram',
+      message: input.message || input.context || '',
+      status: 'pending',
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'farcaster.activity-read': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { fid: 'number', limit: 'number', cursor: 'string' }
+    });
+    // PHASE 5: wire to Neynar activity endpoint
+    return {
+      fid: input.fid || null,
+      casts: [],
+      cursor: null,
+      count: 0,
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'cast.read': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { fid: 'number', limit: 'number', channel: 'string' }
+    });
+    // PHASE 5: wire to farcaster.read
+    return {
+      fid: input.fid || null,
+      casts: [],
+      count: 0,
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'cast.draft': async function({ input, state, signal }) {
+    validateInput(input, {
+      required: ['text'],
+      types: { text: 'string', channel: 'string', parent: 'string' }
+    });
+    // SECURITY: never posts; returns staged draft only
+    return {
+      drafted: true,
+      draftId: `draft_${Math.random().toString(36).slice(2, 9)}`,
+      text: input.text,
+      channel: input.channel || null,
+      status: 'staged',
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'farcaster.recent-casts-parse': async function({ input, state, signal }) {
+    // PHASE 5: parse casts array from upstream farcaster.read result
+    const rawCasts = (state && state.casts) || input.casts || [];
+    return {
+      parsed: true,
+      count: rawCasts.length,
+      summaries: rawCasts.slice(0, 10).map((c, i) => ({ index: i, text: c.text || '' })),
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'farcaster.dm-send': async function({ input, state, signal }) {
+    validateInput(input, {
+      required: ['recipientFid', 'message'],
+      types: { recipientFid: 'number', message: 'string' }
+    });
+    // SECURITY: draft-only — actual DM send requires approval gate (PHASE 5)
+    return {
+      drafted: true,
+      recipientFid: input.recipientFid,
+      message: input.message,
+      status: 'draft_only',
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'log.relationship-events-write': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { eventType: 'string', fid: 'number', note: 'string' }
+    });
+    // PHASE 5: write to relationship-events log in state adapter
+    return {
+      logged: true,
+      eventType: input.eventType || 'unknown',
+      fid: input.fid || null,
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'log.zol-events-write': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { event: 'string', context: 'string' }
+    });
+    // PHASE 5: wire to ZOL event log in state adapter
+    return {
+      logged: true,
+      event: input.event || 'unknown',
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'model.completion': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { prompt: 'string', model: 'string', tier: 'string', maxTokens: 'number' }
+    });
+    // PHASE 5: wire to ModelGateway.complete(prompt, { tier, model })
+    // tier: 'cheap' (classify/route), 'standard' (default), 'frontier' (build/reason)
+    return {
+      completed: true,
+      text: '',
+      tier: input.tier || 'standard',
+      model: input.model || 'stub',
+      tokens: 0,
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'checkpoint.local.write': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { checkpointKey: 'string', workPacketId: 'string' }
+    });
+    // PHASE 5: wire to state-adapter checkpoint store
+    return {
+      written: true,
+      checkpointId: `chk_${Math.random().toString(36).slice(2, 9)}`,
+      checkpointKey: input.checkpointKey || 'default',
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'artifact.draft.write': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { artifactType: 'string', title: 'string' }
+    });
+    // SECURITY: draft status only — publishing requires separate approval gate
+    return {
+      artifactId: `art_${Math.random().toString(36).slice(2, 9)}`,
+      artifactType: input.artifactType || 'unknown',
+      status: 'draft',
+      staged: true,
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'api.read.external': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { url: 'string', method: 'string', scope: 'string' }
+    });
+    // PHASE 5: wire to approved HTTP read gateway
+    return {
+      read: true,
+      url: input.url || '',
+      data: null,
+      status: 200,
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'bonfire.delve-recall': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { query: 'string', scope: 'string', limit: 'number' }
+    });
+    // PHASE 5: blocked on BrandonDucar/dream-net PRs #1559/#1560
+    return {
+      recalled: false,
+      reason: 'bonfire-integration-pending',
+      results: [],
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'toolgym.mastery.record': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { tool: 'string', score: 'number', context: 'string' }
+    });
+    // PHASE 5: wire to ToolGym mastery store
+    return {
+      recorded: true,
+      tool: input.tool || 'unknown',
+      score: input.score || 0,
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'toolgym.workout.run': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { workout: 'string', tool: 'string' }
+    });
+    // PHASE 5: wire to ToolGym workout runner
+    return {
+      completed: true,
+      workout: input.workout || 'unknown',
+      result: 'stub',
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'cowork.fetch-projects': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { project: 'string', owner: 'string' }
+    });
+    // PHASE 5: reads from COWORK_TRACKER_URL/rest/v1/tasks (project: zaodevz)
+    return {
+      projects: [],
+      count: 0,
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'circle.relationship-status-read': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { fid: 'number', scope: 'string' }
+    });
+    // PHASE 5: wire to Circle or relationship-store integration
+    return {
+      fid: input.fid || null,
+      status: null,
+      found: false,
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'circle.relationship-status-write': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { fid: 'number', status: 'string', note: 'string' }
+    });
+    // PHASE 5: wire to Circle or relationship-store integration
+    return {
+      written: true,
+      fid: input.fid || null,
+      status: input.status || 'unknown',
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'artist-spotlight.filter-eligible-artists': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { cooldownDays: 'number' }
+    });
+    // PHASE 5: delegate to artistspotlight filter logic
+    return {
+      eligible: [],
+      count: 0,
+      cooldownDays: input.cooldownDays || 60,
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'artist-spotlight.select-one-artist': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { strategy: 'string' }
+    });
+    // PHASE 5: delegate to artistspotlight selection logic
+    return {
+      selected: null,
+      strategy: input.strategy || 'rotation',
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'artist-spotlight.compose-spotlight-draft': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { artist: 'string', maxLength: 'number' }
+    });
+    // SECURITY: draft only — never posts
+    return {
+      drafted: true,
+      draftId: `spot_${Math.random().toString(36).slice(2, 9)}`,
+      artist: input.artist || null,
+      text: '',
+      status: 'draft',
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'artist-spotlight.stage-draft-for-approval': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { draftId: 'string', channel: 'string' }
+    });
+    // PHASE 5: submit staged draft to approval queue
+    return {
+      staged: true,
+      draftId: input.draftId || null,
+      status: 'pending_approval',
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'artist-spotlight.record-spotlight-completion': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { artist: 'string', draftId: 'string' }
+    });
+    // PHASE 5: record completion in spotlight history
+    return {
+      recorded: true,
+      artist: input.artist || null,
+      draftId: input.draftId || null,
+      timestamp: new Date().toISOString()
+    };
   }
 };
 

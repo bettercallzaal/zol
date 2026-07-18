@@ -5,6 +5,27 @@
 
 const crypto = require('node:crypto');
 
+// Cheap-model tier routing (doc 1111 + board task 8c56f160):
+// Route deterministic classify/route/gate-check sub-tasks to a cheap tier;
+// reserve frontier for build/reason/verify. Resolves per-provider.
+const TIER_MODELS = {
+  cheap: {
+    openrouter: 'anthropic/claude-haiku-4-5',
+    ollama: process.env.ZOL_CHEAP_OLLAMA_MODEL || 'phi3',
+    mock: 'mock',
+  },
+  standard: {
+    openrouter: process.env.OPENROUTER_MODEL || 'anthropic/claude-sonnet-4-6',
+    ollama: process.env.ZOL_STANDARD_OLLAMA_MODEL || 'llama3',
+    mock: 'mock',
+  },
+  frontier: {
+    openrouter: process.env.ZOL_FRONTIER_MODEL || 'anthropic/claude-opus-4-8',
+    ollama: process.env.ZOL_FRONTIER_OLLAMA_MODEL || 'llama3:70b',
+    mock: 'mock',
+  },
+};
+
 // ---------------------------------------------------------------------------
 // QuotaExceededError
 // ---------------------------------------------------------------------------
@@ -218,7 +239,7 @@ class ModelGateway {
   // -------------------------------------------------------------------------
   async complete(
     prompt,
-    { model, provider, timeoutMs = 30000, fallbackProvider } = {}
+    { model, tier, provider, timeoutMs = 30000, fallbackProvider } = {}
   ) {
     // 1. Check quota (use a rough prompt-length estimate before we know output size)
     const quota = await this._loadQuota();
@@ -237,6 +258,9 @@ class ModelGateway {
       selectedProvider = 'mock';
     }
 
+    // 2b. Resolve model from tier when no explicit model given (doc 1111 cheap-model routing)
+    const resolvedModel = model || (tier && TIER_MODELS[tier] && TIER_MODELS[tier][selectedProvider]) || undefined;
+
     // 3. Call with AbortController timeout
     const start = Date.now();
     let result;
@@ -248,7 +272,7 @@ class ModelGateway {
     let fallbackReason = null;
 
     try {
-      result = await this._callWithTimeout(selectedProvider, prompt, { model, timeoutMs });
+      result = await this._callWithTimeout(selectedProvider, prompt, { model: resolvedModel, timeoutMs });
       success = true;
     } catch (primaryErr) {
       err = primaryErr;
@@ -268,8 +292,9 @@ class ModelGateway {
             );
             err.code = 'FALLBACK_RAISES_AUTHORITY';
           } else {
+            const fbModel = resolvedModel || (tier && TIER_MODELS[tier] && TIER_MODELS[tier][fb]);
             try {
-              result = await this._callWithTimeout(fb, prompt, { model, timeoutMs });
+              result = await this._callWithTimeout(fb, prompt, { model: fbModel, timeoutMs });
               usedProvider = fb;
               success = true;
               fallbackOccurred = true;
@@ -297,6 +322,7 @@ class ModelGateway {
     if (!success) {
       // Record failed telemetry (no text)
       const failEntry = {
+        tier: tier || null,
         date: this._todayDate(),
         provider: usedProvider,
         model: model || 'unknown',
@@ -317,6 +343,7 @@ class ModelGateway {
 
     // 5. Record telemetry with fallback flag (verification-gate invariant #7)
     const telemetryEntry = {
+      tier: tier || null,
       date: this._todayDate(),
       provider: usedProvider,
       model: finalModel,

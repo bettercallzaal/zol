@@ -98,5 +98,83 @@ describe('ModelGateway', () => {
     assert.ok('tokensEstimate' in entry, 'telemetry entry should have tokensEstimate');
     assert.ok('durationMs' in entry, 'telemetry entry should have durationMs');
     assert.ok('success' in entry, 'telemetry entry should have success');
+    assert.ok('tier' in entry, 'telemetry entry should have tier field');
+  });
+
+  test('tier routing: cheap tier resolves to haiku model for openrouter', async () => {
+    const store = makeMockStore();
+    let capturedModel = null;
+    const mockProvider = {
+      name: 'cheap-test',
+      available: true,
+      async complete(prompt, { model } = {}) {
+        capturedModel = model;
+        return { text: 'ok', model: model || 'mock' };
+      },
+    };
+    const gw = new ModelGateway(store, {
+      defaultProvider: 'openrouter',
+      quotaTokensPerDay: 10000,
+      providers: { openrouter: mockProvider, mock: mockProvider },
+    });
+
+    await gw.complete('classify this intent', { tier: 'cheap' });
+
+    assert.ok(capturedModel && capturedModel.includes('haiku'), `cheap tier should resolve to haiku, got: ${capturedModel}`);
+  });
+
+  test('tier routing: frontier tier resolves to opus model for openrouter', async () => {
+    const store = makeMockStore();
+    let capturedModel = null;
+    const mockProvider = {
+      name: 'frontier-test',
+      available: true,
+      async complete(prompt, { model } = {}) {
+        capturedModel = model;
+        return { text: 'ok', model: model || 'mock' };
+      },
+    };
+    const gw = new ModelGateway(store, {
+      defaultProvider: 'openrouter',
+      quotaTokensPerDay: 10000,
+      providers: { openrouter: mockProvider, mock: mockProvider },
+    });
+
+    await gw.complete('reason about this complex problem', { tier: 'frontier' });
+
+    assert.ok(capturedModel && capturedModel.includes('opus'), `frontier tier should resolve to opus, got: ${capturedModel}`);
+  });
+
+  test('tier routing: explicit model overrides tier', async () => {
+    const store = makeMockStore();
+    let capturedModel = null;
+    const mockProvider = {
+      name: 'override-test',
+      available: true,
+      async complete(prompt, { model } = {}) {
+        capturedModel = model;
+        return { text: 'ok', model: model || 'mock' };
+      },
+    };
+    const gw = new ModelGateway(store, {
+      defaultProvider: 'openrouter',
+      quotaTokensPerDay: 10000,
+      providers: { openrouter: mockProvider, mock: mockProvider },
+    });
+
+    await gw.complete('test', { tier: 'cheap', model: 'anthropic/claude-opus-4-8' });
+
+    assert.equal(capturedModel, 'anthropic/claude-opus-4-8', 'explicit model should override tier');
+  });
+
+  test('tier routing: tier field recorded in telemetry', async () => {
+    const store = makeMockStore();
+    const gw = new ModelGateway(store, { defaultProvider: 'mock', quotaTokensPerDay: 10000 });
+
+    await gw.complete('classify this', { tier: 'cheap' });
+
+    const telemetry = await store.get('model-gateway-telemetry');
+    const entry = telemetry[telemetry.length - 1];
+    assert.equal(entry.tier, 'cheap', 'tier should be recorded in telemetry');
   });
 });

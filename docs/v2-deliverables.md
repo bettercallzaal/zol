@@ -1,7 +1,7 @@
 # ZOL Persistent Agent Upgrade v2 — Full Deliverables
 
 **Date:** 2026-07-16 (updated 2026-07-17)
-**Status:** COMPLETE — awaiting operator review and Pi activation (442 tests green, verification gate items 1-10 proven)
+**Status:** COMPLETE — awaiting operator review and Pi activation (483 tests green, verification gate items 1-10 proven)
 **Version:** zol@1.0.0 (package.json)
 
 ---
@@ -21,7 +21,8 @@ PRs in the v2 stack (merge in order):
 - **PR #32** (`ws/v2-api-response-shape`) — All AgentGateway REST success responses include `ok:true`; all errors include `ok:false`. MCP `/mcp/tools` raw array preserved. 3 new tests.
 - **PR #33** (`ws/v2-route-validation`) — Native `safeParse(jsonSchema, input)` validator (zero deps, mirrors Zod safeParse contract); applied to all body-receiving routes + per-tool MCP inputSchema lookup. 14 unit tests + 4 HTTP-level integration tests. Also: `farcaster.connectivity.check` handler, `cast-readiness-check-v1` loop, `zabal-channel-watch-v1`, `zabal-submissions-watch-v1` DreamLoops.
 - **PR #34** (`ws/v2-sparkz-wins`) — Ports unique content from stale PRs #17 (Sparkz launch-readiness) and #18 (Community Wins Spotter). 8 Sparkz energy-score handlers (read-only Farcaster signals, 0-100 score, launch_now/keep_building/insufficient_data output), community wins spotter handler (draft-only celebration casts, Bonfire deferred). 2 new capsules + 2 new loops. 30 new tests (14 Sparkz + 16 wins spotter).
-- **PR #35** (`ws/v2-durable-execution`) — Fleet durable-execution hardening. `IdempotencyStore` (in-memory + atomic-file, 24h TTL default); ToolGateway `idempotencyKey` option (consequential write-tool dedup without re-executing handler); WorkRouter auto-generated `sideEffectKey` on every packet; `CoworkTracker.claimTask()` + `board.task.claim` handler with conditional Supabase PATCH (`?status=eq.todo`) to prevent shared-clone collisions. 20 new tests. Total: 23 capsules, 72 loops, 442 tests.
+- **PR #35** (`ws/v2-durable-execution`) — Fleet durable-execution hardening. `IdempotencyStore` (in-memory + atomic-file, 24h TTL default); ToolGateway `idempotencyKey` option (consequential write-tool dedup without re-executing handler); WorkRouter auto-generated `sideEffectKey` on every packet; `CoworkTracker.claimTask()` + `board.task.claim` handler with conditional Supabase PATCH (`?status=eq.todo`) to prevent shared-clone collisions. 20 new tests. Subtotal: 23 capsules, 72 loops, 442 tests.
+- **PR #36** (`ws/v2-sparkz-launch-rail`) — `launch-rail.decision` handler (0xSplits-first default per doc 1098) + legal guardrail + 27 stub handlers closing loop manifest gap + model-gateway cheap-model tier routing (doc 1111) + Neynar/Supabase API field-drift guides. Handler smoke tests. 41 new tests total. **Total: 23 capsules, 72 loops, 483 tests. Handler registry: 80 handlers (all 72 loop steps satisfied).**
 
 Supplementary PRs (no merge dependency on main stack):
 - **PR #29** (`ws/v2-runner-gateway-design`) — Heterogeneous Runner Gateway design doc (design-only, no code)
@@ -37,7 +38,7 @@ Supplementary PRs (no merge dependency on main stack):
 │                                                                      │
 │  ┌────────────────────────────────────────────────────────────────┐  │
 │  │                    DREAMLOOPS ENGINE                           │  │
-│  │   Capsule Registry (23 capsules) ↔ Loop Registry (54 loops)   │  │
+│  │   Capsule Registry (23 capsules) ↔ Loop Registry (72 loops)   │  │
 │  └──────────┬───────────────────────────────────┬────────────────┘  │
 │             │                                   │                    │
 │  ┌──────────▼──────────┐           ┌────────────▼──────────────┐    │
@@ -168,56 +169,105 @@ zol-upgrade/
 │   ├── verify-work.manifest.json
 │   ├── warper-keeper-work-cycle.manifest.json
 │   ├── weave-memory.manifest.json
-│   └── weekly-curator-v1.manifest.json
+│   ├── weekly-curator-v1.manifest.json
+│   ├── board-triage-nightly.manifest.json    [NEW — PR #31]
+│   ├── bootstrap-state.manifest.json         [NEW — PR #26]
+│   ├── capability-gap-analysis.manifest.json [NEW — PR #36]
+│   ├── cast-readiness-check-v1.manifest.json [NEW — PR #33]
+│   ├── component-watch.manifest.json         [NEW — PR #36]
+│   ├── heartbeat.manifest.json               [NEW — PR #26]
+│   ├── improvement-proposal.manifest.json    [NEW — PR #36]
+│   ├── morning-brief-with-board-v1.manifest.json [NEW — PR #31]
+│   ├── open-trapper.manifest.json            [NEW — PR #28]
+│   ├── relationship-sync.manifest.json       [NEW — PR #26]
+│   ├── request-approval.manifest.json        [NEW — PR #28]
+│   ├── restart-recovery.manifest.json        [NEW — PR #26]
+│   ├── resume-work.manifest.json             [NEW — PR #26]
+│   ├── source-citation.manifest.json         [NEW — PR #26]
+│   ├── zabal-channel-watch-v1.manifest.json  [NEW — PR #33]
+│   └── zabal-submissions-watch-v1.manifest.json [NEW — PR #33]
 ├── src/                                      [CORE v2 MODULES]
 │   ├── agent-gateway.js                      [NEW — Layer 9, HTTP+MCP]
+│   ├── approval-bridge.js                    [NEW — Layer 10, PR #28]
 │   ├── artifact-pipeline.js                  [NEW — Layer 12]
 │   ├── capsule-registry.js                   [NEW — Layer 1]
 │   ├── config.js
+│   ├── cowork-tracker.js                     [NEW — PR #31, CoworkTracker + COWORK_TASK_SCHEMA]
 │   ├── dreamloop-registry.js                 [NEW — Layer 2]
+│   ├── idempotency-store.js                  [NEW — PR #35, in-memory+file, 24h TTL]
+│   ├── integrations.js                       [UPDATED — PR #36, Neynar/Supabase field-drift guides]
 │   ├── memory-weaver.js                      [NEW — Layer 6]
-│   ├── model-gateway.js                      [NEW — Layer 5]
+│   ├── model-gateway.js                      [NEW — Layer 5, UPDATED — PR #36 tier routing]
 │   ├── receipt-journal.js                    [NEW — Layer 8]
+│   ├── safe-parse.js                         [NEW — PR #33, native JSON Schema validator]
 │   ├── state-adapter.js                      [NEW — Layer 11]
 │   ├── tool-gateway.js                       [NEW — Layer 7]
 │   ├── work-router.js                        [NEW — Layer 5]
 │   ├── zictionary.js                         [NEW — Layer 14]
+│   ├── zocuments.js                          [NEW — Layer 14, PR #27]
+│   ├── zikipedia.js                          [NEW — Layer 14, PR #27]
 │   ├── adapters/
 │   │   ├── proof-drop-adapter.js             [NEW — Layer 15]
 │   │   ├── toolgym-adapter.js                [NEW — Layer 15]
 │   │   └── warper-keeper-adapter.js          [Phase 7, unchanged]
 │   ├── handlers/
-│   │   ├── index.js
+│   │   ├── index.js                          [UPDATED — PR #36, 27 stub handlers]
 │   │   ├── artist-spotlight.js
+│   │   ├── board-handlers.js                 [NEW — PR #31, 9 board.task.* handlers]
 │   │   ├── community-crm.js
 │   │   ├── component-radar.js
+│   │   ├── radar-handlers.js                 [NEW — PR #26]
 │   │   ├── self-improvement-state-machine.js
-│   │   ├── sparkz-launch-readiness.js        [NEW — PR #34]
-│   │   ├── warper-keeper-handlers.js
+│   │   ├── sparkz-launch-readiness.js        [NEW — PR #34, UPDATED — PR #36 0xSplits-first]
+│   │   ├── warper-keeper-handlers.js         [UPDATED — PR #36, 3 new warper alias stubs]
 │   │   ├── weekly-curator.js
 │   │   └── wins-spotter.js                   [NEW — PR #34]
 │   │   └── __tests__/
-│   │       └── sparkz.test.js                [NEW — PR #34, 14 tests]
+│   │       ├── artist-spotlight.test.js
+│   │       ├── community-crm.test.js
+│   │       ├── handlers.test.js
+│   │       ├── sparkz.test.js                [NEW — PR #34, UPDATED — PR #36]
+│   │       ├── stub-handlers.test.js         [NEW — PR #36, 26 tests]
+│   │       └── weekly-curator.test.js
 │   └── __tests__/
+│       ├── approval-bridge.test.js           [NEW — PR #28]
+│       ├── artifact-pipeline.test.js         [NEW — PR #27]
 │       ├── capsule-registry.test.js
+│       ├── cast-readiness.test.js            [NEW — PR #33, 6 tests]
+│       ├── cowork-tracker.test.js            [NEW — PR #31, 26 tests]
 │       ├── dreamloop-registry.test.js
+│       ├── durable-execution.test.js         [NEW — PR #35, 20 tests]
 │       ├── integration-matrix.test.js
 │       ├── memory-weaver.test.js
-│       ├── model-gateway.test.js
+│       ├── model-gateway.test.js             [UPDATED — PR #36, 4 tier routing tests]
+│       ├── proof-drop-adapter.test.js        [NEW — PR #27]
+│       ├── real-backend.test.js              [NEW — PR #28, restart-continuity]
 │       ├── receipt-journal.test.js
+│       ├── safe-parse.test.js                [NEW — PR #33, 14 tests]
 │       ├── self-improvement.test.js
 │       ├── state-adapter.test.js
 │       ├── tool-gateway.test.js
-│       └── wins-spotter.test.js              [NEW — PR #34, 16 tests]
-│       └── work-router.test.js
+│       ├── toolgym-adapter.test.js           [NEW — PR #27]
+│       ├── v2-integration.test.js            [NEW — PR #28, HTTP integration tests]
+│       ├── verification-gate.test.js         [NEW — PR #28, all 7 gate-item-8 scenarios]
+│       ├── wins-spotter.test.js              [NEW — PR #34, 16 tests]
+│       ├── work-router.test.js
+│       ├── zictionary.test.js                [NEW — PR #27]
+│       ├── zikipedia.test.js                 [NEW — PR #27]
+│       └── zocuments.test.js                 [NEW — PR #27]
 ├── scripts/
 │   ├── dl-dry-run.js
+│   ├── dl-dry-run-board-triage.js            [NEW — PR #31]
+│   ├── dl-dry-run-weekly-curator.js          [NEW — PR #21]
+│   ├── dl-dry-run-artist-spotlight.js        [NEW — PR #22]
 │   ├── dl-state-migrate.js
 │   ├── dl-state-restore.js
 │   ├── secret-scan.sh
 │   └── (existing scripts unchanged)
 └── docs/
     ├── persistent-agent-delivery.md          (Phase 8 delivery, unchanged)
+    ├── pi-activation-runbook-v1.md           [NEW — PR #31]
+    ├── zol-bankr-risk-model-v1.md            [NEW — PR #31, gated on Zaal decision form]
     └── v2-deliverables.md                    (THIS FILE)
 ```
 
@@ -313,8 +363,24 @@ zol-upgrade/
 | weekly-curator-v1 | 5 | weekly-cron | PASS |
 | sparkz-launch-readiness-v1 | 8 | on-demand/weekly | PASS (dry-run) |
 | community-wins-spotlight-v1 | 5 | daily at 6:30am | PASS (dry-run) |
+| board-triage-nightly | 4 | every 24h at 02:00 | PASS |
+| bootstrap-state | 5 | first startup / state reset | PASS |
+| cast-readiness-check-v1 | 4 | before casting / every 4h | PASS |
+| heartbeat | 4 | every 30 minutes | PASS |
+| morning-brief-with-board-v1 | 7 | daily at 06:30 | PASS |
+| restart-recovery | 5 | on daemon restart / SIGTERM | PASS |
+| zabal-channel-watch-v1 | 7 | every 2 hours | PASS |
+| zabal-submissions-watch-v1 | 7 | every 4 hours | PASS |
+| capability-gap-analysis | 5 | weekly / on failed task | PASS (rehearsed) |
+| component-watch | 5 | weekly / after gap analysis | PASS (rehearsed) |
+| improvement-proposal | 5 | after gap/watch findings | PASS (rehearsed) |
+| open-trapper | 5 | on new Trapper assignment | PASS (rehearsed) |
+| relationship-sync | 5 | after inbox-triage / on event | PASS (rehearsed) |
+| request-approval | 5 | before consequential action | PASS (rehearsed) |
+| resume-work | 5 | after restart / checkpoint | PASS (rehearsed) |
+| source-citation | 5 | when citation required | PASS (rehearsed) |
 
-68 loops: PASS | 3 loops: disabled (Warper Keeper — off by default, correct behavior)
+61 loops: PASS | 8 loops: PASS (rehearsed/dry-run) | 3 loops: disabled (Warper Keeper — off by default, correct behavior)
 
 ---
 
@@ -325,19 +391,45 @@ zol-upgrade/
 ```
 npm run v2:test
 
-tests: 139
-pass:  139
+tests: 147
+pass:  147
 fail:  0
-duration: ~1200 ms
+duration: ~1800 ms
 
-Coverage:
+Coverage (src/__tests__/):
+  approval-bridge.test.js     — ApprovalBridge gate, consume, replay rejection
+  artifact-pipeline.test.js   — plan/build/verify/package lifecycle, SHA-256 hashing
   capsule-registry.test.js    — CapsuleRegistry load/validate/compose
+  cast-readiness.test.js      — farcaster.connectivity.check handler (6 tests)
+  cowork-tracker.test.js      — CoworkTracker CRUD, triage, claimTask collision (26 tests)
   dreamloop-registry.test.js  — DreamLoopRegistry manifest loading
-  receipt-journal.test.js     — append-only chain, sha256 linking
+  durable-execution.test.js   — IdempotencyStore dedup, board.task.claim collision (20 tests)
+  integration-matrix.test.js  — Cross-loop permission matrix, required allowed_actions
   memory-weaver.test.js       — read/write/prune, secret guard
-  work-router.test.js         — createPacket, routing, queue
-  model-gateway.test.js       — OpenRouter + Ollama adapters, budget
-  tool-gateway.test.js        — handler dispatch, permission validation
+  model-gateway.test.js       — OpenRouter + Ollama adapters, budget, tier routing (4 new)
+  proof-drop-adapter.test.js  — ProofDropAdapter sanitization, private field stripping
+  real-backend.test.js        — AtomicFileStore restart-continuity (live write → restart → read)
+  receipt-journal.test.js     — append-only chain, sha256 linking
+  safe-parse.test.js          — native safeParse(jsonSchema, input) validator (14 tests)
+  self-improvement.test.js    — evidence-gated state machine
+  state-adapter.test.js       — AtomicFileStore read/write/secret guard
+  tool-gateway.test.js        — handler dispatch, permission validation, idempotency
+  toolgym-adapter.test.js     — ToolGymAdapter mock-block mastery guard
+  v2-integration.test.js      — HTTP-level integration tests (route validation, approval gate)
+  verification-gate.test.js   — All 7 gate-item-8 state-machine scenarios
+  wins-spotter.test.js        — Community Wins Spotter handler suite (16 tests)
+  work-router.test.js         — createPacket, routing, queue, auto sideEffectKey
+  zictionary.test.js          — term add/update/approve lifecycle
+  zikipedia.test.js           — wiki page generation from approved Zocuments
+  zocuments.test.js           — document import/export/hash
+
+Coverage (src/handlers/__tests__/):
+  artist-spotlight.test.js    — artist-spotlight step handlers
+  community-crm.test.js       — CRM read/write handlers
+  handlers.test.js            — handler registry integration
+  sparkz.test.js              — Sparkz launch-readiness + 0xSplits-first doctrine (14 tests)
+  stub-handlers.test.js       — Phase-5 stub registration + draft-only enforcement (26 tests)
+  weekly-curator.test.js      — weekly-curator handlers
 ```
 
 ### dl:test (full suite including DreamLoops vendor tests)
@@ -345,10 +437,10 @@ Coverage:
 ```
 npm run dl:test
 
-tests:  442
-pass:   442
+tests:  483
+pass:   483
 fail:   0
-duration: ~7400 ms
+duration: ~6000 ms
 ```
 
 ---
@@ -748,7 +840,7 @@ npm install
 # 4. Verify syntax
 npm run check
 
-# 5. Run v2 core tests (should see 51 pass, 0 fail)
+# 5. Run v2 core tests (should see 147 pass, 0 fail)
 npm run v2:test
 
 # 6. Run full DreamLoops test suite
@@ -996,7 +1088,7 @@ Verification: all 72 loops complete dry-run with no errors. No state changes wri
 ```bash
 npm run dl:test
 ```
-Verification: `pass: 442  fail: 0`.
+Verification: `pass: 483  fail: 0`.
 
 **Step 11 — (Optional) Start Agent Gateway**
 ```bash

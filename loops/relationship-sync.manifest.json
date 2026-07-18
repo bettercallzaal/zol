@@ -33,7 +33,7 @@
     "wallet.sign"
   ],
   "promotion_path": "rehearsed -> active_local -> live_guarded",
-  "last_reviewed": "2026-07-16",
+  "last_reviewed": "2026-07-17",
   "failure_modes": [
     "budget exceeded",
     "timeout",
@@ -121,12 +121,28 @@
     "log:error",
     "halt"
   ],
-  "inputs": [],
-  "context_sources": [],
-  "checks": [],
-  "evidence_outputs": [],
-  "receipt_outputs": [],
-  "knowledge_state_outputs": [],
+  "inputs": [
+    "relationship_store_snapshot"
+  ],
+  "context_sources": [
+    "relationship store (memory weaver)",
+    "Farcaster activity (public data only)",
+    "last sync receipt"
+  ],
+  "checks": [
+    "relationship_store_read",
+    "stale_entries_updated",
+    "sync_receipt_written"
+  ],
+  "evidence_outputs": [
+    "relationship_delta"
+  ],
+  "receipt_outputs": [
+    "relationship-sync-receipt"
+  ],
+  "knowledge_state_outputs": [
+    "updated_relationship_records"
+  ],
   "execution_trace_outputs": [],
   "memory_routes": []
 }

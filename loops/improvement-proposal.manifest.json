@@ -37,7 +37,7 @@
     "handler error"
   ],
   "promotion_path": "rehearsed -> active_local -> live_guarded",
-  "last_reviewed": "2026-07-16",
+  "last_reviewed": "2026-07-17",
   "limits": {
     "max_wall_time_ms": 60000,
     "max_steps": 6,
@@ -108,12 +108,30 @@
     "log:error",
     "halt"
   ],
-  "inputs": [],
-  "context_sources": [],
-  "checks": [],
-  "evidence_outputs": [],
-  "receipt_outputs": [],
-  "knowledge_state_outputs": [],
+  "inputs": [
+    "gap_analysis_findings",
+    "component_watch_alerts"
+  ],
+  "context_sources": [
+    "capability-gap-analysis output (state store)",
+    "component-watch alert queue",
+    "proposal template (state store)",
+    "pending proposals store"
+  ],
+  "checks": [
+    "findings_loaded",
+    "proposal_validated",
+    "approval_request_submitted"
+  ],
+  "evidence_outputs": [
+    "improvement_proposal_draft"
+  ],
+  "receipt_outputs": [
+    "improvement-proposal-receipt"
+  ],
+  "knowledge_state_outputs": [
+    "pending_proposals"
+  ],
   "execution_trace_outputs": [],
   "memory_routes": []
 }

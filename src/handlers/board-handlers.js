@@ -3,6 +3,28 @@
 // can update the board without importing CoworkTracker directly.
 // All handlers are fire-and-forget safe: a board error returns ok:false but never throws.
 
+// FIELD DRIFT GUIDE — CoworkTracker / Supabase REST (COWORK_TRACKER_URL/rest/v1/tasks)
+// If board.task.* handlers return empty results or 400s, check these first:
+//
+// Table columns (as of 2026-07-17, post-PR #1279 cowork-rls-hardening):
+//   id (uuid), title (text), status (text), priority (text),
+//   category (text), notes (text), created_at (timestamptz),
+//   completed_at (timestamptz), owner_id (text)
+//   NO 'assignee' column — use owner_id instead.
+//
+// Status vocab: 'todo' | 'in_progress' | 'done' | 'blocked'
+// Priority vocab: 'high' | 'med' | 'low'  (NOT P1/P2/P3 — normalizeTask() converts)
+//
+// DRIFT RISK: RLS policy change — after PR #1279 (drops authenticated_all), ZOL must
+//   use service_role key or explicit anon tasks policy. If 403s appear, check RLS.
+// DRIFT RISK: Supabase REST filter syntax — ?status=eq.todo uses eq., not =.
+//   ilike filter: ?title=ilike.*keyword* (percent-encoded in URL if needed).
+// DRIFT RISK: PATCH response for conditional update (?status=eq.todo): empty array []
+//   means collision (another agent claimed); non-empty means success.
+//
+// Supabase REST docs: https://supabase.com/docs/guides/api/rest
+// Last verified: 2026-07-17
+
 'use strict';
 
 const { getTracker } = require('../cowork-tracker');
