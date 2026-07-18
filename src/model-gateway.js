@@ -146,18 +146,23 @@ class ModelGateway {
    * @param {string} [opts.defaultProvider='openrouter']
    * @param {number} [opts.quotaTokensPerDay=20000]
    */
-  constructor(stateStore, { defaultProvider = 'openrouter', quotaTokensPerDay = 20000 } = {}) {
+  constructor(stateStore, { defaultProvider = 'openrouter', quotaTokensPerDay = 20000, providers } = {}) {
     this.stateStore = stateStore;
     this.defaultProvider = defaultProvider;
     this.quotaTokensPerDay = quotaTokensPerDay;
 
-    // Build provider map; OllamaAdapter only included when OLLAMA_BASE_URL is set
-    this._providers = {
-      openrouter: new OpenRouterAdapter(),
-      mock: new MockAdapter(),
-    };
-    if (process.env.OLLAMA_BASE_URL) {
-      this._providers.ollama = new OllamaAdapter();
+    if (providers) {
+      // Injected providers (for testing / verification-gate invariant #7)
+      this._providers = providers;
+    } else {
+      // Build provider map; OllamaAdapter only included when OLLAMA_BASE_URL is set
+      this._providers = {
+        openrouter: new OpenRouterAdapter(),
+        mock: new MockAdapter(),
+      };
+      if (process.env.OLLAMA_BASE_URL) {
+        this._providers.ollama = new OllamaAdapter();
+      }
     }
   }
 
@@ -238,6 +243,9 @@ class ModelGateway {
     let usedProvider = selectedProvider;
     let success = false;
     let err;
+    let fallbackOccurred = false;
+    let fallbackFrom = null;
+    let fallbackReason = null;
 
     try {
       result = await this._callWithTimeout(selectedProvider, prompt, { model, timeoutMs });
@@ -248,16 +256,32 @@ class ModelGateway {
       if (fallbackProvider) {
         const fb = fallbackProvider;
         if (this._providers[fb] && this._providers[fb].available) {
-          try {
-            result = await this._callWithTimeout(fb, prompt, { model, timeoutMs });
-            usedProvider = fb;
-            success = true;
-            err = null;
-          } catch (fallbackErr) {
+          // Block fallback if it would raise authority/risk profile
+          // (verification-gate invariant #7: a fallback that raises authority must be blocked)
+          const primaryTier = this._providers[selectedProvider] && this._providers[selectedProvider].tier || 0;
+          const fallbackTier = this._providers[fb] && this._providers[fb].tier || 0;
+          if (fallbackTier > primaryTier) {
             err = new Error(
-              `Primary provider '${selectedProvider}' failed: ${primaryErr.message}. ` +
-                `Fallback provider '${fb}' also failed: ${fallbackErr.message}`
+              `ModelGateway.complete: fallback to '${fb}' (tier ${fallbackTier}) blocked — ` +
+              `it would raise authority above primary '${selectedProvider}' (tier ${primaryTier}). ` +
+              `Re-approval required. Original error: ${primaryErr.message}`
             );
+            err.code = 'FALLBACK_RAISES_AUTHORITY';
+          } else {
+            try {
+              result = await this._callWithTimeout(fb, prompt, { model, timeoutMs });
+              usedProvider = fb;
+              success = true;
+              fallbackOccurred = true;
+              fallbackFrom = selectedProvider;
+              fallbackReason = primaryErr.message;
+              err = null;
+            } catch (fallbackErr) {
+              err = new Error(
+                `Primary provider '${selectedProvider}' failed: ${primaryErr.message}. ` +
+                  `Fallback provider '${fb}' also failed: ${fallbackErr.message}`
+              );
+            }
           }
         } else {
           err = new Error(
@@ -279,6 +303,9 @@ class ModelGateway {
         tokensEstimate: 0,
         durationMs,
         success: false,
+        fallback: fallbackOccurred,
+        fallback_from: fallbackFrom,
+        fallback_reason: fallbackReason,
       };
       await this._recordTelemetry(failEntry);
       throw err;
@@ -288,7 +315,7 @@ class ModelGateway {
     const tokensEstimate = Math.ceil((prompt.length + result.text.length) / 4);
     const finalModel = result.model || model || 'unknown';
 
-    // 5. Record telemetry (NO prompt/response text)
+    // 5. Record telemetry with fallback flag (verification-gate invariant #7)
     const telemetryEntry = {
       date: this._todayDate(),
       provider: usedProvider,
@@ -296,6 +323,9 @@ class ModelGateway {
       tokensEstimate,
       durationMs,
       success: true,
+      fallback: fallbackOccurred,
+      fallback_from: fallbackFrom,
+      fallback_reason: fallbackReason,
     };
     await this._recordTelemetry(telemetryEntry);
 
