@@ -119,4 +119,40 @@ describe('Zocuments', () => {
       assert.ok(d.docId, 'imported doc should have docId');
     }
   });
+
+  test('add() stores sourceUrl and sourceName (source metadata)', async () => {
+    const docs = new Zocuments(makeMockStore());
+
+    const doc = await docs.add({
+      type: 'transcript',
+      title: 'ZAO Fractal Session W28',
+      content: 'Session transcript content',
+      sourceUrl: 'https://thezao.com/fractal/2026-W28',
+      sourceName: 'ZAO Fractal Session Recording',
+    });
+
+    assert.equal(doc.sourceUrl, 'https://thezao.com/fractal/2026-W28', 'sourceUrl should be stored');
+    assert.equal(doc.sourceName, 'ZAO Fractal Session Recording', 'sourceName should be stored');
+
+    const found = await docs.search('Session transcript');
+    assert.ok(found.length > 0, 'doc should be findable');
+    assert.equal(found[0].sourceUrl, 'https://thezao.com/fractal/2026-W28', 'sourceUrl should survive round-trip');
+  });
+
+  test('add() scrubs secrets from sourceUrl', async () => {
+    const docs = new Zocuments(makeMockStore());
+
+    const doc = await docs.add({
+      type: 'link',
+      title: 'API Doc with Token',
+      content: 'some content',
+      sourceUrl: 'https://api.example.com?token=sk-abc123secretkey',
+    });
+
+    assert.ok(
+      !doc.sourceUrl.includes('sk-abc123secretkey'),
+      'sk- prefixed secret should be redacted from sourceUrl'
+    );
+    assert.ok(doc.sourceUrl.includes('[REDACTED]'), 'redacted placeholder should appear in sourceUrl');
+  });
 });
