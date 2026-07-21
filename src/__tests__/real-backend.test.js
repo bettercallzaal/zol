@@ -21,6 +21,9 @@ const { ApprovalBridge } = require('../approval-bridge');
 const { WorkRouter } = require('../work-router');
 const { AgentGateway } = require('../agent-gateway');
 const { CapsuleRegistry } = require('../capsule-registry');
+const { ToolGateway } = require('../tool-gateway');
+const { IdempotencyStore } = require('../idempotency-store');
+const { MemoryWeaver } = require('../memory-weaver');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -748,4 +751,159 @@ test('run_loop MCP tool returns status=validated for known loop, unknown-loop fo
   } finally {
     rmDir(dir);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Test 14: duplicate execution — same idempotencyKey runs handler exactly once
+// ---------------------------------------------------------------------------
+
+test('Test 14: ToolGateway + IdempotencyStore — duplicate call with same idempotencyKey runs handler once', async (t) => {
+  const dir = makeTmpDir('idem');
+  try {
+    const store = await freshStore(dir);
+    const idem = new IdempotencyStore({ dir });
+    await idem.init();
+
+    let callCount = 0;
+    const tg = new ToolGateway(store, null, { idempotencyStore: idem });
+    tg.register({
+      toolId: 'state.local.write',
+      name: 'state.local.write',
+      requiredPermission: 'state.local.write',
+      isConsequential: true,
+      handler: async () => {
+        callCount++;
+        return { written: true };
+      },
+    });
+
+    const opts = {
+      grantedPermissions: ['state.local.write'],
+      executionMode: 'mock',
+      idempotencyKey: 'test-idem-key-14',
+    };
+    // execute() wraps handler result as { output, receiptId }
+    const r1 = await tg.execute('state.local.write', {}, opts);
+    const r2 = await tg.execute('state.local.write', {}, opts);
+
+    assert.equal(callCount, 1, 'handler must run exactly once despite two calls');
+    assert.equal(r2.idempotent, true, 'second call must be marked idempotent');
+    assert.equal(r1.output.written, true, 'first call output must contain handler result');
+  } finally {
+    rmDir(dir);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Test 15: supervisor restart — AgentGateway artifact survives stop + new instance
+// ---------------------------------------------------------------------------
+
+test('Test 15: AgentGateway stop + restart on same dir — artifact survives', async (t) => {
+  const dir = makeTmpDir('restart');
+  try {
+    const store1 = await freshStore(dir);
+    const pipeline1 = new ArtifactPipeline(store1, null);
+    const router1 = new WorkRouter(store1);
+    const journal1 = new ReceiptJournal(store1, { agentId: 'test-agent' });
+    const stubLoops = { get: () => null };
+
+    // Build an artifact directly via pipeline1 (no HTTP POST route exists)
+    const planned = await pipeline1.plan({ type: 'test', title: 'restart test', description: 'supervisor restart test' });
+    const built = await pipeline1.build(planned.artifactId, { hello: 'world' });
+    const artifactId = built.artifactId;
+    assert.ok(artifactId, 'must have an artifactId after build');
+
+    const gw1 = new AgentGateway({
+      artifactPipeline: pipeline1, workRouter: router1, receiptJournal: journal1,
+      dreamloopRegistry: stubLoops, port: 0, bindAddress: '127.0.0.1',
+    });
+    await gw1.start();
+    await gw1.stop();
+
+    // Boot a second gateway on the same directory
+    const store2 = await freshStore(dir);
+    const pipeline2 = new ArtifactPipeline(store2, null);
+    const router2 = new WorkRouter(store2);
+    const journal2 = new ReceiptJournal(store2, { agentId: 'test-agent' });
+
+    const gw2 = new AgentGateway({
+      artifactPipeline: pipeline2, workRouter: router2, receiptJournal: journal2,
+      dreamloopRegistry: stubLoops, port: 0, bindAddress: '127.0.0.1',
+    });
+    const { port: port2 } = await gw2.start();
+
+    try {
+      // Verify the artifact appears in the list from the restarted gateway
+      const listRes = await fetch(`http://127.0.0.1:${port2}/artifacts`);
+      assert.equal(listRes.status, 200, 'GET /artifacts must succeed on restarted gateway');
+      const body = await listRes.json();
+      assert.ok(body.ok, 'response must be ok');
+      const found = body.artifacts.find(a => a.artifactId === artifactId);
+      assert.ok(found, 'artifact must survive supervisor restart — found in list');
+    } finally {
+      await gw2.stop();
+    }
+  } finally {
+    rmDir(dir);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Test 16: memory outage — MemoryWeaver.write() with broken store propagates typed error
+// ---------------------------------------------------------------------------
+
+test('Test 16: MemoryWeaver.write() with broken store propagates typed error (fail-closed)', async (t) => {
+  const brokenStore = {
+    async get() { return undefined; },
+    async put() { throw new Error('disk full'); },
+  };
+
+  const mw = new MemoryWeaver(brokenStore);
+  await assert.rejects(
+    () => mw.write({
+      type: 'working',
+      content: 'test memory entry',
+      tags: ['test'],
+      provenance: { sourceType: 'operator', confidence: 0.9 },
+      freshness: {},
+      visibility: 'private',
+      contradictions: [],
+    }),
+    (err) => {
+      assert.ok(err instanceof Error, 'must propagate as a typed Error');
+      assert.ok(err.message.length > 0, 'error must have a message');
+      return true;
+    },
+    'MemoryWeaver.write() must throw on store failure, not swallow it'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Test 17: receipt-write failure — ReceiptJournal.append() with broken store propagates
+// ---------------------------------------------------------------------------
+
+test('Test 17: ReceiptJournal.append() with broken store propagates typed error (fail-closed)', async (t) => {
+  const brokenStore = {
+    async get() { return undefined; },
+    async put() { throw new Error('storage unavailable'); },
+  };
+
+  const journal = new ReceiptJournal(brokenStore, { agentId: 'test-agent' });
+  await assert.rejects(
+    () => journal.append({
+      loopId: 'test-loop',
+      runId: 'run-001',
+      stepId: 'step-1',
+      capsuleId: 'cap-001',
+      action: 'state.local.write',
+      status: 'success',
+      evidence: { key: 'test' },
+    }),
+    (err) => {
+      assert.ok(err instanceof Error, 'must propagate as a typed Error');
+      assert.ok(err.message.length > 0, 'error must have a message');
+      return true;
+    },
+    'ReceiptJournal.append() must throw on store failure, not swallow it'
+  );
 });
