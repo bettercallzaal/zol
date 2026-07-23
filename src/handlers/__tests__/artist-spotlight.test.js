@@ -417,4 +417,38 @@ test('artist-spotlight handlers', async (t) => {
     // Lila Rossi should NOT be filtered (>60 days old)
     assert(result.eligible.some((a) => a.toLowerCase() === 'lila rossi'));
   });
+
+  // Audit fix: selectedArtist is sanitized against prompt injection (control chars stripped, length capped)
+  await t.test('compose-spotlight-draft sanitizes selectedArtist (strips newlines and control chars)', async () => {
+    const result = await artistspotlight['artist-spotlight.compose-spotlight-draft']({
+      input: {
+        draftOnly: true,
+        selectedArtist: 'Bad\nActor\r\nWith\tTabs',
+        maxLength: 280,
+      },
+      state: {},
+      signal: null,
+    });
+    assert.strictEqual(result.success, true);
+    // Newlines and tabs must be stripped from the sanitized name used in draft
+    assert(!result.draftText.includes('\n'), 'draft text must not contain injected newlines');
+    assert(!result.draftText.includes('\r'), 'draft text must not contain carriage returns');
+    assert(!result.draftText.includes('\t'), 'draft text must not contain tabs');
+    // selectedArtist in the result is the sanitized version
+    assert(!result.selectedArtist.includes('\n'));
+    assert(result.selectedArtist.length <= 80, 'selectedArtist must be capped at 80 chars');
+  });
+
+  await t.test('compose-spotlight-draft rejects all-special-char artist name', async () => {
+    try {
+      await artistspotlight['artist-spotlight.compose-spotlight-draft']({
+        input: { draftOnly: true, selectedArtist: '<<<>>> ', maxLength: 280 },
+        state: {},
+        signal: null,
+      });
+      assert.fail('should have thrown on invalid artist name');
+    } catch (err) {
+      assert(/SECURITY/.test(err.message), `expected SECURITY error, got: ${err.message}`);
+    }
+  });
 });

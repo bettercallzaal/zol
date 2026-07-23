@@ -581,3 +581,50 @@ describe('toolgym.workout.run', () => {
     assert.ok(typeof result.passed === 'boolean', 'passed must be boolean (not stub string)');
   });
 });
+
+// ===== AUDIT FIX TESTS =====
+describe('audit-fixes', () => {
+  // Fix: model.completion rejects prompts with secret patterns
+  test('model.completion rejects 64-hex secret in prompt', async () => {
+    const secretHex = 'a'.repeat(64);
+    await assert.rejects(
+      () => handlers['model.completion']({
+        input: { prompt: `summarize this key: ${secretHex}`, tier: 'cheap' },
+        state: {},
+        signal: null
+      }),
+      /SECURITY/
+    );
+  });
+
+  test('model.completion rejects sk- token in prompt', async () => {
+    await assert.rejects(
+      () => handlers['model.completion']({
+        input: { prompt: 'use sk-proj-abc123 to authenticate', tier: 'standard' },
+        state: {},
+        signal: null
+      }),
+      /SECURITY/
+    );
+  });
+
+  // Fix: priority.plan uses input.method (not input.methode)
+  test('priority.plan reads input.method (not methode typo)', async () => {
+    const result = await handlers['priority.plan']({
+      input: { method: 'recency', scope: 'test' },
+      state: {},
+      signal: null
+    });
+    assert.strictEqual(result.planned, true);
+    assert.strictEqual(result.method, 'recency', 'should echo back the method value from input.method');
+  });
+
+  test('priority.plan defaults method to task-age when not supplied', async () => {
+    const result = await handlers['priority.plan']({
+      input: {},
+      state: {},
+      signal: null
+    });
+    assert.strictEqual(result.method, 'task-age');
+  });
+});

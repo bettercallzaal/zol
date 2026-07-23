@@ -157,7 +157,7 @@ const communitycrm = {
       return {
         success: true,
         classifications,
-        draftOnly: draftOnly || false,
+        draftOnly: draftOnly !== false,
         timestamp: new Date().toISOString(),
       };
     } finally {
