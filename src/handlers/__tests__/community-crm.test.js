@@ -267,4 +267,25 @@ test('community-crm handlers', async (t) => {
       assert(error.message.includes('invalid type'));
     }
   });
+
+  // Audit fix: message.classify draftOnly defaults to true (safe default, not false)
+  await t.test('message.classify defaults draftOnly to true when not supplied', async () => {
+    const result = await communitycrm['message.classify']({
+      input: { types: ['welcome'], contextKey: 'test' },
+      state: {},
+      signal: null,
+    });
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.draftOnly, true, 'draftOnly must default to true (fail-safe)');
+  });
+
+  // Audit fix: message.classify respects explicit draftOnly:false opt-in
+  await t.test('message.classify passes through explicit draftOnly:false', async () => {
+    const result = await communitycrm['message.classify']({
+      input: { types: ['invite'], contextKey: 'test', draftOnly: false },
+      state: {},
+      signal: null,
+    });
+    assert.strictEqual(result.draftOnly, false);
+  });
 });
