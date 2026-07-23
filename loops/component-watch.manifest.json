@@ -37,7 +37,7 @@
     "handler error"
   ],
   "promotion_path": "rehearsed -> active_local -> live_guarded",
-  "last_reviewed": "2026-07-17",
+  "last_reviewed": "2026-07-23",
   "limits": {
     "max_wall_time_ms": 60000,
     "max_steps": 6,
@@ -124,8 +124,8 @@
       "on_detect": "open improvement-proposal to revisit launch-rail.decision for v5 split mechanics",
       "priority": "high",
       "source_doc": "1094b",
-      "last_checked": "2026-07-17",
-      "last_checked_result": "NOT triggered — latest is clanker-sdk v4.2.18 (2026-07-08). No v5, no B20/droid mechanics. clanker-devco/clanker repo has no public releases; watch SDK repo instead."
+      "last_checked": "2026-07-23",
+      "last_checked_result": "NOT triggered — latest tag is v4.2.18 (2026-07-08); no v5.x tag exists and no B20/droid changelog entries found in any of the 49 published releases."
     },
     {
       "id": "fractally-community-directory",
@@ -134,18 +134,18 @@
       "on_detect": "surface to Zaal to submit ZAO listing (only active fractal DAO on Optimism)",
       "priority": "medium",
       "source_doc": "1208",
-      "last_checked": "2026-07-17",
-      "last_checked_result": "NOT triggered — site has educational content and blog only. No DAO directory or listing feature found."
+      "last_checked": "2026-07-23",
+      "last_checked_result": "NOT triggered — fractally.com shows only a marketing site with whitepaper, blog, and team pages; no DAO directory or community listing feature is visible."
     },
     {
       "id": "optimism-atlas-retro-funding",
       "url": "https://atlas.optimism.io/missions",
-      "check": "new Season 9+ Retro Funding round open for applications (Season 7 and Season 8 Onchain Builders both closed July 2025)",
+      "check": "new Season 10+ Retro Funding round open for applications (S7 closed Jul 2025, S8 closed Jul 2025, S9 concluded 2026-07-11)",
       "on_detect": "surface to Zaal with reference to docs/zol-bankr-risk-model-v1.md and draft new application based on doc 1209 template",
       "priority": "high",
       "source_doc": "1209",
-      "last_checked": "2026-07-17",
-      "last_checked_result": "NOT triggered — S7 Onchain Builders closed July 31 2025; S8 Onchain Builders closed July 30 2025. No Season 9 round announced as of 2026-07-17. Watch gov.optimism.io for S9 announcement."
+      "last_checked": "2026-07-23",
+      "last_checked_result": "NOT triggered — gov.optimism.io retro-funding forum shows Season 9 Final Report (2026-07-11) indicating S9 concluded; no Season 10 open round announced; atlas.optimism.io is JS-rendered and returned no mission list content."
     },
     {
       "id": "zabal-api-new-endpoints",
@@ -154,8 +154,8 @@
       "on_detect": "open improvement-proposal to add specific new endpoint prefixes to the api.read.external ALLOWED_PREFIXES list in src/handlers/index.js",
       "priority": "low",
       "source_doc": "cycle3-capability-gap-wiring",
-      "last_checked": "2026-07-17",
-      "last_checked_result": "NOT triggered — zabalgamez.com is accessible; api.read.external already allows the full 'https://zabalgamez.com/' prefix. No new API documentation found. Current coverage is sufficient."
+      "last_checked": "2026-07-23",
+      "last_checked_result": "NOT triggered — zabalgamez.com contains no developer API docs or endpoints; the 'Data' footer links are public informational pages, not programmatic APIs; page is a community build-a-thon hub unchanged in character from prior checks."
     }
   ],
   "checks": [
