@@ -530,13 +530,13 @@ const handlers = {
 
   'priority.plan': async function({ input, state, signal }) {
     validateInput(input, {
-      types: { methode: 'string' }
+      types: { method: 'string' }
     });
 
     // PHASE 5: wire to LLM or ranking algorithm
     return {
       planned: true,
-      method: input.methode || 'task-age',
+      method: input.method || 'task-age',
       priorities: [],
       timestamp: new Date().toISOString()
     };
@@ -972,6 +972,11 @@ const handlers = {
     validateInput(input, {
       types: { prompt: 'string', model: 'string', tier: 'string', maxTokens: 'number' }
     });
+    // Guard: refuse to send secret patterns (64-hex keys, sk- tokens) into the model
+    const _secretRe = /[0-9a-fA-F]{64}|sk-[a-zA-Z0-9_-]+|ghp_[a-zA-Z0-9_-]+/;
+    if (_secretRe.test(input.prompt || '')) {
+      throw new Error('[SECURITY] model.completion prompt contains secret pattern — refusing to send to model');
+    }
     // tier: 'cheap' (classify/route), 'standard' (default), 'frontier' (build/reason)
     const result = await getModelGateway().complete(input.prompt || '', {
       tier: input.tier || 'standard',
