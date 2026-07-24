@@ -37,8 +37,8 @@
     "handler error"
   ],
   "promotion_path": "rehearsed -> active_local -> live_guarded",
-  "last_reviewed": "2026-07-17",
-  "last_checked": "2026-07-17",
+  "last_reviewed": "2026-07-24",
+  "last_checked": "2026-07-24",
   "limits": {
     "max_wall_time_ms": 60000,
     "max_steps": 6,
@@ -387,6 +387,40 @@
       "stubs_wired": 5,
       "stubs_remaining": 5,
       "note": "All wireable stubs complete. Remaining 5 are permanent or human-gated."
+    }
+  },
+  "gap_report_cycle11": {
+    "cycle": 11,
+    "date": "2026-07-24",
+    "work_packets_scanned": "39 open PRs (#24, #26-#46, #53, #57, #60, #62-#64, standalone #29/#30/#40/#41/#42, #61); 554/554 npm tests passing (77 suites); curiosity-scan cycle 1 board-query scope gap discovered; Brandon WaveWarZ signal 2026-07-20 found outside engineering category",
+    "failure_patterns_identified": [
+      {
+        "id": "curiosity-scan-board-query-scope-gap",
+        "severity": "low",
+        "description": "curiosity-scan cycle 1 queried board:engineering-tasks only. Board task 07994788 (Brandon WaveWarZ receiptable-by-design, 2026-07-20) and fa8dd89d (ZOL Artizen artifact, inbox action) are both category='Other' and were missed. The scan found board-engineering-clear but had incomplete board coverage.",
+        "affected_loops": ["curiosity-scan-v1"],
+        "actionable": true,
+        "status": "mitigated",
+        "note": "context_sources in curiosity-scan.manifest.json updated to include 'board:zol-tagged-inbox-actions'. Manual review this cycle caught both tasks."
+      }
+    ],
+    "missing_tools_catalogued": [
+      {
+        "id": "wavewarz-receipt-primitive-export",
+        "description": "Brandon directed (2026-07-20) that WaveWarZ build 'receiptable by design' on ZOL v2 receipt-journal.js as the cryptographic primitive. ZOL already implements this via receipt-journal.js + AgentGateway /receipts endpoint + ProofDropAdapter. Three adoption paths for external ZAO platforms: (A) export receipt schema JSON — minimal; (B) POST /receipts/verify on AgentGateway — bounded, localhost-only by default; (C) receipt-journal as standalone npm package — broader scope. Design decision needed before any implementation.",
+        "actionable": false,
+        "blocked_on": "Design decision: which adoption path? Zaal/Brandon approval required before implementation."
+      }
+    ],
+    "improvement_proposal": {
+      "id": "improvement-proposal-cycle2",
+      "title": "Improvement Proposal Cycle 2 — WaveWarZ receipt primitive export design queued",
+      "status": "queued",
+      "pr": "ws/v2-improvement-proposal-cycle2",
+      "test_delta": "0 (554 total — manifest-only changes)",
+      "stubs_wired": 0,
+      "stubs_remaining": 2,
+      "note": "New signal from Brandon (2026-07-20): WaveWarZ 'receiptable by design' maps to ZOL v2 receipt-journal.js. Curiosity-scan board-query scope gap identified and fixed. Formal design proposal queued in improvement-proposal.manifest.json for Zaal/Brandon review. No code changes; no new gaps in handlers or tests."
     }
   },
   "gap_report_cycle10": {

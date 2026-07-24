@@ -135,7 +135,25 @@
   "execution_trace_outputs": [],
   "memory_routes": [],
   "last_checked": "2026-07-17",
+  "last_checked": "2026-07-24",
   "proposals": [
+    {
+      "id": "wavewarz-receipt-primitive-export",
+      "status": "queued",
+      "date": "2026-07-24",
+      "triggered_by": "curiosity-scan-v1 cycle 2 — Brandon board task 07994788, 2026-07-20",
+      "title": "WaveWarZ Receipt Primitive Export",
+      "summary": "Brandon directed (2026-07-20) that WaveWarZ build 'receiptable by design' on ZOL v2 receipt-journal.js as the cryptographic primitive. Every consequential WaveWarZ action (battle, trade, leaderboard calc, winner, settlement, payout, AI commentary, moderation) should emit a verifiable receipt chain: timestamp, actor, wallet, event_id, source_tx, calc_version, parser_version, AI_model_version, prev+current receipt hash = append-only chain of evidence. Brandon notes 'Verified by DreamNet as an optional layer for other platforms' and 'Build into architecture now = easy; retrofit later = hard.'\n\nZOL v2 already implements the core primitive: receipt-journal.js (SHA-256 hashing, idempotency keys, prev-receipt links), AgentGateway /receipts GET endpoint, and ProofDropAdapter (sanitized evidence bundles). The gap is an external-adoption path — WaveWarZ needs a way to emit receipts in ZOL's schema without tight coupling to the ZOL runtime.\n\nThree candidate designs:\n(A) RECEIPT SCHEMA EXPORT — publish a receipt-schema.json (JSON Schema draft-07) that any ZAO platform can validate against locally. Zero new ZOL endpoints; platforms bring their own storage. Minimal scope, immediately actionable.\n(B) POST /receipts/verify ENDPOINT — add a receipt submission+verification endpoint to AgentGateway (localhost-only by default, same auth as /tasks). Platforms POST a receipt; ZOL validates schema, checks hash chain integrity, returns {valid, errors}. No cross-platform storage; purely local verification service.\n(C) RECEIPT-JOURNAL AS STANDALONE NPM PACKAGE — extract src/receipt-journal.js as an npm package (e.g. @zaoos/receipt-journal) that WaveWarZ (and other ZAO repos) can install directly. Broadest scope; enables 'Verified by DreamNet' without ZOL runtime dependency.",
+      "gaps_addressed": ["wavewarz-receipt-primitive-export"],
+      "design_questions": [
+        "Which adoption path? (A: schema export / B: POST /receipts/verify endpoint / C: standalone npm package)",
+        "Should ZOL v2 AgentGateway accept cross-platform receipt submissions from non-ZOL callers, or remain ZOL-internal?",
+        "Is 'Verified by DreamNet' a public-facing brand claim — and if so, does it require an audit trail that ZOL hosts?",
+        "Priority vs. merge train: should this be implemented before or after the #26-#64 merge train completes?"
+      ],
+      "blocked_on": "Zaal/Brandon design decision — adoption path + cross-platform policy",
+      "security_note": "No receipt must expose prompts, private memory, credentials, or signer data. ProofDrop redaction rules apply to any export. External receipt submission (Option B) must never bypass the existing Telegram approval gate."
+    },
     {
       "id": "artifact-draft-write-storage-design",
       "status": "resolved",
