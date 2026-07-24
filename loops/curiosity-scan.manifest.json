@@ -143,6 +143,67 @@
     "log:error",
     "halt"
   ],
+  "scan_results_cycle3": {
+    "cycle": 3,
+    "date": "2026-07-24",
+    "scan_sources_covered": [
+      "zol-internal:test-health",
+      "zol-internal:pr-state",
+      "board:engineering-tasks",
+      "board:zol-tagged-inbox-actions",
+      "board:social-stream",
+      "board:research-docs",
+      "component-watch:targets"
+    ],
+    "findings": [
+      {
+        "id": "health-nominal",
+        "category": "zol-internal",
+        "signal": "ZOL test suite: 554/554 pass (77 suites); dl:validate 23 capsules + 72 loops clean; secret-scan clean; 40 open PRs, 0 review comments. No PRs merged to main since cycle 2.",
+        "assessment": "GREEN — no action required",
+        "actionable": false
+      },
+      {
+        "id": "kimi-k3-failover-signal",
+        "category": "board:research-docs",
+        "signal": "Doc 1287 (inbox:research-kimi-k3, 2026-07-24): Kimi K3 (Moonshot AI, released ~2026-07) is on OpenRouter at ~$3/M input / $15/M output. Near-frontier on coding benchmarks (#1 Arena front-end coding). Hallucination rate: 51% (up from 39% on prior models). Board task explicitly labels it 'DIRECTLY relevant to the cheap-AI failover ladder — could be a provider tier' and asks 'add kimi-k3 via OpenRouter as coding-loop provider tier?' (PARKED — evaluate, do not switch fleet).",
+        "assessment": "NEW SIGNAL — queued as improvement proposal kimi-k3-failover-ladder-evaluation. High hallucination rate is a concern for ZOL's factual music-curation use case; proposal documents the tradeoff.",
+        "actionable": true,
+        "triggered_proposal": "kimi-k3-failover-ladder-evaluation"
+      },
+      {
+        "id": "research-docs-annotated",
+        "category": "board:research-docs",
+        "signal": "5 new research docs above 1209: doc 1286 (Gemini Notebook, PARKED), doc 1287 (Kimi K3, NEW ZOL SIGNAL above), doc 1288 (Hyperagent, PARKED), doc 1291 (XTincT, ZABAL Games judging), doc 1322 (research pipeline handoff, zaoos-bot). Docs 1286/1288/1291/1322 annotated + marked done on board (non-ZOL).",
+        "assessment": "4 non-ZOL docs closed; 1 ZOL signal (doc 1287) forwarded to improvement-proposal cycle 3",
+        "actionable": false
+      },
+      {
+        "id": "social-stream-stable",
+        "category": "board:social-stream",
+        "signal": "7 open social-stream tasks (1087-1093) — unchanged from cycle 2. All Zaal-direct account management (Postiz TikTok/Instagram, YouTube, @wavewarz Instagram squatter decision).",
+        "assessment": "CONFIRMED — all Zaal-direct; no ZOL action",
+        "actionable": false
+      },
+      {
+        "id": "component-watch-no-trigger",
+        "category": "component-watch",
+        "signal": "Component-watch cycle 2 ran 2026-07-23. No new cycle since then. Targets: Clanker still v4.2.18, Fractally no directory, Optimism S9 concluded watching S10+, ZABAL no public API. Cycle 3 due ~2026-07-30.",
+        "assessment": "No ecosystem changes require ZOL code updates; component-watch cycle 3 still on schedule",
+        "actionable": false
+      }
+    ],
+    "new_signals_count": 1,
+    "triggered_improvement_proposals": ["kimi-k3-failover-ladder-evaluation"],
+    "scan_receipt": {
+      "receipt_type": "curiosity-scan",
+      "cycle": 3,
+      "status": "complete",
+      "outcome": "1_new_signal",
+      "note": "Doc 1287 (Kimi K3) is the new signal. 4 non-ZOL research docs annotated + board-closed. Failover ladder evaluation queued for Zaal/Brandon decision.",
+      "next_scan_due": "2026-07-31"
+    }
+  },
   "scan_results_cycle2": {
     "cycle": 2,
     "date": "2026-07-24",
