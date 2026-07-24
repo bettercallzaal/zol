@@ -18,7 +18,9 @@
   "context_sources": [
     "memory store",
     "signal source index",
-    "prior findings archive"
+    "prior findings archive",
+    "board:engineering-tasks",
+    "board:zol-tagged-inbox-actions"
   ],
   "allowed_actions": [
     "memory.read",
@@ -70,7 +72,7 @@
     "handler error"
   ],
   "promotion_path": "rehearsed -> active_local -> live_guarded",
-  "last_reviewed": "2026-07-23",
+  "last_reviewed": "2026-07-24",
   "limits": {
     "max_wall_time_ms": 60000,
     "max_steps": 6,
@@ -141,6 +143,67 @@
     "log:error",
     "halt"
   ],
+  "scan_results_cycle2": {
+    "cycle": 2,
+    "date": "2026-07-24",
+    "scan_sources_covered": [
+      "zol-internal:test-health",
+      "zol-internal:pr-state",
+      "board:engineering-tasks",
+      "board:zol-tagged-inbox-actions",
+      "board:social-stream",
+      "board:research-docs"
+    ],
+    "scope_fix_applied": "Added 'board:zol-tagged-inbox-actions' to context_sources — cycle 1 missed category='Other' tasks with ZOL in the title. Board query now also searches title=like.*ZOL* across all categories.",
+    "findings": [
+      {
+        "id": "health-nominal",
+        "category": "zol-internal",
+        "signal": "ZOL test suite: 554/554 pass (77 suites); dl:validate 23 capsules + 72 loops clean; secret-scan clean; 39 open PRs, 0 review comments.",
+        "assessment": "GREEN — no action required",
+        "actionable": false
+      },
+      {
+        "id": "wavewarz-receipt-signal",
+        "category": "board:zol-tagged-inbox-actions",
+        "signal": "Board task 07994788 (Brandon, 2026-07-20): WaveWarZ 'receiptable by design' — every WaveWarZ consequential action should emit a cryptographically verifiable receipt. Brandon explicitly maps this onto ZOL v2 receipt-journal.js primitive and labels it 'Verified by DreamNet as an optional layer for other platforms.' Category=Other — was outside cycle 1 board scan.",
+        "assessment": "NEW SIGNAL — queued as improvement proposal wavewarz-receipt-primitive-export for Zaal/Brandon design decision",
+        "actionable": true,
+        "triggered_proposal": "wavewarz-receipt-primitive-export"
+      },
+      {
+        "id": "artizen-zol-artifact-task",
+        "category": "board:zol-tagged-inbox-actions",
+        "signal": "Board task fa8dd89d: 'ZOL: create an Artizen artifact/project for the ZAO Fund for Emerging Culture + cast about it on Farcaster. Needs ZOL Artizen auth first; create+post are gated (draft, Zaal approves).' Category=Other — was outside cycle 1 board scan.",
+        "assessment": "GATED — requires Zaal to configure ZOL Artizen auth before any action; ZOL Artizen integration is currently out of scope for v2 spec. Noted; no code change needed now.",
+        "actionable": false
+      },
+      {
+        "id": "research-docs-clear",
+        "category": "board:research-docs",
+        "signal": "1 open research-doc task (e38033c3, doc 1060, ZAOOS RLS security) — recurring, gated migration, not ZOL code. No new docs above 1209.",
+        "assessment": "CONFIRMED — no ZOL-code-actionable research docs",
+        "actionable": false
+      },
+      {
+        "id": "social-stream-stable",
+        "category": "board:social-stream",
+        "signal": "7 open social-stream tasks (1087-1093) — all Zaal-direct account management (Postiz TikTok/Instagram, YouTube, display name). No ZOL code impact.",
+        "assessment": "CONFIRMED — all Zaal-direct; no ZOL action",
+        "actionable": false
+      }
+    ],
+    "new_signals_count": 1,
+    "triggered_improvement_proposals": ["wavewarz-receipt-primitive-export"],
+    "scan_receipt": {
+      "receipt_type": "curiosity-scan",
+      "cycle": 2,
+      "status": "complete",
+      "outcome": "1_new_signal",
+      "note": "Scope fix: added board:zol-tagged-inbox-actions to prevent future misses of Other-category ZOL tasks.",
+      "next_scan_due": "2026-07-31"
+    }
+  },
   "scan_results_cycle1": {
     "cycle": 1,
     "date": "2026-07-23",
