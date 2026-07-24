@@ -134,9 +134,25 @@
   ],
   "execution_trace_outputs": [],
   "memory_routes": [],
-  "last_checked": "2026-07-17",
   "last_checked": "2026-07-24",
   "proposals": [
+    {
+      "id": "kimi-k3-failover-ladder-evaluation",
+      "status": "queued",
+      "date": "2026-07-24",
+      "triggered_by": "curiosity-scan-v1 cycle 3 — board task 5117fbc1 (inbox:research-kimi-k3, doc 1287)",
+      "title": "Kimi K3 — Model Failover Ladder Evaluation",
+      "summary": "Board task doc 1287 identifies Kimi K3 (Moonshot AI, ~2026-07) as 'DIRECTLY relevant to the cheap-AI failover ladder' and asks whether to add it as a coding-loop provider tier via OpenRouter.\n\nKimi K3 specs: near-frontier on Arena front-end coding (#1), ~$3/M input / $15/M output (roughly Sonnet 5 price), available on OpenRouter. Hallucination rate: 51% (up from 39% in prior Moonshot models). Board task notes 'keep important work on Claude/GPT.'\n\nZOL's current failover ladder in scripts/zol-daily.js (lines 91-93):\n  1. Primary: env OPENROUTER_MODEL or 'anthropic/claude-fable-5'\n  2. Tier 2: 'deepseek/deepseek-chat'\n  3. Tier 3: 'meta-llama/llama-3.3-70b-instruct'\n\nZOL's model-gateway.js TIER_MODELS (for AgentGateway handlers):\n  cheap: anthropic/claude-haiku-4-5\n  standard: anthropic/claude-sonnet-4-6 (or OPENROUTER_MODEL)\n  frontier: anthropic/claude-opus-4-8 (or ZOL_FRONTIER_MODEL)\n\nKEY CONCERN for ZOL: the daily cast is a FACTUAL use case — 'use ONLY facts in here, do not invent' (zol-daily.js line 86 sys prompt). A 51% hallucination rate would produce false claims about artists, tracks, or events. The existing Telegram approval gate (Zaal reviews before posting) is the safety net, but a hallucinated cast reaching approval is a waste of Zaal's time and risks publication of false music facts.\n\nCOMPARISON: deepseek-chat and llama-3.3-70b-instruct are also potentially hallucinatory but are established OpenRouter options. Kimi K3 is newer with a documented higher hallucination rate.\n\nThree candidate placements:\n(A) NO CHANGE — skip Kimi K3. High hallucination rate is incompatible with ZOL's factual music-curation use case; deepseek+llama ladder is sufficient. Future evaluation when hallucination rate improves.\n(B) ADD TO DAILY FAILOVER — insert 'moonshotai/kimi-k3' between deepseek and llama as a 3rd-tier fallback in scripts/zol-daily.js. The approval gate catches hallucinations; having 4-tier coverage reduces silent-fail risk on credit exhaustion. Low code change (1 line).\n(C) ADD AS TIER_MODELS 'budget' — add a 4th tier 'budget' in model-gateway.js TIER_MODELS pointing to moonshotai/kimi-k3 (OpenRouter). Use ONLY for non-factual tasks (creative generation, draft polish) NOT for route/classify/gate-check where correctness is load-bearing.",
+      "gaps_addressed": ["model-failover-coverage"],
+      "design_questions": [
+        "Add Kimi K3 to ZOL's failover ladder? (A: skip / B: daily-failover tier-3 / C: budget tier in TIER_MODELS)",
+        "OpenRouter model ID for Kimi K3 — confirmed name: 'moonshotai/kimi-k3'? (needs verification; doc says 'on OpenRouter' but doesn't give model ID)",
+        "If Option B: acceptable that Zaal reviews and rejects more hallucinated drafts during credit-exhaustion fallback scenarios?",
+        "If Option C: which handlers should route to 'budget' tier vs 'cheap' tier? (suggestion: only artist-spotlight.compose-spotlight-draft and cast.draft, both already human-gated)"
+      ],
+      "blocked_on": "Zaal/Brandon design decision — placement + hallucination risk acceptance",
+      "security_note": "No model change may bypass the Telegram approval gate. Any Kimi K3 output goes through the same draft-only → approval → post flow. The 'do not invent' instruction in the system prompt is unchanged. No new credentials required — same OpenRouter API key."
+    },
     {
       "id": "wavewarz-receipt-primitive-export",
       "status": "queued",
