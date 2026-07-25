@@ -20,7 +20,8 @@
     "signal source index",
     "prior findings archive",
     "board:engineering-tasks",
-    "board:zol-tagged-inbox-actions"
+    "board:zol-tagged-inbox-actions",
+    "board:site-tech-zol-tasks"
   ],
   "allowed_actions": [
     "memory.read",
