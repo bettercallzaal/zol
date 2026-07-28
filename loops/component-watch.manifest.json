@@ -37,7 +37,7 @@
     "handler error"
   ],
   "promotion_path": "rehearsed -> active_local -> live_guarded",
-  "last_reviewed": "2026-07-23",
+  "last_reviewed": "2026-07-28",
   "limits": {
     "max_wall_time_ms": 60000,
     "max_steps": 6,
@@ -124,8 +124,8 @@
       "on_detect": "open improvement-proposal to revisit launch-rail.decision for v5 split mechanics",
       "priority": "high",
       "source_doc": "1094b",
-      "last_checked": "2026-07-23",
-      "last_checked_result": "NOT triggered — latest tag is v4.2.18 (2026-07-08); no v5.x tag exists and no B20/droid changelog entries found in any of the 49 published releases."
+      "last_checked": "2026-07-28",
+      "last_checked_result": "NOT triggered — latest tag confirmed v4.2.18 (2026-07-08) via GitHub API; no v5.x tag exists and no newer release since cycle 2 check."
     },
     {
       "id": "fractally-community-directory",
@@ -134,8 +134,8 @@
       "on_detect": "surface to Zaal to submit ZAO listing (only active fractal DAO on Optimism)",
       "priority": "medium",
       "source_doc": "1208",
-      "last_checked": "2026-07-23",
-      "last_checked_result": "NOT triggered — fractally.com shows only a marketing site with whitepaper, blog, and team pages; no DAO directory or community listing feature is visible."
+      "last_checked": "2026-07-28",
+      "last_checked_result": "NOT triggered — fractally.com remains a marketing site with whitepaper, blog, and team pages only; no DAO directory or community listing feature has appeared."
     },
     {
       "id": "optimism-atlas-retro-funding",
@@ -144,8 +144,8 @@
       "on_detect": "surface to Zaal with reference to docs/zol-bankr-risk-model-v1.md and draft new application based on doc 1209 template",
       "priority": "high",
       "source_doc": "1209",
-      "last_checked": "2026-07-23",
-      "last_checked_result": "NOT triggered — gov.optimism.io retro-funding forum shows Season 9 Final Report (2026-07-11) indicating S9 concluded; no Season 10 open round announced; atlas.optimism.io is JS-rendered and returned no mission list content."
+      "last_checked": "2026-07-28",
+      "last_checked_result": "NOT triggered — atlas.optimism.io/missions is JS-rendered and returned no mission list; gov.optimism.io retro-funding forum shows no Season 10 announcement; S9 concluded status from cycle 2 (2026-07-11) stands."
     },
     {
       "id": "zabal-api-new-endpoints",
@@ -154,8 +154,8 @@
       "on_detect": "open improvement-proposal to add specific new endpoint prefixes to the api.read.external ALLOWED_PREFIXES list in src/handlers/index.js",
       "priority": "low",
       "source_doc": "cycle3-capability-gap-wiring",
-      "last_checked": "2026-07-23",
-      "last_checked_result": "NOT triggered — zabalgamez.com contains no developer API docs or endpoints; the 'Data' footer links are public informational pages, not programmatic APIs; page is a community build-a-thon hub unchanged in character from prior checks."
+      "last_checked": "2026-07-28",
+      "last_checked_result": "NOT triggered — zabalgamez.com still contains no developer API docs or endpoints; data/graph/research links remain public informational pages; site character unchanged from cycle 2."
     }
   ],
   "checks": [
@@ -172,5 +172,12 @@
   ],
   "knowledge_state_outputs": [],
   "execution_trace_outputs": [],
-  "memory_routes": []
+  "memory_routes": [],
+  "gap_report_cycle3": {
+    "date": "2026-07-28",
+    "targets_checked": 4,
+    "triggered_count": 0,
+    "triggered_targets": [],
+    "notes": "Cycle 3 check — all 4 targets remain NOT triggered. Clanker still at v4.2.18 (confirmed via GitHub API). Fractally still marketing-only. Optimism S10 not announced (S9 concluded 2026-07-11, atlas.optimism.io JS-rendered). ZABAL still no developer API docs."
+  }
 }
