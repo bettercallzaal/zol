@@ -172,7 +172,9 @@
     },
     {
       "id": "doc-2105-grounding-discipline-review",
-      "status": "queued",
+      "status": "resolved",
+      "resolved_date": "2026-07-29",
+      "resolved_by": "doc 2105 reviewed 2026-07-29 — source-nameability grounding rule added to scripts/zol-daily.js system prompt; 3 contract tests added to v2-integration.test.js (describe #18). No new code structure required — prompt tightening is the highest-leverage single change doc recommends. instrument_scope ReceiptJournal field and post-action assertion are deferred: instrument_scope adds value only post-merge when real loop executions generate receipts; post-action assertion requires Telegram read-back (out of v2 spec scope).",
       "date": "2026-07-29",
       "triggered_by": "curiosity-scan-v1 cycle 4 — research-doc:2105 (created 2026-07-28)",
       "title": "Doc 2105 — Grounding Discipline for Agent Engineering",
@@ -185,7 +187,7 @@
         "Should capsule outputs carry a fact/assertion tag in the receipt? (no code change if not; adds a receipt field if yes)",
         "Is a 'grounding receipt' extension in scope for v2 or post-v2?"
       ],
-      "blocked_on": "Review of doc 2105 content — board task 50cdf0e3 (research-doc:2105, status:todo)",
+      "blocked_on": "resolved",
       "security_note": "No code change required until doc is reviewed and a specific pattern is chosen. All ZOL factual outputs continue to go through the Telegram approval gate regardless."
     },
     {
