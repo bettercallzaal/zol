@@ -1421,3 +1421,38 @@ describe('Migrations', () => {
     assert.equal(recovered.value, 42, 'numeric value must be unchanged');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Describe #18 — Grounding Discipline (doc 2105)
+// Contract tests verifying the source-nameability grounding rule is present
+// in zol-daily.js and cannot be accidentally removed.
+// ---------------------------------------------------------------------------
+
+describe('Grounding Discipline (doc 2105)', () => {
+  const fs = require('fs');
+  const dailyScript = fs.readFileSync(
+    path.join(__dirname, '../../scripts/zol-daily.js'),
+    'utf8'
+  );
+
+  test('zol-daily system prompt contains source-nameability grounding rule', () => {
+    assert.ok(
+      dailyScript.includes('source-nameability'),
+      'system prompt must contain source-nameability check instruction'
+    );
+  });
+
+  test('zol-daily system prompt requires claims to trace to named context items', () => {
+    assert.ok(
+      dailyScript.includes('traceable to a named item'),
+      'system prompt must require every claim to trace to a named context item'
+    );
+  });
+
+  test('zol-daily system prompt treats un-traceable claims as inference and rejects them', () => {
+    assert.ok(
+      dailyScript.includes('inference, not fact'),
+      'system prompt must label un-traceable claims as inference and direct output NOTHING'
+    );
+  });
+});
