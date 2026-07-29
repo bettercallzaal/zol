@@ -134,7 +134,7 @@
   ],
   "execution_trace_outputs": [],
   "memory_routes": [],
-  "last_checked": "2026-07-24",
+  "last_checked": "2026-07-29",
   "proposals": [
     {
       "id": "kimi-k3-failover-ladder-evaluation",
@@ -169,6 +169,24 @@
       ],
       "blocked_on": "Zaal/Brandon design decision — adoption path + cross-platform policy",
       "security_note": "No receipt must expose prompts, private memory, credentials, or signer data. ProofDrop redaction rules apply to any export. External receipt submission (Option B) must never bypass the existing Telegram approval gate."
+    },
+    {
+      "id": "doc-2105-grounding-discipline-review",
+      "status": "queued",
+      "date": "2026-07-29",
+      "triggered_by": "curiosity-scan-v1 cycle 4 — research-doc:2105 (created 2026-07-28)",
+      "title": "Doc 2105 — Grounding Discipline for Agent Engineering",
+      "summary": "Research doc 2105 ('Telling fact from assertion: grounding discipline for agent engineering', created 2026-07-28, unreviewed) is directly adjacent to ZOL's factual music-curation use case. ZOL already enforces a 'use ONLY facts in here, do not invent' system prompt in zol-daily.js and the Kimi K3 proposal (cycle 3) flagged hallucination risk as the primary concern for any model-failover decision.\n\nDoc 2105 may introduce patterns for:\n(A) Annotating capsule outputs with a fact/assertion distinction (e.g. 'verified-fact' vs 'model-inferred') so downstream consumers and the Telegram approval gate can weight evidence appropriately.\n(B) Structured grounding checks in the music-scout or artist-context DreamLoops — e.g. requiring source citation before any factual claim is included in a cast draft.\n(C) A 'grounding receipt' extension to the existing ReceiptJournal that records which claims were source-verified vs model-generated for each loop execution.\n\nThis is lower urgency than kimi-k3-failover (no production code change required now) but high relevance if ZOL's music-curation outputs are ever published automatically rather than always Telegram-gated.",
+      "gaps_addressed": [
+        "fact-assertion-discipline"
+      ],
+      "design_questions": [
+        "After reviewing doc 2105: does it introduce any grounding patterns ZOL should adopt now vs. post-merge?",
+        "Should capsule outputs carry a fact/assertion tag in the receipt? (no code change if not; adds a receipt field if yes)",
+        "Is a 'grounding receipt' extension in scope for v2 or post-v2?"
+      ],
+      "blocked_on": "Review of doc 2105 content — board task 50cdf0e3 (research-doc:2105, status:todo)",
+      "security_note": "No code change required until doc is reviewed and a specific pattern is chosen. All ZOL factual outputs continue to go through the Telegram approval gate regardless."
     },
     {
       "id": "artifact-draft-write-storage-design",
