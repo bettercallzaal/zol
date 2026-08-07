@@ -83,20 +83,57 @@ async function draft(ctx, recent) {
   const recentBlock = recent.length
     ? '\n\nRECENTLY POSTED (you already said these - do NOT repeat the same artist, angle, or fact; write about something DIFFERENT and fresh, or output NOTHING):\n' + recent.map((r) => '- ' + r.text).join('\n')
     : '';
-  const sys = persona + '\n\nReal ZAO context from the Bonfire graph (use ONLY facts in here, do not invent):\n' + ctx + recentBlock + '\n\nYou are ZOL, a MUSIC CURATOR. Write ONE original cast in your lane: a song-of-the-day, an artist spotlight, or a concrete note about a specific ZAO / COC Concertz / WaveWarZ artist or track. RULES: name a SPECIFIC artist, track, or event from the context above. Be concrete, not abstract. Do NOT write vague aphorisms about curation, data, or visibility. Do NOT repeat anything from RECENTLY POSTED above - it must be a fresh topic or angle. Do NOT force it - if the context has nothing specific, real, AND new worth posting, output exactly the word NOTHING. Max 280 characters, and always end on a complete sentence (never cut off mid-word). No emojis, no em dashes, no hashtags, no @mentions, no jargon, no hype. Output ONLY the cast text or NOTHING.';
+  const sys = persona + '\n\nReal ZAO context from the Bonfire graph (use ONLY facts in here, do not invent):\n' + ctx + recentBlock + '\n\nYou are ZOL, a MUSIC CURATOR. Write ONE original cast in your lane: a song-of-the-day, an artist spotlight, or a concrete note about a specific ZAO / COC Concertz / WaveWarZ artist or track. RULES: name a SPECIFIC artist, track, or event from the context above. Be concrete, not abstract. Do NOT write vague aphorisms about curation, data, or visibility. Do NOT repeat anything from RECENTLY POSTED above - it must be a fresh topic or angle. Do NOT force it - if the context has nothing specific, real, AND new worth posting, output exactly the word NOTHING. Max 280 characters, and always end on a complete sentence (never cut off mid-word). VOICE: casual and human, like a person in the scene - not a brand account. ASK A REAL QUESTION in roughly half your casts (an actual open question someone would want to answer, not a rhetorical one). If the cast is genuinely about Farcaster infrastructure, dev tooling, or an API question, you MAY tag @neynar - only when it is truly relevant and at most occasionally, never as filler. No emojis, no em dashes, no hashtags, no other @mentions, no jargon, no hype. Output ONLY the cast text or NOTHING.';
   const r = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { Authorization: 'Bearer ' + ORK, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: process.env.OPENROUTER_MODEL || 'anthropic/claude-fable-5', messages: [{ role: 'system', content: sys }, { role: 'user', content: 'Write this hour\'s cast.' }], max_tokens: 220, temperature: 0.85 }), signal: AbortSignal.timeout(45000) });
   const b = await r.json();
   let t = b.choices && b.choices[0] && b.choices[0].message && b.choices[0].message.content;
   if (!t) throw new Error('no draft from model');
-  let out = t.trim().replace(/^["']|["']$/g, '').replace(/@(\w)/g, '$1');
+  let out = t.trim().replace(/^["']|["']$/g, '');
+  // keep allowlisted tags intact, strip every other @ (bot-loop guard)
+  out = out.replace(/@(\w+)/g, (full, name) => (TAGGABLE[name.toLowerCase()] !== undefined ? full : name));
   if (out.length > 280) { out = out.slice(0, 280).replace(/\s+\S*$/, ''); if (!/[.!?]$/.test(out)) out = out.replace(/[\s,;:-]+$/, '') + '.'; }
   return out;
+}
+
+// TAGGING - deliberately narrow. The 2026-06-24 safety patch strips every @ so
+// ZOL can never trigger a bot loop; that guard STAYS for arbitrary handles. Only
+// these vetted, non-bot accounts can be tagged, and a bare "@name" in text does
+// nothing on Farcaster anyway - the protocol needs the fid plus a BYTE offset in
+// mentionsPositions, which is what buildMentions computes.
+const TAGGABLE = { neynar: 6131 };
+
+// Find allowlisted @handles, strip them from the text, and return the protocol
+// mention arrays. Positions are byte offsets into the FINAL text (utf-8), which
+// is what Farcaster expects - not character indexes.
+function buildMentions(text) {
+  const mentions = [];
+  const mentionsPositions = [];
+  let out = '';
+  let rest = text;
+  const re = /@([a-zA-Z0-9_-]+)/;
+  let m;
+  while ((m = re.exec(rest)) !== null) {
+    const handle = m[1].toLowerCase();
+    const before = rest.slice(0, m.index);
+    if (TAGGABLE[handle] !== undefined) {
+      out += before;
+      mentions.push(TAGGABLE[handle]);
+      mentionsPositions.push(Buffer.byteLength(out, 'utf8'));
+    } else {
+      // not allowlisted: keep the word, drop the @ (the original guard)
+      out += before + m[1];
+    }
+    rest = rest.slice(m.index + m[0].length);
+  }
+  out += rest;
+  return { text: out, mentions, mentionsPositions };
 }
 
 async function post(text) {
   const signerHex = JSON.parse(fs.readFileSync(H + '/.openclaw/farcaster-credentials.json', 'utf8')).signerPrivateKey;
   const signer = new NobleEd25519Signer(Buffer.from(signerHex, 'hex'));
-  const add = await makeCastAdd({ text, embeds: [], embedsDeprecated: [], mentions: [], mentionsPositions: [], type: CastType.CAST, parentUrl: 'https://farcaster.xyz/~/channel/zabal' }, { fid: FID, network: FarcasterNetwork.MAINNET }, signer);
+  const tagged = buildMentions(text);
+  const add = await makeCastAdd({ text: tagged.text, embeds: [], embedsDeprecated: [], mentions: tagged.mentions, mentionsPositions: tagged.mentionsPositions, type: CastType.CAST, parentUrl: 'https://farcaster.xyz/~/channel/zabal' }, { fid: FID, network: FarcasterNetwork.MAINNET }, signer);
   if (add.isErr()) throw new Error('makeCastAdd ' + add.error.message);
   const bytes = Message.encode(add.value).finish();
   const res = await fetch(HUB + '/v1/submitMessage', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'x-api-key': NEYNAR_KEY }, body: Buffer.from(bytes) });
