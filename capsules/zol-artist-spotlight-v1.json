@@ -68,7 +68,29 @@
       "secret.value.read",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "artist-spotlight-rotate",
+      "artist-spotlight-draft",
+      "artist-spotlight-stage"
+    ],
+    "allowed_tools": [
+      "farcaster.read",
+      "state.read",
+      "state.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "farcaster.public",
+      "bonfire.recall"
+    ],
+    "disallowed_wallets": [
+      "*"
+    ],
+    "disallowed_signers": [
+      "*"
+    ],
+    "disallowed_environments": []
   },
   "resource_limits": {
     "max_wall_time_ms": 45000,
@@ -85,6 +107,6 @@
   },
   "provenance": {
     "source": "https://github.com/bettercallzaal/zol",
-    "content_hash": "sha256:draft-artist-spotlight-v1"
+    "content_hash": "sha256:95f30e987fafa56c245c1989441686a2b07185d923ae7e3392677d484307e3c3"
   }
 }

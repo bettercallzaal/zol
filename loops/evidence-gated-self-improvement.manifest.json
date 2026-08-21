@@ -132,5 +132,23 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "improvement_proposal_approved",
+    "evidence_threshold_met"
+  ],
+  "exit_conditions": [
+    "improvement_applied_or_staged",
+    "improvement_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

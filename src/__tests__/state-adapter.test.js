@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
-const { createStateStore, AtomicFileStore, SqliteWalStore, BonfireStore, shouldRejectValue } = require('../state-adapter');
+const { createStateStore, AtomicFileStore, SqliteWalStore, BonfireStore, shouldRejectValue, StateStoreInitError } = require('../state-adapter');
 
 // Test both backends: sqlite (if available) and atomic-file
 const BACKENDS_TO_TEST = ['atomic-file'];
@@ -124,15 +124,31 @@ async function testBackend(backendName) {
     }
   });
 
-  test(`${backendName}: secret guard rejects 64-char hex`, async (t) => {
-    const testDir = createTestDir(backendName, 'secrethex');
+  test(`${backendName}: secret guard allows sha256 hashes (evidence, not secrets)`, async (t) => {
+    const testDir = createTestDir(backendName, 'sha256hash');
     try {
       const store = backendName === 'sqlite' ? new SqliteWalStore({ directory: testDir }) : new AtomicFileStore({ directory: testDir });
 
-      const secretKey = 'a'.repeat(64); // 64-char hex
+      const hashValue = 'a'.repeat(64); // valid SHA-256 hex — evidence, not a secret
+      await store.put('receipt-chain', { sha256: hashValue, content_hash: hashValue, commit_hash: hashValue });
+      const retrieved = await store.get('receipt-chain');
+      assert.strictEqual(retrieved.sha256, hashValue, 'SHA-256 evidence hash must survive round-trip');
+
+      if (store.close) store.close();
+    } finally {
+      if (fs.existsSync(testDir)) fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test(`${backendName}: secret guard rejects hex in credential-named fields`, async (t) => {
+    const testDir = createTestDir(backendName, 'credhex');
+    try {
+      const store = backendName === 'sqlite' ? new SqliteWalStore({ directory: testDir }) : new AtomicFileStore({ directory: testDir });
+
+      const hexKey = 'a'.repeat(64);
       try {
-        await store.put('secret', { key: secretKey });
-        assert.fail('Should have rejected 64-char hex value');
+        await store.put('keys', { private_key: hexKey });
+        assert.fail('Should have rejected hex in private_key field');
       } catch (e) {
         assert.match(e.message, /SECURITY.*secret pattern/);
       }
@@ -149,7 +165,7 @@ async function testBackend(backendName) {
       const store = backendName === 'sqlite' ? new SqliteWalStore({ directory: testDir }) : new AtomicFileStore({ directory: testDir });
 
       try {
-        await store.put('openrouter', { key: 'sk-1234567890abcdef' });
+        await store.put('openrouter', { model: 'gpt-4', api_url: 'https://openrouter.ai', _key: 'sk-' + 'x'.repeat(30) });
         assert.fail('Should have rejected sk- prefixed value');
       } catch (e) {
         assert.match(e.message, /SECURITY.*secret pattern/);
@@ -167,7 +183,7 @@ async function testBackend(backendName) {
       const store = backendName === 'sqlite' ? new SqliteWalStore({ directory: testDir }) : new AtomicFileStore({ directory: testDir });
 
       try {
-        await store.put('github', { token: 'ghp_1234567890abcdefghijklmnop' });
+        await store.put('github', { token: 'ghp_' + 'A'.repeat(40) });
         assert.fail('Should have rejected ghp_ token');
       } catch (e) {
         assert.match(e.message, /SECURITY.*secret pattern/);
@@ -179,13 +195,16 @@ async function testBackend(backendName) {
     }
   });
 
-  test(`${backendName}: secret guard allows safe data`, async (t) => {
+  test(`${backendName}: secret guard allows safe data including content hashes`, async (t) => {
     const testDir = createTestDir(backendName, 'safdata');
     try {
       const store = backendName === 'sqlite' ? new SqliteWalStore({ directory: testDir }) : new AtomicFileStore({ directory: testDir });
 
       const safeData = {
-        hashes: ['abc123', 'def456'],
+        sha256: 'a'.repeat(64),
+        content_hash: 'b'.repeat(64),
+        commit_hash: 'c'.repeat(64),
+        idempotency_key: 'd'.repeat(64),
         text: 'This is a normal string',
         numbers: [1, 2, 3],
         nested: { data: 'value' },
@@ -494,18 +513,26 @@ async function testBonfireBackend() {
     }
   });
 
-  test('bonfire: secret guard rejects 64-char hex', async (t) => {
+  test('bonfire: secret guard allows sha256 hashes (evidence)', async (t) => {
     setupMockBonfireAPI();
     try {
-      const store = new BonfireStore({
-        apiKey: 'test-key',
-        bonfireId: 'test-id',
-      });
+      const store = new BonfireStore({ apiKey: 'test-key', bonfireId: 'test-id' });
+      const hashValue = 'a'.repeat(64);
+      await store.put('receipt', { sha256: hashValue, content_hash: hashValue });
+      const retrieved = await store.get('receipt');
+      assert.strictEqual(retrieved.sha256, hashValue, 'SHA-256 hash must survive round-trip');
+    } finally {
+      teardownMockBonfireAPI();
+    }
+  });
 
-      const secretKey = 'a'.repeat(64);
+  test('bonfire: secret guard rejects hex in credential-named fields', async (t) => {
+    setupMockBonfireAPI();
+    try {
+      const store = new BonfireStore({ apiKey: 'test-key', bonfireId: 'test-id' });
       try {
-        await store.put('secret', { key: secretKey });
-        assert.fail('Should have rejected 64-char hex');
+        await store.put('keys', { private_key: 'a'.repeat(64) });
+        assert.fail('Should have rejected hex in private_key field');
       } catch (e) {
         assert.match(e.message, /SECURITY.*secret pattern/);
       }
@@ -517,13 +544,9 @@ async function testBonfireBackend() {
   test('bonfire: secret guard rejects sk- keys', async (t) => {
     setupMockBonfireAPI();
     try {
-      const store = new BonfireStore({
-        apiKey: 'test-key',
-        bonfireId: 'test-id',
-      });
-
+      const store = new BonfireStore({ apiKey: 'test-key', bonfireId: 'test-id' });
       try {
-        await store.put('secret', { key: 'sk-1234567890abcdef' });
+        await store.put('secret', { _key: 'sk-' + 'x'.repeat(30) });
         assert.fail('Should have rejected sk- key');
       } catch (e) {
         assert.match(e.message, /SECURITY.*secret pattern/);
@@ -536,13 +559,9 @@ async function testBonfireBackend() {
   test('bonfire: secret guard rejects ghp_ tokens', async (t) => {
     setupMockBonfireAPI();
     try {
-      const store = new BonfireStore({
-        apiKey: 'test-key',
-        bonfireId: 'test-id',
-      });
-
+      const store = new BonfireStore({ apiKey: 'test-key', bonfireId: 'test-id' });
       try {
-        await store.put('secret', { token: 'ghp_1234567890abcdefghijklmnop' });
+        await store.put('secret', { token: 'ghp_' + 'A'.repeat(40) });
         assert.fail('Should have rejected ghp_ token');
       } catch (e) {
         assert.match(e.message, /SECURITY.*secret pattern/);
@@ -608,20 +627,35 @@ async function testBonfireBackend() {
     }
   });
 
-  test('bonfire: falls back to atomic-file on missing credentials', async (t) => {
+  test('bonfire: createStateStore fails closed on missing credentials (no silent fallback)', async (t) => {
     try {
       process.env.ZOL_STATE_BACKEND = 'bonfire';
       delete process.env.BONFIRE_API_KEY;
       delete process.env.BONFIRE_ID;
 
-      const store = await createStateStore();
-      assert.strictEqual(store.name, 'atomic-file');
-
-      delete process.env.ZOL_STATE_BACKEND;
-    } finally {
-      if (fs.existsSync(path.join(process.env.HOME || '/root', 'zol', 'state'))) {
-        fs.rmSync(path.join(process.env.HOME || '/root', 'zol', 'state'), { recursive: true, force: true });
+      try {
+        await createStateStore();
+        assert.fail('Should have thrown StateStoreInitError');
+      } catch (e) {
+        assert.strictEqual(e.code, 'STATE_STORE_INIT_FAILED', 'must throw StateStoreInitError');
+        assert.strictEqual(e.backend, 'bonfire');
       }
+    } finally {
+      delete process.env.ZOL_STATE_BACKEND;
+    }
+  });
+
+  test('bonfire: createStateStore accepts options object', async (t) => {
+    setupMockBonfireAPI();
+    try {
+      process.env.BONFIRE_API_KEY = 'test-key';
+      process.env.BONFIRE_ID = 'test-id';
+      const store = await createStateStore({ backend: 'bonfire' });
+      assert.strictEqual(store.name, 'bonfire');
+    } finally {
+      delete process.env.BONFIRE_API_KEY;
+      delete process.env.BONFIRE_ID;
+      teardownMockBonfireAPI();
     }
   });
 }

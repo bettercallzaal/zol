@@ -1,0 +1,146 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "sync-trapper-v1",
+  "title": "Sync Trapper",
+  "version": "1.0.0",
+  "status": "rehearsed",
+  "owner": "zolbot",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "periodically during active Warper assignment",
+  "inputs": [
+    "current trapper state",
+    "Warper assignment reference",
+    "sync interval timestamp"
+  ],
+  "context_sources": [
+    "trapper state store",
+    "Warper assignment record",
+    "sync progress log"
+  ],
+  "allowed_actions": [
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write",
+    "warper.trapper.sync"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "active Warper assignment exists",
+    "trapper state is consistent",
+    "sync completed without conflict",
+    "state write succeeded"
+  ],
+  "evidence_outputs": [
+    "sync progress snapshot",
+    "trapper state delta",
+    "sync timestamp"
+  ],
+  "receipt_outputs": [
+    "sync-trapper receipt"
+  ],
+  "knowledge_state_outputs": [
+    "trapper progress synced",
+    "sync state updated"
+  ],
+  "execution_trace_outputs": [
+    "sync-trapper execution trace"
+  ],
+  "memory_routes": [
+    "episodic: sync events log",
+    "transient: last-sync state (rolling)"
+  ],
+  "cooldown": "3600s",
+  "failure_modes": [
+    "budget exceeded",
+    "timeout",
+    "state corruption",
+    "handler error"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-16",
+  "limits": {
+    "max_wall_time_ms": 60000,
+    "max_steps": 6,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "read-trapper-state",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {
+        "stateKey": "trapper-state",
+        "requireActive": true
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "sync-progress",
+      "handler": "warper.trapper.sync",
+      "permission": "warper.trapper.sync",
+      "with": {
+        "syncTarget": "warper-keeper",
+        "includeProgress": true
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "write-state",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {
+        "stateKey": "trapper-state",
+        "updateType": "sync-progress"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-receipt",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {
+        "receiptType": "sync-trapper"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "trapper_sync_triggered",
+    "trapper_state_accessible"
+  ],
+  "exit_conditions": [
+    "trapper_state_synced",
+    "sync_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
+  ]
+}
