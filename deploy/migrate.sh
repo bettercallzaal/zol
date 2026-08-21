@@ -140,7 +140,7 @@ systemctl daemon-reload
 # parity with the current manual/cron-based behavior. You can enable features
 # later by setting environment variables in the .zao/private/zol.env file.
 
-for service in zol-daily zol-reply zol-calendar; do
+for service in zol-daily zol-reply zol-calendar zol-weekly-loops; do
   log_info "  Enabling $service..."
   systemctl enable "${service}.service" || systemctl enable "${service}.timer"
 done
@@ -149,6 +149,7 @@ log_info ""
 log_info "  Starting timers..."
 systemctl start zol-daily.timer
 systemctl start zol-calendar.timer
+systemctl start zol-weekly-loops.timer
 
 log_info "  Starting reply daemon..."
 systemctl start zol-reply.service
@@ -162,6 +163,7 @@ log_info "Step 6: Verifying services..."
 echo ""
 systemctl status zol-daily.timer || log_warn "zol-daily.timer status check failed"
 systemctl status zol-calendar.timer || log_warn "zol-calendar.timer status check failed"
+systemctl status zol-weekly-loops.timer || log_warn "zol-weekly-loops.timer status check failed"
 systemctl status zol-reply.service || log_warn "zol-reply.service status check failed"
 
 echo ""
@@ -173,7 +175,7 @@ log_info "  2. Check timer status: systemctl list-timers --all"
 log_info "  3. View drafts via dashboard: http://ansuz:8088 (over Tailscale)"
 log_info ""
 log_info "To rollback to manual operation:"
-log_info "  1. Stop the services: sudo systemctl stop zol-daily.timer zol-calendar.timer zol-reply.service"
-log_info "  2. Disable the services: sudo systemctl disable zol-daily.timer zol-calendar.timer zol-reply.service"
+log_info "  1. Stop the services: sudo systemctl stop zol-daily.timer zol-calendar.timer zol-weekly-loops.timer zol-reply.service"
+log_info "  2. Disable the services: sudo systemctl disable zol-daily.timer zol-calendar.timer zol-weekly-loops.timer zol-reply.service"
 log_info "  3. Re-enable your previous cron entries or manual startup scripts"
 log_info ""
