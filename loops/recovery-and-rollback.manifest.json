@@ -3,7 +3,7 @@
   "loop_id": "recovery-and-rollback-v1",
   "title": "Recovery and Rollback",
   "version": "1.0.0",
-  "status": "rehearsed",
+  "status": "active",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"
@@ -105,5 +105,23 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "production-ready",
+  "entry_conditions": [
+    "failure_detected",
+    "rollback_candidate_exists"
+  ],
+  "exit_conditions": [
+    "rollback_complete_or_skipped",
+    "recovery_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 2,
+    "backoff_ms": 2000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

@@ -3,7 +3,7 @@
   "loop_id": "bootstrap-agent-state-v1",
   "title": "Bootstrap Agent State",
   "version": "1.0.0",
-  "status": "rehearsed",
+  "status": "active",
   "owner": "zol-curator-v1",
   "stewards": [
     "zaal"
@@ -123,5 +123,22 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "production-ready",
+  "entry_conditions": [
+    "agent_cold_start"
+  ],
+  "exit_conditions": [
+    "state_initialized",
+    "bootstrap_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

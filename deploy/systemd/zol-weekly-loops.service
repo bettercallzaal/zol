@@ -1,0 +1,26 @@
+[Unit]
+Description=ZOL Weekly DreamLoops (weekly-curator, artist-spotlight)
+Documentation=https://github.com/bettercallzaal/zol
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=zaal
+Group=zaal
+WorkingDirectory=/home/zaal/zol
+EnvironmentFile=/home/zaal/.zao/private/zol.env
+Environment="HOME=/home/zaal"
+Environment="NODE_ENV=production"
+
+# Self-gates on DREAMLOOPS_ENABLED + WEEKLY_CURATOR_ENABLED/ARTIST_SPOTLIGHT_ENABLED
+# (all unset/off by default in zol.env) - safe to always enable this unit,
+# it exits immediately with no side effects until those flags are set.
+ExecStart=/usr/bin/node scripts/dl-run-weekly.js
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zol-weekly-loops
+
+[Install]
+WantedBy=multi-user.target

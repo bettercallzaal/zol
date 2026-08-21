@@ -1,0 +1,157 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "morning-brief-with-board-v1",
+  "title": "Morning Brief with Board (ZOL data layer for ZOE)",
+  "version": "1.0.0",
+  "status": "active",
+  "owner": "zolbot",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "daily at 06:30",
+  "cooldown": "43200s",
+  "description": "Produces a structured morning-brief artifact: board top-10 unblocked tasks (AI-ranked by priority+age), WAITING-ON-YOU items, budget snapshot, and episodic memory summary. The artifact is available via AgentGateway /artifacts for ZOE or any consumer to render. This is the ZOL data layer for the ZOE morning-brief upgrade (AI-ranked queue + WAITING-ON-YOU lane).",
+  "allowed_actions": [
+    "artifact.local.write",
+    "board.task.list-open",
+    "board.triage.run",
+    "budget.read",
+    "memory.read",
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write"
+  ],
+  "blocked_actions": [
+    "board.task.create",
+    "cloud.mutate",
+    "deployment.production.write",
+    "farcaster.post",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "failure_modes": [
+    "board API unreachable (brief proceeds with board section empty)",
+    "memory read timeout",
+    "artifact write failure",
+    "budget read failure"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-17",
+  "limits": {
+    "max_wall_time_ms": 90000,
+    "max_steps": 8,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "run-board-triage",
+      "handler": "board.triage.run",
+      "permission": "board.triage.run",
+      "with": { "topN": 10 },
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "list-open-tasks",
+      "handler": "board.task.list-open",
+      "permission": "board.task.list-open",
+      "with": { "limit": 50, "normalize": true },
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "read-budget",
+      "handler": "budget.read",
+      "permission": "budget.read",
+      "with": {},
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "read-memory-summary",
+      "handler": "memory.read",
+      "permission": "memory.read",
+      "with": { "query": "recent episodic summary", "limit": 5 },
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "write-brief-artifact",
+      "handler": "artifact.local.write",
+      "permission": "artifact.local.write",
+      "with": {
+        "type": "morning-brief",
+        "title": "Morning Brief",
+        "sections": ["board-top10", "waiting-on-you", "budget", "memory-summary"]
+      },
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "write-brief-state",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {},
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "record-brief-receipt",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {},
+      "retry": { "max_attempts": 2 }
+    }
+  ],
+  "lifecycle_state": "production-ready",
+  "entry_conditions": [
+    "agent_running",
+    "state_readable"
+  ],
+  "exit_conditions": [
+    "brief_artifact_written",
+    "receipt_recorded"
+  ],
+  "retry_limits": {
+    "max_retries": 2,
+    "backoff_ms": 3000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "continue_partial"
+  ],
+  "inputs": [
+    "current date",
+    "operator priority override (optional)"
+  ],
+  "context_sources": [
+    "cowork_board",
+    "episodic_memory",
+    "budget_records",
+    "local_state"
+  ],
+  "checks": [
+    "state_readable",
+    "artifact_store_writable"
+  ],
+  "evidence_outputs": [
+    "board_top10",
+    "waiting_on_you_list",
+    "budget_snapshot",
+    "memory_summary"
+  ],
+  "receipt_outputs": [
+    "morning-brief-with-board.receipt.json"
+  ],
+  "knowledge_state_outputs": [
+    "morning-brief.artifact",
+    "brief.last_generated"
+  ],
+  "execution_trace_outputs": [
+    "morning-brief-with-board.trace.json"
+  ],
+  "memory_routes": [
+    "brief.last_generated -> state.local"
+  ]
+}

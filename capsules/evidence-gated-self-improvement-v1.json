@@ -39,6 +39,30 @@
       "self.modify.live",
       "signer.change",
       "wallet.sign"
+    ],
+    "allowed_loops": [
+      "capability-gap-analysis",
+      "improvement-proposal",
+      "evidence-gated-self-improvement",
+      "curiosity-scan"
+    ],
+    "allowed_tools": [
+      "state.read",
+      "state.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "proposal.local",
+      "source.public"
+    ],
+    "disallowed_wallets": [
+      "*"
+    ],
+    "disallowed_signers": [
+      "*"
+    ],
+    "disallowed_environments": [
+      "production"
     ]
   },
   "resource_limits": {
@@ -52,6 +76,6 @@
   },
   "provenance": {
     "source": "https://github.com/BrandonDucar/dreamloops",
-    "content_hash": "sha256:9f3e9baa466ccf6d7d0bce10dad645e46a6079aa857da8fcab20ff89df7fd218"
+    "content_hash": "sha256:c1a577d1cdefa6c7d6509a0fabd35857833e6e580add33fdd4b2c094a9e95754"
   }
 }

@@ -167,5 +167,22 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "communication_intent_detected",
+    "draft_ready"
+  ],
+  "exit_conditions": [
+    "communication_approved OR communication_denied"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 3000
+  },
+  "escalation_rules": [
+    "deny:action",
+    "notify:owner",
+    "log:error"
   ]
 }
