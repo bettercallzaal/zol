@@ -1,0 +1,159 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/bettercallzaal/zol/docs/fleet-standard/schemas/receipt.schema.json",
+  "title": "ZOL ReceiptJournal Receipt Record",
+  "description": "JSON Schema for a ZOL ReceiptJournal receipt record. DRAFT — Fleet Standard v0.1. Every consequential action must produce one of these records. The sha256 field is an integrity hash, NOT a secret — do not redact it.",
+  "version": "0.1.0",
+  "type": "object",
+  "required": [
+    "receiptId",
+    "loopId",
+    "runId",
+    "agentId",
+    "action",
+    "status",
+    "sha256",
+    "previousReceiptId",
+    "previousReceiptHash",
+    "evidence",
+    "createdAt"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "receiptId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique receipt identifier. Format: UUID v4 or 'rcpt-<sha256-prefix>'. NOT a secret."
+    },
+    "loopId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The DreamLoop ID or loop session name that produced this action (e.g., 'bootstrap-agent-state-v1')."
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for the execution run that produced this receipt. Format: UUID v4."
+    },
+    "agentId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Agent identity (e.g., 'zolbot'). Never a private key or token."
+    },
+    "action": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Action string from the authority matrix (e.g., 'farcaster.reply', 'receipt.local.write')."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "failure", "pending"],
+      "description": "Outcome of the action at the time this receipt was written."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "SHA-256 hash of this receipt's canonical content (sha256:<64-hex>). Computed over all fields except this one. NOT a secret — an integrity check value. The value 'sha256:[REDACTED]' is INVALID and must be rejected."
+    },
+    "previousReceiptId": {
+      "type": ["string", "null"],
+      "description": "Receipt ID of the preceding receipt in the chain, or null for the genesis receipt of a run."
+    },
+    "previousReceiptHash": {
+      "type": ["string", "null"],
+      "pattern": "^(sha256:[0-9a-f]{64}|null)$",
+      "description": "SHA-256 hash of the previous receipt record, or null for genesis. Used for chain verification. NOT a secret."
+    },
+    "evidence": {
+      "type": "object",
+      "description": "Structured evidence for this action. Must NOT contain raw prompt text, LLM completions, memory entries, or secret values. Contains only hashes, counts, status labels, and metadata.",
+      "properties": {
+        "directive": {
+          "type": "string",
+          "description": "Directive file path or version hash."
+        },
+        "task": {
+          "type": "string",
+          "description": "Associated task packet ID."
+        },
+        "inputs_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "SHA-256 of normalized inputs. NOT a secret."
+        },
+        "outputs_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "SHA-256 of normalized outputs. NOT a secret."
+        },
+        "approval": {
+          "type": ["string", "null"],
+          "description": "ApprovalBridge capability ID that authorized this action, or null if approval was not required."
+        },
+        "model_calls": {
+          "type": "array",
+          "description": "Categorical summary of model calls. No prompt text or completions.",
+          "items": {
+            "type": "object",
+            "required": ["provider", "model"],
+            "properties": {
+              "provider": { "type": "string" },
+              "model": { "type": "string" },
+              "tokens_in": { "type": "integer", "minimum": 0 },
+              "tokens_out": { "type": "integer", "minimum": 0 },
+              "status": { "type": "string", "enum": ["success", "failure", "fallback"] }
+            },
+            "additionalProperties": false
+          }
+        },
+        "tool_calls": {
+          "type": "array",
+          "description": "Categorical summary of tool calls. No raw inputs/outputs.",
+          "items": {
+            "type": "object",
+            "required": ["tool", "status"],
+            "properties": {
+              "tool": { "type": "string" },
+              "status": { "type": "string", "enum": ["success", "failure", "denied"] },
+              "permission": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of receipt creation."
+    },
+    "taskId": {
+      "type": "string",
+      "description": "Associated WorkRouter task packet ID. Optional but recommended for consequential actions."
+    },
+    "attemptId": {
+      "type": "string",
+      "description": "Task attempt identifier (for lease binding). Must match the task lease's attemptId."
+    },
+    "fencingEpoch": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Supervisor fencing epoch at the time this action was taken. Used to detect stale-epoch actions."
+    },
+    "approvalId": {
+      "type": "string",
+      "description": "ApprovalBridge capability ID that was consumed to authorize this action."
+    },
+    "actorDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "SHA-256 of the normalized actor identity. NOT a secret."
+    },
+    "actionDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "SHA-256 of the normalized action string + inputs. NOT a secret."
+    }
+  }
+}
