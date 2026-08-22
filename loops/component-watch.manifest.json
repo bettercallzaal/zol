@@ -37,7 +37,7 @@
     "handler error"
   ],
   "promotion_path": "rehearsed -> active_local -> live_guarded",
-  "last_reviewed": "2026-07-28",
+  "last_reviewed": "2026-08-22",
   "limits": {
     "max_wall_time_ms": 60000,
     "max_steps": 6,
@@ -124,8 +124,8 @@
       "on_detect": "open improvement-proposal to revisit launch-rail.decision for v5 split mechanics",
       "priority": "high",
       "source_doc": "1094b",
-      "last_checked": "2026-07-28",
-      "last_checked_result": "NOT triggered — latest tag confirmed v4.2.18 (2026-07-08) via GitHub API; no v5.x tag exists and no newer release since cycle 2 check."
+      "last_checked": "2026-08-22",
+      "last_checked_result": "NOT triggered — latest tag remains v4.2.18 (2026-07-08) via GitHub API; no v5.x tag exists and no new releases since cycle 3 check (2026-07-28)."
     },
     {
       "id": "fractally-community-directory",
@@ -134,18 +134,18 @@
       "on_detect": "surface to Zaal to submit ZAO listing (only active fractal DAO on Optimism)",
       "priority": "medium",
       "source_doc": "1208",
-      "last_checked": "2026-07-28",
-      "last_checked_result": "NOT triggered — fractally.com remains a marketing site with whitepaper, blog, and team pages only; no DAO directory or community listing feature has appeared."
+      "last_checked": "2026-08-22",
+      "last_checked_result": "NOT triggered — fractally.com is unchanged: marketing site with whitepaper, blog, team pages, press kit, and newsletter. No DAO directory or community listing feature."
     },
     {
       "id": "optimism-atlas-retro-funding",
       "url": "https://atlas.optimism.io/missions",
-      "check": "new Season 10+ Retro Funding round open for applications (S7 closed Jul 2025, S8 closed Jul 2025, S9 concluded 2026-07-11)",
-      "on_detect": "surface to Zaal with reference to docs/zol-bankr-risk-model-v1.md and draft new application based on doc 1209 template",
-      "priority": "high",
+      "check": "new Season 10+ Retro Funding round open for applications",
+      "on_detect": "WATCH TARGET INVALIDATED (2026-08-22): Optimism announced in Jan 2026 that Retro Funding is paused for at least 12 months. No Season 10 is planned. If/when program resumes, surface to Zaal with docs/zol-bankr-risk-model-v1.md and doc 1209 application template.",
+      "priority": "low",
       "source_doc": "1209",
-      "last_checked": "2026-07-28",
-      "last_checked_result": "NOT triggered — atlas.optimism.io/missions is JS-rendered and returned no mission list; gov.optimism.io retro-funding forum shows no Season 10 announcement; S9 concluded status from cycle 2 (2026-07-11) stands."
+      "last_checked": "2026-08-22",
+      "last_checked_result": "WATCH TARGET INVALIDATED — Optimism Retro Funding program paused for 12+ months as of January 2026. Program is being reevaluated for long-term strategy fit; no Season 10 or new rounds in 2026. Target demoted to low priority; retain to monitor for program resumption announcement."
     },
     {
       "id": "zabal-api-new-endpoints",
@@ -154,8 +154,8 @@
       "on_detect": "open improvement-proposal to add specific new endpoint prefixes to the api.read.external ALLOWED_PREFIXES list in src/handlers/index.js",
       "priority": "low",
       "source_doc": "cycle3-capability-gap-wiring",
-      "last_checked": "2026-07-28",
-      "last_checked_result": "NOT triggered — zabalgamez.com still contains no developer API docs or endpoints; data/graph/research links remain public informational pages; site character unchanged from cycle 2."
+      "last_checked": "2026-08-22",
+      "last_checked_result": "NOT triggered — zabalgamez.com still has no developer API docs or programmatic endpoints. Data section has Farcaster Batches, ZAO Graph, and Research links but all are public informational pages, not APIs. Site character unchanged from cycle 3."
     }
   ],
   "checks": [
@@ -179,5 +179,12 @@
     "triggered_count": 0,
     "triggered_targets": [],
     "notes": "Cycle 3 check — all 4 targets remain NOT triggered. Clanker still at v4.2.18 (confirmed via GitHub API). Fractally still marketing-only. Optimism S10 not announced (S9 concluded 2026-07-11, atlas.optimism.io JS-rendered). ZABAL still no developer API docs."
+  },
+  "gap_report_cycle4": {
+    "date": "2026-08-22",
+    "targets_checked": 4,
+    "triggered_count": 1,
+    "triggered_targets": ["optimism-atlas-retro-funding"],
+    "notes": "Cycle 4 check (2026-08-22, 25 days since cycle 3). Clanker still v4.2.18 (no v5). Fractally still marketing-only. ZABAL still no developer API. SIGNIFICANT CHANGE: Optimism Retro Funding program PAUSED for 12+ months (announced January 2026) — S10 is not planned; watch target invalidated and demoted to low priority. Retain to monitor for resumption announcement. No code changes required from any target."
   }
 }
