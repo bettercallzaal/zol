@@ -73,7 +73,7 @@
     "handler error"
   ],
   "promotion_path": "rehearsed -> active_local -> live_guarded",
-  "last_reviewed": "2026-07-29",
+  "last_reviewed": "2026-08-22",
   "limits": {
     "max_wall_time_ms": 60000,
     "max_steps": 6,
@@ -144,6 +144,90 @@
     "log:error",
     "halt"
   ],
+  "scan_results_cycle5": {
+    "cycle": 5,
+    "date": "2026-08-22",
+    "scan_sources_covered": [
+      "zol-internal:test-health",
+      "zol-internal:pr-state",
+      "board:engineering-tasks",
+      "board:zol-tagged-tasks",
+      "board:research-docs",
+      "board:social-stream",
+      "component-watch:cycle4-results"
+    ],
+    "findings": [
+      {
+        "id": "health-nominal",
+        "category": "zol-internal",
+        "signal": "ZOL test suite: 557/557 pass (78 suites), 0 fail. dl:validate clean (23 capsules + 72 loops). Secret-scan clean.",
+        "assessment": "GREEN — no action required",
+        "actionable": false
+      },
+      {
+        "id": "pr-train-advancing",
+        "category": "zol-internal",
+        "signal": "3 PRs merged since cycle 4 (2026-07-29): PR #26 (ws/v2-core-layers, merged 2026-08-21 — v2 Layers 1-2, 5-8, 11 now on main), PR #41 (ws/v2-ci, merged 2026-08-21 — GitHub Actions CI live), PR #70 (merged 2026-08-15 — feat: ask real questions + tag @neynar properly). PRs #27-#39 were CLOSED but their content landed on main as direct commits. 21 open PRs remain (#43-#69 stack + standalones).",
+        "assessment": "MILESTONE — v2 core layers now on main. CI is live. Farcaster mention quality improved (#70). Merge train advancing. Downstream stack (#43-#69) still human-gated but base merged.",
+        "actionable": false
+      },
+      {
+        "id": "mention-listening-signal",
+        "category": "board:zol-tagged-tasks",
+        "signal": "Board task #9068 (todo): 'ZOL: add mention-listening (Neynar webhook POST /v2/bot/mentions -> fetch convo -> reply).' New ZOL capability request. Neynar already in the api.read.external allowlist (api.neynar.com). Adding a POST webhook endpoint would let ZOL respond to @mentions automatically.",
+        "assessment": "NEW SIGNAL — concrete ZOL code feature request. Neynar webhook listener + reply loop. Requires Zaal design decision: authentication model, reply gate (Telegram approval?), rate-limit strategy. Queued as improvement proposal.",
+        "actionable": true,
+        "triggered_proposal": "mention-listening-neynar-webhook",
+        "board_task": "4d2e600e"
+      },
+      {
+        "id": "revive-zol-epic",
+        "category": "board:zol-tagged-tasks",
+        "signal": "Board task #9379 (todo): 'Revive ZOL: loops + DreamLoops + cleanup (epic).' No notes. Appears to be a high-level operational task signaling Zaal wants to activate ZOL loops, likely after PR #26 merged to main.",
+        "assessment": "OPERATIONAL SIGNAL — Pi activation epic. With v2 core now on main (#26 merged 2026-08-21), Pi cutover may be closer. See docs/pi-activation-runbook-v1.md. No code change needed; Zaal-gated.",
+        "actionable": false
+      },
+      {
+        "id": "farcaster-agent-talk-signal",
+        "category": "board:zol-tagged-tasks",
+        "signal": "Board task #9060 (todo): 'Upgrade ZOL to talk to other Farcaster AI agents.' No notes beyond the title.",
+        "assessment": "WEAK SIGNAL — no design detail. Related to mention-listening proposal (#9068). Too sparse to action now; captured for future curiosity-scan.",
+        "actionable": false
+      },
+      {
+        "id": "research-docs-above-2105",
+        "category": "board:research-docs",
+        "signal": "15+ new research docs above doc 2105 (docs 2308–2365 range visible). Metawall has routed all doc-review tasks to human (Zaal batch read). Key ZOL-adjacent docs: doc 2313 (Farcaster auth primitives for Sparkz — metawall: human), doc 2321 (WaveWarZ Base platform handoff — metawall: human, informs receipt proposal), doc 2356 (WaveWarZ clip bounty pre-launch grounding — metawall: human, informs receipt proposal). All have status=todo and route=human.",
+        "assessment": "ALL HUMAN-GATED — metawall correctly routes doc reviews to Zaal. Docs 2321+2356 provide WaveWarZ context for pending receipt proposal (PR #65). No ZOL code signal from this batch.",
+        "actionable": false
+      },
+      {
+        "id": "optimism-retro-paused",
+        "category": "component-watch:cycle4-results",
+        "signal": "Optimism Retro Funding program paused for 12+ months (announced Jan 2026). No Season 10 planned. component-watch cycle 4 watch target invalidated and demoted to low priority.",
+        "assessment": "CONFIRMED from component-watch cycle 4 — no ZOL code action required. Watch target retained to monitor for program resumption.",
+        "actionable": false
+      },
+      {
+        "id": "directive-file-location",
+        "category": "zol-internal",
+        "signal": "zol-directive.md is at /home/zaal/zol-directive.md (not /home/zaal/zol-upgrade/zol-directive.md as loop-agent.sh expects). The loop-agent.sh invocation passes the wrong path; the file exists at the home directory level.",
+        "assessment": "OPERATIONAL NOTE — loop script path mismatch. No ZOL code action; operator config issue.",
+        "actionable": false
+      }
+    ],
+    "new_signals_count": 1,
+    "triggered_improvement_proposals": ["mention-listening-neynar-webhook"],
+    "scan_receipt": {
+      "receipt_type": "curiosity-scan",
+      "cycle": 5,
+      "status": "complete",
+      "outcome": "1_new_signal",
+      "note": "Board task #9068 (mention-listening via Neynar webhook) is the new ZOL code signal. 3 PRs merged (#26/#41/#70) — v2 core on main, CI live, Farcaster quality improved. Optimism Retro Funding paused (from component-watch cycle 4). 15+ new research docs all metawall-routed to Zaal. Revive ZOL epic (#9379) is a Pi activation signal, not a code change.",
+      "board_task": "2e34e576",
+      "next_scan_due": "2026-08-29"
+    }
+  },
   "scan_results_cycle4": {
     "cycle": 4,
     "date": "2026-07-29",
