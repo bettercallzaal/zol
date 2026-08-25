@@ -67,6 +67,29 @@ function validateDraft(draft) {
   return { valid: issues.length === 0, issues };
 }
 
+
+// Read what the ZAO board says was actually finished, and shape it like an
+// episode so the existing parser/scorer needs no change.
+//
+// Best-effort by design: the board being unreachable must not crash the morning
+// loop. It returns [] and the caller reports `cowork-board-empty`, which is
+// honest - "I found nothing" and "I could not look" are both zero wins, and the
+// distinction is carried in the error log rather than by inventing data.
+async function loadBoardWins(sinceDays) {
+  try {
+    const { getTracker } = require('../cowork-tracker');
+    const res = await getTracker().listRecentlyDone(sinceDays, 25);
+    if (!res.ok || !Array.isArray(res.rows)) return [];
+    return res.rows.map((r) => ({
+      name: r.project ? `board:${r.project}` : 'board',
+      content: r.title || '',
+      created_at: r.completed_at || new Date().toISOString(),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 const MOCK_EPISODES = [
   { name: 'zaal-note', content: 'Shipped WaveWarZ v2 on mainnet with the community.', created_at: new Date().toISOString() },
   { name: 'zol-discover', content: 'COC Concertz #7 pilot ran successfully last night.', created_at: new Date().toISOString() },
@@ -76,11 +99,42 @@ const handlers = {
 
   'community.wins.spot': async function({ input, state, signal }) {
     try {
-      const episodes = (input && Array.isArray(input.episodes) && input.episodes.length > 0)
-        ? input.episodes
-        : (state?.executionMode === 'mock' || !process.env.BONFIRE_API_KEY)
-          ? MOCK_EPISODES
-          : MOCK_EPISODES;
+      // SOURCE ORDER, and why it is not a ternary any more.
+      //
+      // Until 2026-08-25 this read:
+      //     : (state?.executionMode === 'mock' || !process.env.BONFIRE_API_KEY)
+      //         ? MOCK_EPISODES
+      //         : MOCK_EPISODES;
+      //
+      // BOTH ARMS RETURNED THE MOCKS. So the community-wins-spotlight-v1 loop -
+      // which is `status: active` and fires daily at 06:30 - has been drafting a
+      // celebration cast about the same two invented wins every morning, and
+      // asking Zaal to approve posting them. The condition looked like it
+      // selected a source and never did.
+      //
+      // Now: real finished work first, mocks only when explicitly asked for.
+      let episodes;
+      let source;
+      if (input && Array.isArray(input.episodes) && input.episodes.length > 0) {
+        episodes = input.episodes;
+        source = 'input';
+      } else if (state?.executionMode === 'mock') {
+        episodes = MOCK_EPISODES;
+        source = 'mock';
+      } else {
+        const board = await loadBoardWins(input?.sinceDays ?? 1);
+        if (board.length > 0) {
+          episodes = board;
+          source = 'cowork-board';
+        } else {
+          // Nothing finished in the window is a REAL answer, and it must not be
+          // dressed up as two fake wins. An empty list yields winsFound: 0, the
+          // draft step is skipped by its own conditional, and no approval
+          // request goes out. A quiet morning should be quiet.
+          episodes = [];
+          source = 'cowork-board-empty';
+        }
+      }
 
       const wins = episodes
         .map(parseWinEpisode)
@@ -99,12 +153,15 @@ const handlers = {
         patterns: patterns.patterns,
         draft,
         validation,
-        bonfireMode: process.env.BONFIRE_API_KEY ? 'available' : 'mock',
+        // `source` names what was ACTUALLY read. The old `bonfireMode` field
+        // reported 'available' whenever BONFIRE_API_KEY was set while the data
+        // was mock either way - a status field that lied about its own input.
+        source,
         timestamp: new Date().toISOString(),
       };
     } catch (err) {
       if (signal?.aborted) throw new Error('community.wins.spot timed out');
-      return { ok: false, error: err.message, winsFound: 0, wins: [], patterns: [], draft: '', timestamp: new Date().toISOString() };
+      return { ok: false, error: err.message, winsFound: 0, wins: [], patterns: [], draft: '', source: 'error', timestamp: new Date().toISOString() };
     }
   },
 };

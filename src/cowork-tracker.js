@@ -63,6 +63,26 @@ class CoworkTracker {
     return { ok: true, row: resp.data[0] || null };
   }
 
+  // Fetch tasks FINISHED in the last `days` days, newest first.
+  //
+  // Added 2026-08-25 so the wins spotter can celebrate work that actually
+  // happened. Until now its only source was two hardcoded mock episodes, so the
+  // active 6:30am loop offered the same two invented wins every morning.
+  //
+  // `completed_at` is the field the board stamps on close, so it is the honest
+  // "when was this finished" column - `updated_at` moves on any edit.
+  async listRecentlyDone(days = 1, limit = 25) {
+    const since = new Date(Date.now() - days * 86400_000).toISOString();
+    const resp = await this._req(
+      'GET',
+      `/rest/v1/tasks?status=eq.done&completed_at=gte.${encodeURIComponent(since)}` +
+        `&order=completed_at.desc&limit=${limit}` +
+        `&select=id,title,notes,project,completed_at,metadata`,
+    );
+    if (!resp.ok) return { ok: false, error: resp.error, rows: [] };
+    return { ok: true, rows: resp.data };
+  }
+
   // Fetch all open (non-done) tasks, ordered by priority then creation date.
   // Returns up to `limit` rows (default 100).
   // When normalize:true, rows are mapped to the standard CoworkTask shape.
