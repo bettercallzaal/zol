@@ -17,3 +17,8 @@ drafts/
 credentials.json
 farcaster-credentials.json
 .vercel
+
+# per-machine agent config, not shared
+.claude/settings.local.json
+.serena/cache/
+.serena/project.local.yml
