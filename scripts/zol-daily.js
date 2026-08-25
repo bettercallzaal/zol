@@ -84,10 +84,28 @@ async function draft(ctx, recent) {
     ? '\n\nRECENTLY POSTED (you already said these - do NOT repeat the same artist, angle, or fact; write about something DIFFERENT and fresh, or output NOTHING):\n' + recent.map((r) => '- ' + r.text).join('\n')
     : '';
   const sys = persona + '\n\nReal ZAO context from the Bonfire graph (use ONLY facts in here, do not invent):\n' + ctx + recentBlock + '\n\nYou are ZOL, a MUSIC CURATOR. Write ONE original cast in your lane: a song-of-the-day, an artist spotlight, or a concrete note about a specific ZAO / COC Concertz / WaveWarZ artist or track. RULES: name a SPECIFIC artist, track, or event from the context above. Be concrete, not abstract. Do NOT write vague aphorisms about curation, data, or visibility. Do NOT repeat anything from RECENTLY POSTED above - it must be a fresh topic or angle. Do NOT force it - if the context has nothing specific, real, AND new worth posting, output exactly the word NOTHING. Max 280 characters, and always end on a complete sentence (never cut off mid-word). No emojis, no em dashes, no hashtags, no @mentions, no jargon, no hype. Output ONLY the cast text or NOTHING.';
-  const r = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { Authorization: 'Bearer ' + ORK, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: process.env.OPENROUTER_MODEL || 'anthropic/claude-fable-5', messages: [{ role: 'system', content: sys }, { role: 'user', content: 'Write this hour\'s cast.' }], max_tokens: 220, temperature: 0.85 }), signal: AbortSignal.timeout(45000) });
-  const b = await r.json();
-  let t = b.choices && b.choices[0] && b.choices[0].message && b.choices[0].message.content;
-  if (!t) throw new Error('no draft from model');
+  // Model failover ladder: try the primary, then cheap known-good fallbacks, so
+  // a single model being out-of-credits / rate-limited / momentarily empty does
+  // not silence ZOL. Capture the REAL reason from each so a failure ping is
+  // actionable ("402 insufficient credits") instead of an opaque "no draft".
+  const models = [process.env.OPENROUTER_MODEL || 'anthropic/claude-fable-5',
+                  'deepseek/deepseek-chat',
+                  'meta-llama/llama-3.3-70b-instruct'];
+  const reasons = [];
+  let t = null;
+  for (const model of models) {
+    try {
+      const r = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { Authorization: 'Bearer ' + ORK, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, messages: [{ role: 'system', content: sys }, { role: 'user', content: 'Write this hour\'s cast.' }], max_tokens: 220, temperature: 0.85 }), signal: AbortSignal.timeout(45000) });
+      const b = await r.json();
+      const c = b.choices && b.choices[0] && b.choices[0].message && b.choices[0].message.content;
+      if (c && c.trim()) { t = c; break; }
+      const reason = (b.error && (b.error.message || b.error.code)) || ('http ' + r.status) || 'empty completion';
+      reasons.push(model.split('/').pop() + ': ' + String(reason).slice(0, 80));
+    } catch (e) {
+      reasons.push(model.split('/').pop() + ': ' + (((e && e.message) || e) + '').slice(0, 80));
+    }
+  }
+  if (!t) throw new Error('no draft from any model [' + reasons.join(' | ') + ']');
   let out = t.trim().replace(/^["']|["']$/g, '').replace(/@(\w)/g, '$1');
   if (out.length > 280) { out = out.slice(0, 280).replace(/\s+\S*$/, ''); if (!/[.!?]$/.test(out)) out = out.replace(/[\s,;:-]+$/, '') + '.'; }
   return out;
@@ -145,8 +163,23 @@ async function logBonfire(text) {
     await ping('ZOL posted (auto):\n\n' + text);
     console.log('POSTED:', text);
   } catch (e) {
-    await ping('ZOL post failed: ' + ((e && e.message) || e));
-    console.error('ERR', (e && e.message) || e);
+    const msg = ((e && e.message) || e) + '';
+    // Throttle identical failures: ping a NEW reason once, then suppress repeats
+    // of the same reason for 6h so a persistent outage does not spam hourly.
+    // Dry runs never ping.
+    const failPath = H + '/zol/last-failure.json';
+    let last = {};
+    try { last = JSON.parse(fs.readFileSync(failPath, 'utf8')); } catch (_) {}
+    const key = msg.slice(0, 70);
+    const now = Date.now();
+    const SIX_H = 6 * 3600 * 1000;
+    if (!DRY && (last.key !== key || (now - (last.ts || 0)) > SIX_H)) {
+      await ping('ZOL post failed: ' + msg);
+      try { fs.mkdirSync(H + '/zol', { recursive: true }); fs.writeFileSync(failPath, JSON.stringify({ key, ts: now })); } catch (_) {}
+    } else {
+      console.error('ZOL fail (ping throttled):', msg);
+    }
+    console.error('ERR', msg);
     process.exit(1);
   }
 })();
