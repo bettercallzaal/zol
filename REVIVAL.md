@@ -139,7 +139,7 @@ key required. Three things stand between it and the goal.
 
 ### Blocker 1 - ZOL is hardcoded to ignore Zaal
 
-`scripts/zol-reply.js:52`
+`scripts/zol-reply.js:49`
 
 ```js
 if(pfid===19640){continue;} // skip owner's own casts - ZOL does not reply to Zaal announcements
