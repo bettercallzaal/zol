@@ -253,26 +253,38 @@ commits - `3521015` (the ladder, see 2b), `1e65d08`, `f656eb6`.
 
 ## 5. The Zaal tap list
 
-Short, and in order. Everything above is blocked on the first item.
+Short, and in order. **Updated 2026-08-26** - taps 1 and 3 are closed, the code is
+written and committed at `786b378`, and exactly one tap now stands between ZOL and
+answering tags: number 2.
 
-1. **OpenRouter top-up, roughly $5-10.** The scope note's finding 1 decision box
-   is still unticked: `[ ] top up  [ ] free models  [ ] stay dark`. This is a
-   money tap, not code. It unblocks the daily cast **and** the mention listener.
-   Immediately after, read `~/zol/last-failure.json` to confirm the error actually
-   cleared rather than assuming it (see 2a).
+1. ~~**OpenRouter top-up, roughly $5-10.**~~ **CLOSED 2026-08-26.** The account
+   reads `total_credits 90`, `total_usage 80.199` - about $9.80 of headroom. The
+   Aug 3 exhaustion is over. Still worth reading `~/zol/last-failure.json` on the
+   first Pi login to confirm the recorded error was the credit error and not a
+   second cause hiding behind it (see 2a).
 
-2. **Pi access for the deploy.** Either start Tailscale on this mac so the work can
-   be done directly, or Zaal runs the pull and the `tmux kill-session -t zol`
-   himself. Nothing in section 3 ships without one of these.
+2. **Pi access for the deploy. THE ONLY REMAINING BLOCKER.** Tailscale is stopped
+   on this mac and `ansuz` does not resolve, so the daemon cannot be updated from
+   here. Either start Tailscale, or Zaal runs it himself:
+   ```
+   ssh zaal@ansuz
+   cd ~/zol/farcaster-agent && git pull && npm test
+   tmux kill-session -t zol   # start-fleet.sh restarts it within 15 min
+   ```
+   The restart is required. Cron scripts pick up new code on their own, daemons
+   do not. This branch must reach the Pi first - see the reconcile note in 4.
 
-3. **Sign off on ZOL answering you.** Narrowing the fid 19640 guard is a
-   deliberate behavior change: ZOL starts drafting replies to Zaal's tags. Output
-   stays approval-gated, so nothing posts unreviewed, but it is his rule being
-   reversed and it should be his call.
+3. ~~**Sign off on ZOL answering you.**~~ **GRANTED 2026-08-26.** The fid 19640
+   skip is deleted, replaced by a self-loop guard on ZOL's own fid. ZOL now posts
+   replies itself rather than staging them, capped at 5 per rolling hour globally,
+   fail-closed, with the old approval gate kept as the overflow path for anything
+   the cap refuses.
 
 4. **Pick which ladder survives.** The Pi's `zao/zol-rate-limit` versus local
    `3521015`. Needs a diff and a decision before any Pi pull, and the 2-posts-per-4h
-   cap must not be lost in the merge (see 2b).
+   cap must not be lost in the merge (see 2b). Note this is the *posting* cap on
+   the daily cast, a different limiter from the 5/hr reply cap added in tap 3.
+   Neither replaces the other.
 
 5. **Standing, not blocking:** retire `repor`/`seor`/`ytr` from `start-fleet.sh`
    unless a consumer is named (scope note finding 2), and the branch-and-PR hygiene
