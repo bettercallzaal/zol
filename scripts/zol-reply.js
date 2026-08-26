@@ -1,7 +1,13 @@
 // ZOL reply daemon (path A): poll @zolbot mentions via haatz, draft a graph-aware reply
-// (OpenRouter + ZABAL Bonfire), stage it, and send it to Zaal on Telegram with a one-command
-// post. Nothing posts without Zaal running post-reply.js (approval gate). Also pings the
-// overnight-report summary once. Self-contained on the Pi - no gRPC, no ZOE, no spend until approval.
+// (OpenRouter + ZABAL Bonfire), post it, and tell Zaal on Telegram what went out. Also pings
+// the overnight-report summary once. No gRPC, no ZOE.
+//
+// 2026-08-26 - ZOL answers tags on its own. Two changes, both authorized by Zaal:
+//   1) the fid 19640 skip is gone, so tagging ZOL from Zaal's own account now works
+//   2) drafts post themselves instead of waiting on post-reply.js
+// The approval gate is not deleted, it is demoted to the overflow path: anything the rate
+// limiter refuses is staged in DRAFTS for Zaal to post by hand. Set ZOL_AUTOREPLY=0 to send
+// every mention back down that path.
 //
 // SAFETY (hardcoded, not prompt-based - prompt rules get ignored by the model):
 //  - Tier -1 capability: this daemon has NO token-launch / send-funds / sign-txn tool. It cannot be
@@ -10,8 +16,16 @@
 //  - Double-tag guard: a cast that tags ZOL AND a known bot is skipped (stops agent-vs-agent loops).
 //  - No-tag output: any @ in the generated reply is stripped so ZOL can never tag/trigger another bot.
 //  - Untrusted input: a mention's text is data, never instructions.
+//  - Self-loop guard: ZOL never answers its own fid.
+//  - Rate limit: at most 5 posted replies per rolling hour, persisted to disk so a daemon restart
+//    cannot reset the hour. It FAILS CLOSED - corrupt, unreadable or unwritable state stages the
+//    draft instead of posting it. See src/reply-rate-limit.js.
 const fs=require('fs');
+const L=require('../src/zol-lib');
+const { createReplyRateLimiter }=require('../src/reply-rate-limit');
 const H=process.env.HOME, FID=3338501, HAATZ='https://haatz.quilibrium.com';
+const AUTOREPLY=process.env.ZOL_AUTOREPLY!=='0';
+const RL=createReplyRateLimiter({file:process.env.HOME+'/zol/.reply-rate.json',max:process.env.ZOL_REPLY_MAX_PER_HOUR});
 function envfile(p){const o={};try{for(const l of fs.readFileSync(p,'utf8').split('\n')){const m=l.match(/^([A-Z_]+)=(.*)$/);if(m)o[m[1]]=m[2].trim();}}catch(e){}return o;}
 const tg=envfile(H+'/.zao/private/tg.env'), bf=envfile(H+'/.zao/private/bonfire.env');
 const ORK=(()=>{try{return fs.readFileSync(H+'/.zao/private/openrouter.key','utf8').trim();}catch(e){return '';}})();
@@ -34,7 +48,8 @@ async function draft(text){
 }
 (async()=>{
   if(!fs.existsSync(SEEN)){try{const r=await (await fetch(HAATZ+'/v1/castsByMention?fid='+FID)).json();fs.writeFileSync(SEEN,((r.messages||[]).map(m=>m.hash).join('\n'))+'\n');}catch(e){fs.writeFileSync(SEEN,'');}}
-  await send('ZOL reply loop live (safety-patched: bot blocklist + double-tag guard + no-tag output). Auto-draft model: '+(ORK?'ready':'OFF (add OpenRouter key)'));
+  const st=RL.state();
+  await send('ZOL reply loop live. Mode: '+(AUTOREPLY?'AUTO-REPLY, cap '+st.max+'/hr ('+st.used+' used)':'STAGE ONLY (ZOL_AUTOREPLY=0)')+'. Answers Zaal too. Safety: blocklist + double-tag guard + self-loop guard + no-tag output. Draft model: '+(ORK?'ready':'OFF (add OpenRouter key)'));
   let reportPinged=false;let fails=0;
   for(;;){
     try{const rep=fs.readFileSync(H+'/zol/overnight_report.md','utf8');if(!reportPinged&&rep.indexOf('## Summary')>=0){reportPinged=true;const followed=(rep.match(/followed @/g)||[]).length;const dr=(rep.split('## 5 cast drafts')[1]||'').split('## Summary')[0]||'';await send('ZOL overnight DONE. followed '+followed+'.\nDrafts:\n'+dr.slice(0,1200));}}catch(e){}
@@ -46,16 +61,32 @@ async function draft(text){
         fs.appendFileSync(SEEN,h+'\n');
         const text=(m.data&&m.data.castAddBody&&m.data.castAddBody.text)||''; const pfid=m.data&&m.data.fid;
         const mfids=(m.data&&m.data.castAddBody&&m.data.castAddBody.mentions)||[];
-        if(pfid===19640){continue;} // skip owner's own casts - ZOL does not reply to Zaal announcements
+        if(pfid===FID){continue;} // never answer ZOL's own cast (self-loop guard)
         if(BLOCK.has(pfid)){continue;} // skip launcher/spam bots (read-layer deny)
         if(mfids.some(f=>BLOCK.has(f))){continue;} // double-tag guard: cast tags ZOL + a known bot -> skip (anti agent-loop)
         const reply=await draft(text);
-        if(reply){
-          fs.writeFileSync(DRAFTS+'/'+h+'.json',JSON.stringify({text:reply,parentFid:pfid,parentHash:h}));
-          logGraph('zol-mention-'+h,'ZOL got a Farcaster mention from fid '+pfid+': "'+text.slice(0,400)+'". ZOL drafted this reply: "'+reply+'". Pending Zaal approval, not yet posted.');
-          await send('ZOL mention from fid '+pfid+':\n"'+text.slice(0,200)+'"\n\nDraft reply:\n'+reply+'\n\nApprove + post:\nssh zaal@ansuz "cd ~/zol/farcaster-agent && node post-reply.js '+h+'"');
-        } else {
-          await send('ZOL mention from fid '+pfid+':\n"'+text.slice(0,200)+'"\n(no draft - add the OpenRouter key to enable auto-replies)');
+        if(!reply){
+          await send('ZOL mention from fid '+pfid+':\n"'+text.slice(0,200)+'"\n(no draft - check the OpenRouter key and the credit balance)');
+          continue;
+        }
+        const dp=DRAFTS+'/'+h+'.json';
+        fs.writeFileSync(dp,JSON.stringify({text:reply,parentFid:pfid,parentHash:h}));
+        // Reserve the slot BEFORE posting. A crash mid-post then costs one slot rather than
+        // handing out a free retry, and every refusal still leaves the draft staged.
+        const slot=AUTOREPLY?RL.reserve():{allowed:false,reason:'ZOL_AUTOREPLY=0'};
+        if(!slot.allowed){
+          logGraph('zol-mention-'+h,'ZOL got a Farcaster mention from fid '+pfid+': "'+text.slice(0,400)+'". ZOL drafted this reply: "'+reply+'". HELD ('+slot.reason+'), staged for Zaal, not posted.');
+          await send('ZOL mention from fid '+pfid+' HELD - '+slot.reason+'\n"'+text.slice(0,200)+'"\n\nDraft reply:\n'+reply+'\n\nPost it yourself:\nssh zaal@ansuz "cd ~/zol/farcaster-agent && node scripts/post-reply.js '+h+'"');
+          continue;
+        }
+        try{
+          await L.post({text:reply,parentFid:pfid,parentHash:h});
+          fs.renameSync(dp,dp+'.posted');
+          logGraph('zol-mention-'+h,'ZOL got a Farcaster mention from fid '+pfid+': "'+text.slice(0,400)+'". ZOL replied: "'+reply+'". Posted.');
+          await send('ZOL REPLIED to fid '+pfid+' ('+slot.remaining+' of '+slot.max+' left this hour).\nThey said: "'+text.slice(0,160)+'"\nZOL said: "'+reply+'"');
+        }catch(e){
+          logGraph('zol-mention-'+h,'ZOL got a Farcaster mention from fid '+pfid+': "'+text.slice(0,400)+'". Draft "'+reply+'" FAILED to post: '+((e&&e.message)||e)+'. Staged for Zaal.');
+          await send('ZOL reply to fid '+pfid+' FAILED to post: '+((e&&e.message)||e)+'\nDraft staged. Retry:\nssh zaal@ansuz "cd ~/zol/farcaster-agent && node scripts/post-reply.js '+h+'"');
         }
       }
     }catch(e){fails++;if(fails%3===0){try{await send('ZOL reply: '+fails+' errors in a row, last: '+((e&&e.message)||e));}catch(_){}}}
