@@ -1,0 +1,26 @@
+[Unit]
+Description=ZOL Reply Daemon (mention polling + drafting)
+Documentation=https://github.com/bettercallzaal/zol
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zaal
+Group=zaal
+WorkingDirectory=/home/zaal/zol
+EnvironmentFile=/home/zaal/.zao/private/zol.env
+Environment="HOME=/home/zaal"
+Environment="NODE_ENV=production"
+
+ExecStart=/usr/bin/node scripts/zol-reply.js
+
+Restart=on-failure
+RestartSec=15s
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zol-reply
+
+[Install]
+WantedBy=multi-user.target
