@@ -1,8 +1,13 @@
 # ZOL Revival
 
+> **CLOSED 2026-08-27. ZOL answers @tags.** The loop was proved end to end against
+> a real cast, not a dry run. Details in section 6; the audit below is kept as the
+> record of how it got there. Sections 1-3 describe the broken state and are
+> historical from here on.
+
 Working doc for the revive. Re-verified 2026-08-25 from branch
-`ws/dreamloop-artist-spotlight`. No credentials read for their values, nothing
-deployed, nothing pushed.
+`ws/dreamloop-artist-spotlight`, then executed 2026-08-26/27. No credentials were
+read for their values, and nothing has been pushed.
 
 **Scope and root cause are already settled.** See
 `~/zao-vault/notes/zol-revive-scope.md` (metawall card `746bfbcf`, fractal lane
@@ -289,3 +294,75 @@ answering tags: number 2.
 5. **Standing, not blocking:** retire `repor`/`seor`/`ytr` from `start-fleet.sh`
    unless a consumer is named (scope note finding 2), and the branch-and-PR hygiene
    in finding 4. Neither gates the tag path.
+
+---
+
+## 6. Loop closed - 2026-08-27
+
+ZOL answers tags. **Tag `@zolbot` on Farcaster**, any client, any channel or root
+cast. It posts the reply itself; there is no approval step in the normal path.
+
+### The proving cast
+
+Rather than wait for a fresh tag, one of Zaal's four unanswered tags was un-seeded
+and allowed to run through the live daemon:
+
+```
+parent  0x2d9509af5c3e53944a19c45b4ae5d70ad90af7ed   fid 19640, 2026-08-03
+        "how can I make my [agent] better at interacting with other accounts"
+reply   0x2c25962a89dbeae2da622327ae301ed5c3d8e482   fid 3338501, 2026-08-27 00:31:26Z
+        https://farcaster.xyz/zolbot/0x2c25962a
+```
+
+Confirmed by querying `castsByParent` on the hub, not by trusting local state. The
+2026-08-03 parent is the tag that sat unanswered for 23 days, which makes it the
+right one to prove the fid guard is actually gone.
+
+### What the run verified
+
+- **The limiter counted it.** `~/zol/.reply-rate.json` went from not existing to
+  `{"posted":[<one timestamp>]}` - the cold-start path, one slot spent, four left.
+- **Reserve-before-post holds in production.** Slot stamped `00:31:25.918`, cast
+  timestamp `00:31:26`. The reservation lands before the network call, which is the
+  property the whole fail-closed design rests on.
+- **The self-loop guard did not fire.** It skips only `pfid===FID` (3338501); the
+  parent was 19640. The reply existing is the proof.
+- **Nothing else went out.** One rate entry, one `.posted` draft.
+
+### The three remaining tags stay unanswered
+
+Only `0x2d9509af` was un-seeded. These three are still in `~/zol/.reply-seen` and
+**ZOL will not answer them**, by design - a hash is recorded before the skip check,
+so anything from the dark period is permanently marked seen:
+
+```
+0xb15dc1d6...  2026-07-12  "can u find the zabalgamez recording links for empire builder"
+0xfd814e68...  2026-07-19  the tipping ask - deliberately out of scope, see section 3
+0x4ce5855f...  2026-08-03  "can u do any of that"
+```
+
+The tipping tag is the scope note's `ef98e806` (Empire Builder, scoped signer key
+or stay gated) and is a different risk class. It gets its own decision, not a
+backfill. If Zaal wants either of the other two answered, un-seed that one hash the
+same way. The pre-edit seen-file is preserved at
+`~/zol/.reply-seen.bak-20260826-preunseed` (13 lines) - **do not delete it**, it is
+the only record of which hashes predate the revival.
+
+### Where the code actually lives
+
+The Pi does **not** run this repo. `~/zol/farcaster-agent` is a clone of
+`rishavmukherji/farcaster-agent`, push disabled, flat layout, and its `zol-reply.js`
+was *ahead* of ours - it had the two-operator hub ladder and backoff added after the
+2026-08-08 haatz outage, which never reached this repo. A `git pull` deploy would
+have silently regressed that. The live file was patched in place instead and then
+ported back here in `d752b01`, so the two are diffable. The previous daemon is
+backed up on the Pi at `zol-reply.js.bak-preautoreply-20260826`.
+
+Correct the README when convenient: it claims the Pi clones *this* repo. It does not.
+
+### Still open
+
+- `~/zol/last-failure.json` holds an OpenRouter credit error from 2026-08-26
+  02:00 UTC. It looks stale - the balance has headroom and ZOL has posted since -
+  but it was not provable either way without spending a call.
+- Tap 4 in section 5, the ladder merge, is untouched.
