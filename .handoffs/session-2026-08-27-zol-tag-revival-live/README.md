@@ -58,6 +58,10 @@ Nothing else went out: one rate entry, one `.posted` draft.
 | `38934fa` | REVIVAL.md tap list - taps 1 and 3 closed |
 | `d752b01` | Adopted the Pi's hub ladder, post-deploy |
 | `2590a68` | REVIVAL.md section 6 - loop closed, cast hash, three checks |
+| `0a1f0df` | This handoff |
+
+Any commit after `0a1f0df` on this branch is a correction to this file, not new
+work. The lane shipped in the five above.
 
 `npm test`: 34 pass, 0 fail. `npm test` was itself broken before this lane -
 `node --test test/` resolves the directory as a module on current Node, so it
@@ -100,17 +104,29 @@ un-seeding a hash by hand rather than waiting.
 0x4ce5855f...  2026-08-03  "can u do any of that"
 ```
 
-The tipping tag is the scope note's `ef98e806` (Empire Builder - scoped signer
-key or stay gated). It is a different risk class and gets its own decision, not
-a backfill. If Zaal wants either of the other two answered, un-seed that single
-hash:
+**Standing order, 2026-08-27: do not un-seed any of these three.** Reasons are
+per-tag and do not generalise:
+
+- `0xfd814e68` (tipping) is the scope note's `ef98e806` - Empire Builder, scoped
+  signer key or stay gated. Different risk class, gets its own decision, never a
+  backfill.
+- `0xb15dc1d6` (zabalgamez links) would publish **unpreviewed**. ZOL would draft
+  specific recording links from graph recall and post them with no human between
+  the draft and the timeline. That is exactly the failure mode the auto-post path
+  makes cheap.
+- `0x4ce5855f` is low-context ("can u do any of that") and answering it alone
+  reads as a non-sequitur two months late.
+
+The mechanism, recorded so a future decision does not have to re-derive it - **not
+an invitation to run it**. Only on an explicit fresh instruction from Zaal naming
+the specific hash:
 
 ```
 ssh zaal@ansuz "sed -i '/<hash-without-0x>/d' ~/zol/.reply-seen"
 ```
 
-Then wait one poll cycle. Do not clear the whole file - that would replay the
-entire back-catalogue.
+Then wait one poll cycle. Never clear the whole file - that replays the entire
+back-catalogue at 5 casts an hour until it drains.
 
 ---
 
@@ -125,12 +141,14 @@ Three copies now exist:
 | `~/zol/archive/reply-seen.bak-20260826-preunseed` | archived on the Pi |
 | `reply-seen-snapshot-20260826.txt` (this dir) | off-Pi copy, survives a Pi failure |
 
-Renamed on the way in: `.gitignore:11` is `*.bak-*`, so the copy had to lose the
-`.bak-` infix to be trackable at all. Same 13 lines, byte for byte.
+13 lines. Public Farcaster cast hashes only, no secrets. The repo copy was
+renamed on the way in - `.gitignore:11` is `*.bak-*`, so it had to lose the
+`.bak-` infix to be trackable at all - and was diffed against the Pi archive
+afterwards: identical byte for byte.
 
-13 lines. Public Farcaster cast hashes only, no secrets. The live
-`~/zol/.reply-seen` is back to 13 lines too, having re-absorbed `0x2d9509af`
-when the reply posted.
+The live `~/zol/.reply-seen` is back to 13 lines too, having re-absorbed
+`0x2d9509af` when the reply posted. So the snapshot and the live file now have
+the same line count for different reasons, which is a coincidence, not a check.
 
 ---
 
@@ -151,7 +169,7 @@ when the reply posted.
 
 ## 7. Preserved index state
 
-Untouched across all four commits, as it has been since July: **13 AD entries,
+Untouched across every commit in this lane, as it has been since July: **13 AD entries,
 0 others**. Every commit used a pathspec so the index was never disturbed.
 
 GC-proof snapshot: `refs/backup/index-snapshot-2026-08-25`
