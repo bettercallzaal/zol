@@ -1,6 +1,12 @@
 // src/handlers/__tests__/stub-handlers.test.js - Tests for Phase 5 stub handlers
 // Run: node --test src/handlers/__tests__/stub-handlers.test.js
 
+// Pin the ModelGateway to the mock provider. ModelGateway auto-enables the live
+// OpenRouter adapter whenever ~/.zao/private/openrouter.key exists, so without
+// this pin the model.completion tests make a real, paid API call on any dev
+// machine or Pi that has the key file (CI has no key and always used mock).
+process.env.OPENROUTER_MODEL_PROVIDER = 'mock';
+
 const { describe, test } = require('node:test');
 const assert = require('node:assert');
 const handlers = require('../index');
