@@ -180,4 +180,35 @@ describe('Zictionary', () => {
     assert.equal(updated.definition, 'Updated definition', 'definition should be updateable');
     assert.deepEqual(updated.citations, ['original citation'], 'citations must remain immutable');
   });
+
+  test('edit() throws when trying to set status=approved (hardening-pass item 10)', async () => {
+    const zic = new Zictionary(makeMockStore());
+    const entry = await zic.add({ term: 'ApprovalTest', definition: 'Cannot self-approve via edit' });
+
+    await assert.rejects(
+      () => zic.edit(entry.entryId, { status: 'approved' }),
+      /cannot set status=approved via edit/,
+      'edit() must reject status=approved and direct callers to approve()'
+    );
+  });
+
+  test('edit() on an approved entry invalidates approval and resets to draft (hardening-pass item 10)', async () => {
+    const zic = new Zictionary(makeMockStore());
+    const entry = await zic.add({ term: 'WillBeApproved', definition: 'Start as draft' });
+    const approved = await zic.approve(entry.entryId, { approvedBy: 'zaal' });
+
+    assert.equal(approved.status, 'approved');
+    assert.equal(approved.approvedBy, 'zaal');
+
+    const edited = await zic.edit(approved.entryId, { definition: 'Updated definition post-approval' });
+
+    assert.equal(edited.status, 'draft', 'edit() must reset approved entry back to draft');
+    assert.equal(edited.approvedBy, null, 'approvedBy must be cleared after edit');
+    assert.equal(edited.definition, 'Updated definition post-approval', 'definition should be updated');
+    const lastHistory = edited.history[edited.history.length - 1];
+    assert.ok(
+      lastHistory.change.includes('approval invalidated'),
+      'history must record that approval was invalidated'
+    );
+  });
 });

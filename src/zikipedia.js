@@ -228,8 +228,19 @@ class Zikipedia {
       if (!immutable.has(k)) allowed[k] = v;
     }
 
+    if (allowed.status === 'approved') {
+      throw new Error('Zikipedia.edit: cannot set status=approved via edit(); use approve() with verified authority.');
+    }
     if (allowed.status && !VALID_STATUSES.includes(allowed.status)) {
       throw new Error(`Zikipedia.edit: status must be one of: ${VALID_STATUSES.join(', ')}`);
+    }
+
+    // Any edit on an approved page invalidates approval and returns it to draft.
+    // Re-approval requires a fresh call to approve() with verified authority.
+    const wasApproved = page.status === 'approved';
+    if (wasApproved) {
+      allowed.status = 'draft';
+      allowed.approvedBy = null;
     }
 
     const now = new Date().toISOString();

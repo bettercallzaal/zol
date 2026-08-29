@@ -38,6 +38,7 @@
   ],
   "promotion_path": "rehearsed -> active_local -> live_guarded",
   "last_reviewed": "2026-07-17",
+  "last_checked": "2026-07-17",
   "limits": {
     "max_wall_time_ms": 60000,
     "max_steps": 6,
@@ -134,5 +135,342 @@
     "identified_gaps"
   ],
   "execution_trace_outputs": [],
-  "memory_routes": []
+  "memory_routes": [],
+  "gap_report_cycle1": {
+    "cycle": 1,
+    "date": "2026-07-17",
+    "work_packets_scanned": "22 open PRs (#24, #26-#47); 508/508 tests passing; 23 stub handlers",
+    "failure_patterns_identified": [
+      {
+        "id": "model-completion-stub",
+        "severity": "medium",
+        "description": "model.completion handler returned {text: ''} stub. Two active loops received empty model output.",
+        "affected_loops": ["zabal-channel-watch-v1", "zabal-submissions-watch-v1"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle1"
+      }
+    ],
+    "missing_tools_catalogued": [
+      {
+        "id": "receipt-local-query",
+        "description": "No receipt.local.query handler existed. Self-Improvement Governor could not scan receipt journal by loopId or date range.",
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle2"
+      }
+    ]
+  },
+  "gap_report_cycle2": {
+    "cycle": 2,
+    "date": "2026-07-17",
+    "work_packets_scanned": "24 open PRs (#24, #26-#48); 509/509 tests passing; 21 remaining stub handlers after cycle 1",
+    "failure_patterns_identified": [
+      {
+        "id": "cowork-fetch-projects-stub",
+        "severity": "low",
+        "description": "cowork.fetch-projects returned empty stub. relationship-lifecycle-update loop received no board context. CoworkTracker.listOpen() already existed.",
+        "affected_loops": ["relationship-lifecycle-update"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle2",
+        "note": "Degrades gracefully when COWORK_TRACKER_URL/KEY not configured."
+      }
+    ],
+    "missing_tools_catalogued": [
+      {
+        "id": "api-read-external",
+        "description": "api.read.external is a stub (returns {data: null}). Requires design decision on approved URL allowlist before wiring.",
+        "actionable": false,
+        "blocked_on": "URL allowlist policy decision."
+      }
+    ],
+    "improvement_proposal_queued": true,
+    "improvement_proposal": {
+      "id": "wire-receipt-query-and-cowork-fetch",
+      "title": "Wire receipt.local.query + cowork.fetch-projects (Phase 5, cycle 2)",
+      "status": "implemented",
+      "pr": "ws/v2-capability-gap-cycle2",
+      "test_delta": "+3 tests (512 total)"
+    }
+  },
+  "gap_report_cycle3": {
+    "cycle": 3,
+    "date": "2026-07-17",
+    "work_packets_scanned": "25 open PRs (#24, #26-#49); 512/512 tests passing; 24 stub handlers after cycle 2",
+    "failure_patterns_identified": [
+      {
+        "id": "log-handlers-stub",
+        "severity": "low",
+        "description": "log.relationship-events-write and log.zol-events-write returned mock shapes. Events not persisted to state store despite AtomicFileStore being available.",
+        "affected_loops": ["relationship-lifecycle-update", "heartbeat-v1", "morning-brief-v1"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle3",
+        "note": "Uses createStateStore() per call. Degrades gracefully on init failure (non-critical path)."
+      },
+      {
+        "id": "checkpoint-local-write-stub",
+        "severity": "low",
+        "description": "checkpoint.local.write returned mock shape without persisting. AtomicFileStore available.",
+        "affected_loops": ["heartbeat-v1", "relationship-lifecycle-update"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle3"
+      },
+      {
+        "id": "api-read-external-stub",
+        "severity": "medium",
+        "description": "api.read.external always returned {data:null} stub. zabal-submissions-watch-v1 received no submission data. Only known URL: https://zabalgamez.com/api/submissions.",
+        "affected_loops": ["zabal-submissions-watch-v1"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle3",
+        "note": "Conservative allowlist: api.neynar.com, hub-api.neynar.com, zabalgamez.com. New origins require PR review."
+      }
+    ],
+    "missing_tools_catalogued": [
+      {
+        "id": "artifact-draft-write-persistence",
+        "description": "artifact.draft.write returns a draft ID but does not persist the draft content anywhere. Requires a design decision on storage location, format, versioning, and disk-flood protection.",
+        "actionable": false,
+        "blocked_on": "Design decision: artifact storage backend (local FS, S3, AtomicFileStore). Formal improvement-proposal needed."
+      }
+    ],
+    "improvement_proposal": {
+      "id": "wire-log-checkpoint-api-read",
+      "title": "Wire log.*, checkpoint.local.write, api.read.external (Phase 5, cycle 3)",
+      "status": "implemented",
+      "pr": "ws/v2-capability-gap-cycle3",
+      "test_delta": "+1 test (513 total)",
+      "stubs_wired": 4,
+      "stubs_remaining": 20
+    }
+  },
+  "gap_report_cycle4": {
+    "cycle": 4,
+    "date": "2026-07-17",
+    "work_packets_scanned": "26 open PRs (#24, #26-#50); 513/513 tests passing; 20 stub handlers after cycle 3",
+    "failure_patterns_identified": [
+      {
+        "id": "toolgym-mastery-record-stub",
+        "severity": "low",
+        "description": "toolgym.mastery.record returned mock shape. Mastery scores not persisted to state store despite AtomicFileStore available.",
+        "affected_loops": ["mastery-receipt"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle4",
+        "note": "AtomicFileStore key: toolgym-mastery-records, capped at 200. Degrades gracefully."
+      },
+      {
+        "id": "circle-relationship-status-stub",
+        "severity": "low",
+        "description": "circle.relationship-status-read always returned found:false; write returned mock without persisting. Local AtomicFileStore used as a local-first store (fid-keyed map). Circle API integration is future work.",
+        "affected_loops": ["relationship-lifecycle-update"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle4",
+        "note": "Map capped at 1000 FIDs; evicts oldest by updatedAt on overflow."
+      },
+      {
+        "id": "farcaster-recent-casts-parse-parse-only",
+        "severity": "low",
+        "description": "farcaster.recent-casts-parse was already a pure function but only returned bare text summaries. Enriched with music keyword detection (16 keywords), channel extraction, likes, and musicCasts filter.",
+        "affected_loops": ["zabal-channel-watch-v1", "zabal-submissions-watch-v1"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle4"
+      }
+    ],
+    "missing_tools_catalogued": [
+      {
+        "id": "toolgym-workout-run-input-mismatch",
+        "description": "toolgym.workout.run loop manifest sends {workout:string} but ToolGymAdapter.runWorkout() needs {toolId, inputs, maxRounds}. Requires a shape-mapping layer or loop manifest change — design decision needed.",
+        "actionable": false,
+        "blocked_on": "Input shape design decision: map workout name → toolId + inputs, or change loop manifest."
+      }
+    ],
+    "improvement_proposal": {
+      "id": "wire-toolgym-mastery-circle-status-casts-parse",
+      "title": "Wire toolgym.mastery.record, circle.relationship-status-*, farcaster.recent-casts-parse (Phase 5, cycle 4)",
+      "status": "implemented",
+      "pr": "ws/v2-capability-gap-cycle4",
+      "test_delta": "+2 tests (515 total)",
+      "stubs_wired": 4,
+      "stubs_remaining": 16
+    }
+  },
+  "gap_report_cycle5": {
+    "cycle": 5,
+    "date": "2026-07-17",
+    "work_packets_scanned": "27 open PRs (#24, #26-#51); 515/515 tests; 16 stub handlers after cycle 4",
+    "failure_patterns_identified": [
+      {
+        "id": "farcaster-read-stubs",
+        "severity": "medium",
+        "description": "farcaster.activity-read and cast.read always returned empty arrays. zabal-channel-watch-v1 and relationship-lifecycle-update received no real cast data. fetchNeynarWithTimeout already exported; already returns {error} gracefully when key absent.",
+        "affected_loops": ["zabal-channel-watch-v1", "relationship-lifecycle-update", "weekly-curator-v1"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle5",
+        "note": "cast.read accepts both input.channel and input.channel_id (loop manifests use channel_id). Graceful fallback when NEYNAR_API_KEY absent."
+      },
+      {
+        "id": "telegram-approval-request-stub",
+        "severity": "medium",
+        "description": "telegram.approval.request returned mock pending shape without persisting to ApprovalBridge. Pi Telegram bot cannot pick up requests that are never stored.",
+        "affected_loops": ["request-approval", "artist-spotlight-v1"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle5",
+        "note": "Wired to ApprovalBridge.request() with fresh createStateStore() per call. Graceful fallback on failure."
+      },
+      {
+        "id": "warper-alias-stubs",
+        "severity": "none",
+        "description": "warper.assignment.accept, warper.trapper.release, warper.trapper.sync were in stub list but already correctly implement disabled-mode behavior via WarperKeeperAdapter.ensureAdapter().",
+        "affected_loops": ["open-trapper"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle5",
+        "note": "No code change needed — removed from stub list, added to wired list. Returns {ok:false, reason:'Warper Keeper is disabled'} in all environments without WARPER_KEEPER_MODE=remote."
+      }
+    ],
+    "missing_tools_catalogued": [
+      {
+        "id": "artist-spotlight-handlers-unwired",
+        "description": "artist-spotlight.* (5 handlers) are stubs. All can be wired locally: filter-eligible-artists + record-spotlight-completion use AtomicFileStore; select-one-artist uses rotation state; compose-spotlight-draft uses ModelGateway; stage-draft-for-approval uses ApprovalBridge. No Pi-specific credentials required.",
+        "actionable": true,
+        "blocked_on": "None — all wireable to local state store + ModelGateway. Queued for cycle 6."
+      }
+    ],
+    "improvement_proposal": {
+      "id": "wire-farcaster-reads-telegram-approval-warper-reclassify",
+      "title": "Wire farcaster.activity-read, cast.read, telegram.approval.request; reclassify warper.* (Phase 5, cycle 5)",
+      "status": "implemented",
+      "pr": "ws/v2-capability-gap-cycle5",
+      "test_delta": "0 net (515 total — same assertions)",
+      "stubs_wired": 6,
+      "stubs_remaining": 10
+    }
+  },
+  "gap_report_cycle6": {
+    "cycle": 6,
+    "date": "2026-07-17",
+    "work_packets_scanned": "28 open PRs (#24, #26-#52); 515/515 tests; 10 stub handlers after cycle 5",
+    "failure_patterns_identified": [
+      {
+        "id": "artist-spotlight-handlers-unwired",
+        "severity": "medium",
+        "description": "All 5 artist-spotlight.* handlers were stubs. Pi-specific credentials are NOT required — all are wireable to local AtomicFileStore + ModelGateway: filter uses spotlight history for cooldown, select uses rotation state, compose uses ModelGateway.complete(), stage uses ApprovalBridge, record appends to spotlight-history.",
+        "affected_loops": ["artist-spotlight-v1"],
+        "actionable": true,
+        "status": "implemented",
+        "pr": "ws/v2-capability-gap-cycle6",
+        "note": "compose-spotlight-draft uses mock provider in CI (no ANTHROPIC_API_KEY); returns non-empty text either way. filter-eligible-artists accepts input.candidates for candidate injection."
+      }
+    ],
+    "missing_tools_catalogued": [
+      {
+        "id": "stub-phase-complete",
+        "description": "All wireable stubs have been wired across cycles 1-6. Remaining 5 stubs are correct-as-stubs: cast.draft + farcaster.dm-send (security invariant — draft-only), artifact.draft.write (pending design decision in improvement-proposal.manifest.json), bonfire.delve-recall (blocked on dream-net PRs #1559/#1560), toolgym.workout.run (input shape mismatch — design decision needed).",
+        "actionable": false,
+        "blocked_on": "Human decisions: artifact storage backend (Zaal), toolgym shape mapping (design), dream-net upstream (Brandon)."
+      }
+    ],
+    "improvement_proposal": {
+      "id": "wire-artist-spotlight-all-5-handlers",
+      "title": "Wire all 5 artist-spotlight.* handlers (Phase 5, cycle 6 — FINAL STUB WIRING CYCLE)",
+      "status": "implemented",
+      "pr": "ws/v2-capability-gap-cycle6",
+      "test_delta": "+3 tests (518 total)",
+      "stubs_wired": 5,
+      "stubs_remaining": 5,
+      "note": "All wireable stubs complete. Remaining 5 are permanent or human-gated."
+    }
+  },
+  "gap_report_cycle9": {
+    "cycle": 9,
+    "date": "2026-07-17",
+    "work_packets_scanned": "33 open PRs (#24, #26-#57); 528/528 tests passing; all loop handlers wired post cycle 8; 4 specification-only loops audited — 3 promoted to dry-run, 1 retained (WK disabled); 2 permanent stubs remain",
+    "failure_patterns_identified": [],
+    "missing_tools_catalogued": [
+      {
+        "id": "no-new-wireable-gaps",
+        "description": "All 72 loop handlers confirmed wired. 2 permanent stubs remain: farcaster.dm-send (security invariant) and bonfire.delve-recall (upstream dream-net PRs #1559/#1560). No new wireable gaps found.",
+        "actionable": false,
+        "blocked_on": "Permanent — security and upstream constraints only."
+      }
+    ],
+    "improvement_proposal": {
+      "id": "improvement-proposal-cycle9",
+      "title": "Capability Gap Cycle 9 — lifecycle promotion: 4 specification-only loops → dry-run",
+      "status": "resolved",
+      "pr": "ws/v2-loop-lifecycle-promote",
+      "test_delta": "0 (528 total — manifest-only changes)",
+      "stubs_wired": 0,
+      "stubs_remaining": 2,
+      "note": "No new wireable stubs. All handlers complete. Promoted 3 loops from specification-only → dry-run: accept-warper-assignment-v1, proof-drop-export-v1, tool-workout-v1. warper-keeper-work-cycle-v1 remains specification-only (Warper Keeper disabled mode — cannot rehearse until WK activated). Specification-only count: 4 → 1."
+    }
+  },
+  "gap_report_cycle8": {
+    "cycle": 8,
+    "date": "2026-07-17",
+    "work_packets_scanned": "32 open PRs (#24, #26-#56); 528/528 tests passing; Brandon directive to keep advancing (2026-07-17); 3 improvement-proposal stubs wired",
+    "failure_patterns_identified": [],
+    "missing_tools_catalogued": [
+      {
+        "id": "cast-draft-wired",
+        "description": "cast.draft wired to AtomicFileStore: persists staged drafts (capped 50), falls back gracefully. Text pulled from input.text or state.draft/approvedDraft/text.",
+        "actionable": true,
+        "resolved": true
+      },
+      {
+        "id": "artifact-draft-write-wired",
+        "description": "artifact.draft.write wired to AtomicFileStore (Option A per Brandon directive): persists draft artifacts (capped 50). Accepts input.type or input.artifactType.",
+        "actionable": true,
+        "resolved": true
+      },
+      {
+        "id": "toolgym-workout-run-wired",
+        "description": "toolgym.workout.run wired via WORKOUT_PRESETS table (Option A): maps workoutScope/workout string to ToolGymAdapter workoutDef. Presets: scheduled-session, field-test, tool-workout, mastery-check. Graceful fallback if ToolGym unavailable.",
+        "actionable": true,
+        "resolved": true
+      }
+    ],
+    "improvement_proposal": {
+      "id": "improvement-proposal-cycle8",
+      "title": "Capability Gap Cycle 8 — 3 stubs wired per Brandon directive",
+      "status": "resolved",
+      "pr": "ws/v2-wire-draft-stubs",
+      "test_delta": "+10 (528 total)",
+      "stubs_wired": 3,
+      "stubs_remaining": 2,
+      "note": "cast.draft + artifact.draft.write + toolgym.workout.run all wired. 2 permanent stubs remain: farcaster.dm-send (security) + bonfire.delve-recall (upstream dream-net PRs #1559/#1560)."
+    }
+  },
+  "gap_report_cycle7": {
+    "cycle": 7,
+    "date": "2026-07-17",
+    "work_packets_scanned": "30 open PRs (#24, #26-#54); 518/518 tests passing; 5 stub handlers remaining (all permanent or human-gated); all 61 loop-manifest handler references confirmed covered",
+    "failure_patterns_identified": [],
+    "missing_tools_catalogued": [
+      {
+        "id": "all-wireable-stubs-complete",
+        "description": "Handler coverage audit confirmed: every handler referenced in the 72 loop manifests is registered in src/handlers/index.js. 5 remaining stubs are correct-as-stubs — cast.draft + farcaster.dm-send (security invariant: draft-only), artifact.draft.write (design pending), bonfire.delve-recall (upstream-blocked on dream-net PRs #1559/#1560), toolgym.workout.run (input shape design pending).",
+        "actionable": false,
+        "blocked_on": "Human decisions only — see improvement-proposal.manifest.json for both open proposals."
+      }
+    ],
+    "improvement_proposal": {
+      "id": "improvement-proposal-cycle1",
+      "title": "Improvement Proposal Cycle 1 — toolgym.workout.run input shape queued for Zaal decision",
+      "status": "queued",
+      "pr": "ws/v2-improvement-proposal-cycle1",
+      "test_delta": "0 (518 total — manifest-only changes)",
+      "stubs_wired": 0,
+      "stubs_remaining": 5,
+      "note": "No new wireable gaps found. Two design proposals now queued for Zaal: artifact-draft-write-storage-design + toolgym-workout-run-input-shape."
+    }
+  }
 }

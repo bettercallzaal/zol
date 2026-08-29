@@ -337,6 +337,12 @@ const artistspotlight = {
         throw new Error('[SAFETY] artist-spotlight.compose-spotlight-draft is draft-only; never auto-post');
       }
 
+      // Sanitize artist name against prompt injection: allow only letters, numbers, spaces, hyphens, apostrophes
+      const safeArtistName = selectedArtist.replace(/[^a-zA-Z0-9 '\-\.]/g, '').trim().slice(0, 80);
+      if (!safeArtistName) {
+        throw new Error('[SECURITY] selectedArtist contains no valid characters after sanitization');
+      }
+
       // Mock context for the selected artist
       const artistContext = {
         'Ivy Wong': 'Ivy Wong is an experimental electronic producer exploring the intersection of AI and human composition. Her latest work channels ZAO community feedback into immersive soundscapes.',
@@ -346,10 +352,10 @@ const artistspotlight = {
         'Sofia Delgado': 'Sofia Delgado composes ambient soundscapes that reflect ZAO moments. Her work is a meditation on community, structure, and emergence.',
       };
 
-      const context = artistContext[selectedArtist] || `${selectedArtist} is a talented ZAO artist pushing creative boundaries.`;
+      const context = artistContext[safeArtistName] || `${safeArtistName} is a talented ZAO artist pushing creative boundaries.`;
 
       // Compose a spotlight cast (mock LLM call)
-      let draftText = `Spotlight: ${selectedArtist}. ${context} Follow their work and see what moves them at the intersection of music and community.`;
+      let draftText = `Spotlight: ${safeArtistName}. ${context} Follow their work and see what moves them at the intersection of music and community.`;
 
       // Trim to maxLength
       if (draftText.length > maxLength) {
@@ -358,7 +364,7 @@ const artistspotlight = {
 
       return {
         success: true,
-        selectedArtist,
+        selectedArtist: safeArtistName,
         draftText,
         textLength: draftText.length,
         maxLength,

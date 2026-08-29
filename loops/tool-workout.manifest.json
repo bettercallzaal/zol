@@ -133,7 +133,7 @@
       }
     }
   ],
-  "lifecycle_state": "specification-only",
+  "lifecycle_state": "dry-run",
   "entry_conditions": [
     "toolgym_session_scheduled",
     "tool_target_specified"
