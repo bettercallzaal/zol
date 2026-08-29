@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// fleet-conformance.js — ZOL Fleet Standard v0.1 conformance harness.
+// fleet-conformance.js - ZOL Fleet Standard v0.1 conformance harness.
 // CommonJS, no npm deps, compatible with: node --test (Node 18+) or plain:
 //   node scripts/fleet-conformance.js
 // Run from repo root: node scripts/fleet-conformance.js
@@ -55,8 +55,8 @@ function listJsonFiles(dir) {
 // ---------------------------------------------------------------------------
 // Check registry
 // Results have two severities:
-//   hard — a violation; counted as a failure; causes exit 1.
-//   advisory — a known in-progress item; printed as WARN; does not fail.
+//   hard - a violation; counted as a failure; causes exit 1.
+//   advisory - a known in-progress item; printed as WARN; does not fail.
 // ---------------------------------------------------------------------------
 
 const results = [];
@@ -99,7 +99,7 @@ function advisory(name, prNote, fn) {
 // ---------------------------------------------------------------------------
 // SECTION 1: Capsule validation
 // Validates all files in capsules/ against the capsule schema.
-// Manual validation — no ajv: checks required fields and types.
+// Manual validation - no ajv: checks required fields and types.
 // For capsules with status="draft", a placeholder content_hash of the form
 // "sha256:draft-*" is accepted with an advisory warning.
 // ---------------------------------------------------------------------------
@@ -237,13 +237,13 @@ for (const filePath of capsuleFiles) {
   // Advisory: draft capsules with placeholder hashes should be finalized
   advisory(
     `capsule ${fileName}: provenance.content_hash is a real SHA-256 (not a draft placeholder)`,
-    "PR #26 — capsule hash computation",
+    "PR #26 - capsule hash computation",
     () => {
       const manifest = readJson(filePath);
       const ch = manifest.provenance.content_hash;
       if (!/^sha256:[0-9a-f]{64}$/.test(ch)) {
         throw new Error(
-          `content_hash "${ch}" is a draft placeholder — compute and replace with real capsuleContentHash(manifest) before promoting this capsule to active status`
+          `content_hash "${ch}" is a draft placeholder - compute and replace with real capsuleContentHash(manifest) before promoting this capsule to active status`
         );
       }
     }
@@ -351,10 +351,10 @@ const ZOL_LIB_PATH = repoPath("src", "zol-lib.js");
 
 advisory(
   "src/zol-lib.js: require('@farcaster/hub-nodejs') is NOT at top level (Pi-only guard)",
-  "PR #26 — lazy-require @farcaster/hub-nodejs inside the functions that use it",
+  "PR #26 - lazy-require @farcaster/hub-nodejs inside the functions that use it",
   () => {
     if (!fs.existsSync(ZOL_LIB_PATH)) {
-      // File doesn't exist — no violation possible.
+      // File doesn't exist - no violation possible.
       return;
     }
     const source = readText(ZOL_LIB_PATH);
@@ -397,14 +397,14 @@ check("scripts/secret-scan.sh exists", () => {
 // ---------------------------------------------------------------------------
 // SECTION 5: src/approval-bridge.js exports ApprovalBridge and consume
 // ADVISORY: This file is in scope for PR #28 (ApprovalBridge hardening).
-// Reported as WARN — does not block the harness exit code.
+// Reported as WARN - does not block the harness exit code.
 // ---------------------------------------------------------------------------
 
 const APPROVAL_BRIDGE_PATH = repoPath("src", "approval-bridge.js");
 
 advisory(
   "src/approval-bridge.js exists and exports ApprovalBridge class and consume function",
-  "PR #28 — ApprovalBridge implementation (connect to ToolGateway and AgentGateway)",
+  "PR #28 - ApprovalBridge implementation (connect to ToolGateway and AgentGateway)",
   () => {
     if (!fs.existsSync(APPROVAL_BRIDGE_PATH)) {
       throw new Error(
@@ -496,7 +496,7 @@ if (hardFailed.length > 0) {
 }
 
 if (advisoryFailed.length > 0) {
-  console.warn("\nADVISORY WARNINGS (not failures — tracked in open PRs):");
+  console.warn("\nADVISORY WARNINGS (not failures - tracked in open PRs):");
   for (const r of advisoryFailed) {
     console.warn(`  WARN  ${r.name}`);
     console.warn(`        ${r.note}`);
@@ -510,7 +510,7 @@ const totalFailed = hardFailed.length; // advisory failures do NOT count
 console.log(
   `${hardPassed.length} conformance checks passed, ${hardFailed.length} failed` +
   (advisoryFailed.length > 0
-    ? ` (${advisoryFailed.length} advisory warning${advisoryFailed.length === 1 ? "" : "s"} — see above)`
+    ? ` (${advisoryFailed.length} advisory warning${advisoryFailed.length === 1 ? "" : "s"} - see above)`
     : "") +
   (advisoryPassed.length > 0 && advisoryFailed.length === 0
     ? ` (+${advisoryPassed.length} advisory checks clean)`

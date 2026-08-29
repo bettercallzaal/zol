@@ -51,7 +51,7 @@ async function addSigner(privateKey) {
 
   console.log('\nGenerated signer keypair:');
   console.log('Public Key:', signerPublicKeyHex);
-  // Private key is NOT logged — write it directly to credentials file to avoid shell history / log exposure
+  // Private key is NOT logged - write it directly to credentials file to avoid shell history / log exposure
 
   // Create self-signed key request
   // Deadline: 24 hours from now
@@ -127,7 +127,7 @@ if (require.main === module) {
       console.log('\n=== Signer Added ===');
       console.log('Signer Public Key:', signerPublicKey);
       console.log('TX:', txHash);
-      // Signer private key is NOT printed — save signerPrivateKey to ~/.openclaw/farcaster-credentials.json
+      // Signer private key is NOT printed - save signerPrivateKey to ~/.openclaw/farcaster-credentials.json
       console.log('\nSTORE the signerPrivateKey field from the return value in ~/.openclaw/farcaster-credentials.json');
     })
     .catch(err => {

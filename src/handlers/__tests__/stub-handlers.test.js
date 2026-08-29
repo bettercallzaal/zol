@@ -375,7 +375,7 @@ describe('artist-spotlight step handlers (wired cycle 6)', () => {
   });
 });
 
-describe('warper handlers (disabled-mode correct — no Warper Keeper configured)', () => {
+describe('warper handlers (disabled-mode correct - no Warper Keeper configured)', () => {
   test('warper.assignment.accept returns ok or disabled', async () => {
     const result = await handlers['warper.assignment.accept']({
       input: { scope: 'zol-work' },

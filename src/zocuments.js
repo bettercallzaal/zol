@@ -206,7 +206,7 @@ class Zocuments {
       at: now,
       fields: changedFields || 'none',
       changedBy: changes.changedBy || 'operator',
-      ...(wasApproved ? { note: 'approval invalidated — returned to draft' } : {}),
+      ...(wasApproved ? { note: 'approval invalidated - returned to draft' } : {}),
     };
     const merged = {
       ...doc,

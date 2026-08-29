@@ -1423,7 +1423,7 @@ describe('Migrations', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Describe #18 — Grounding Discipline (doc 2105)
+// Describe #18 - Grounding Discipline (doc 2105)
 // Contract tests verifying the source-nameability grounding rule is present
 // in zol-daily.js and cannot be accidentally removed.
 // ---------------------------------------------------------------------------

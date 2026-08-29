@@ -184,7 +184,7 @@ class Zictionary {
         {
           at: now,
           change: wasApproved
-            ? `Fields edited: ${changedFields || 'none'} (approval invalidated — returned to draft)`
+            ? `Fields edited: ${changedFields || 'none'} (approval invalidated - returned to draft)`
             : `Fields edited: ${changedFields || 'none'}`,
           changedBy: changes.changedBy || 'operator',
         },

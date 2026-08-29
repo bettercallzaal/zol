@@ -189,7 +189,7 @@ class CoworkTracker {
     if (!resp.ok) return { ok: false, error: resp.error };
     const rows = Array.isArray(resp.data) ? resp.data : (resp.data ? [resp.data] : []);
     if (rows.length > 0) return { ok: true, row: rows[0] };
-    // Primary claim missed — try reclaiming an expired in_progress lease.
+    // Primary claim missed - try reclaiming an expired in_progress lease.
     const now = new Date().toISOString();
     const newLease = new Date(Date.now() + ttlMs).toISOString();
     const reclaimBody = { status: 'in_progress', leased_until: newLease, notes: notes || undefined };

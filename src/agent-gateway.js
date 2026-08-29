@@ -762,7 +762,7 @@ class AgentGateway {
           return sendError(res, 400, 'Bad Request: loopId is required');
         }
         const loop = this._dreamloopRegistry ? this._dreamloopRegistry.get(loopId) : null;
-        // Status is 'validated' (not 'queued') — the gateway confirms the loop is registered
+        // Status is 'validated' (not 'queued') - the gateway confirms the loop is registered
         // but does not enqueue or execute it. Full execution requires the DreamLoopRunner
         // on the Pi. Hardening-pass rule: never return 'queued' when nothing was queued.
         result = {

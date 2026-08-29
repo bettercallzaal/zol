@@ -729,7 +729,7 @@ test('run_loop MCP tool returns status=validated for known loop, unknown-loop fo
       const b1 = await r1.json();
       assert.equal(b1.ok, true);
       assert.equal(b1.result.status, 'validated',
-        'run_loop must return validated, not queued — hardening-pass rule');
+        'run_loop must return validated, not queued - hardening-pass rule');
       assert.notEqual(b1.result.status, 'queued',
         'queued is forbidden: nothing was actually enqueued');
       assert.equal(b1.result.loop.loop_id, 'heartbeat');
@@ -754,10 +754,10 @@ test('run_loop MCP tool returns status=validated for known loop, unknown-loop fo
 });
 
 // ---------------------------------------------------------------------------
-// Test 14: duplicate execution — same idempotencyKey runs handler exactly once
+// Test 14: duplicate execution - same idempotencyKey runs handler exactly once
 // ---------------------------------------------------------------------------
 
-test('Test 14: ToolGateway + IdempotencyStore — duplicate call with same idempotencyKey runs handler once', async (t) => {
+test('Test 14: ToolGateway + IdempotencyStore - duplicate call with same idempotencyKey runs handler once', async (t) => {
   const dir = makeTmpDir('idem');
   try {
     const store = await freshStore(dir);
@@ -795,10 +795,10 @@ test('Test 14: ToolGateway + IdempotencyStore — duplicate call with same idemp
 });
 
 // ---------------------------------------------------------------------------
-// Test 15: supervisor restart — AgentGateway artifact survives stop + new instance
+// Test 15: supervisor restart - AgentGateway artifact survives stop + new instance
 // ---------------------------------------------------------------------------
 
-test('Test 15: AgentGateway stop + restart on same dir — artifact survives', async (t) => {
+test('Test 15: AgentGateway stop + restart on same dir - artifact survives', async (t) => {
   const dir = makeTmpDir('restart');
   try {
     const store1 = await freshStore(dir);
@@ -839,7 +839,7 @@ test('Test 15: AgentGateway stop + restart on same dir — artifact survives', a
       const body = await listRes.json();
       assert.ok(body.ok, 'response must be ok');
       const found = body.artifacts.find(a => a.artifactId === artifactId);
-      assert.ok(found, 'artifact must survive supervisor restart — found in list');
+      assert.ok(found, 'artifact must survive supervisor restart - found in list');
     } finally {
       await gw2.stop();
     }
@@ -849,7 +849,7 @@ test('Test 15: AgentGateway stop + restart on same dir — artifact survives', a
 });
 
 // ---------------------------------------------------------------------------
-// Test 16: memory outage — MemoryWeaver.write() with broken store propagates typed error
+// Test 16: memory outage - MemoryWeaver.write() with broken store propagates typed error
 // ---------------------------------------------------------------------------
 
 test('Test 16: MemoryWeaver.write() with broken store propagates typed error (fail-closed)', async (t) => {
@@ -879,7 +879,7 @@ test('Test 16: MemoryWeaver.write() with broken store propagates typed error (fa
 });
 
 // ---------------------------------------------------------------------------
-// Test 17: receipt-write failure — ReceiptJournal.append() with broken store propagates
+// Test 17: receipt-write failure - ReceiptJournal.append() with broken store propagates
 // ---------------------------------------------------------------------------
 
 test('Test 17: ReceiptJournal.append() with broken store propagates typed error (fail-closed)', async (t) => {

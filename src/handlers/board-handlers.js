@@ -55,7 +55,7 @@ const handlers = {
   // Prevents two agent clones from both claiming the same task (shared-clone collision).
   // Returns { ok: false, collision: true } if another agent already claimed it.
   // With COWORK_LEASE_ENABLED=1: uses TTL-based lease so expired in_progress tasks
-  // can be reclaimed (requires leased_until column — see FIELD DRIFT GUIDE above).
+  // can be reclaimed (requires leased_until column - see FIELD DRIFT GUIDE above).
   // input: { id, notes?, fromStatus?, claimerId? }
   'board.task.claim': async function({ input }) {
     const { id, notes, fromStatus, claimerId } = input || {};
