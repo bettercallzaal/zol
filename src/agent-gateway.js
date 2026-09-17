@@ -633,10 +633,11 @@ class AgentGateway {
 
     const { bundle } = parsed.data;
     const plan = await this._artifactPipeline.plan(bundle);
-    const artifact = await this._artifactPipeline.build(plan);
-    const artifactId = artifact.artifactId || artifact.id || crypto.randomUUID();
+    // plan() returns the full artifact object; build() needs the string ID and content.
+    const content = bundle.content !== undefined ? bundle.content : bundle;
+    const artifact = await this._artifactPipeline.build(plan.artifactId, content);
 
-    sendJson(res, 200, { ok: true, artifactId, imported: true });
+    sendJson(res, 200, { ok: true, artifactId: artifact.artifactId, imported: true });
   }
 
   async _handleTrappersExportList(_req, res) {
@@ -761,13 +762,16 @@ class AgentGateway {
           return sendError(res, 400, 'Bad Request: loopId is required');
         }
         const loop = this._dreamloopRegistry ? this._dreamloopRegistry.get(loopId) : null;
+        // Status is 'validated' (not 'queued') - the gateway confirms the loop is registered
+        // but does not enqueue or execute it. Full execution requires the DreamLoopRunner
+        // on the Pi. Hardening-pass rule: never return 'queued' when nothing was queued.
         result = {
           loopId,
           executionMode,
-          status: loop ? 'queued' : 'unknown-loop',
+          status: loop ? 'validated' : 'unknown-loop',
           loop: loop ? { loop_id: loop.loop_id, title: loop.title } : null,
           input: loopInput,
-          note: 'DreamLoop execution requires the runtime; this confirms the loop is registered.',
+          note: 'Loop validated in registry. Execution requires DreamLoopRunner on the Pi.',
         };
         break;
       }

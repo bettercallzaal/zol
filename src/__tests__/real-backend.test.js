@@ -21,6 +21,9 @@ const { ApprovalBridge } = require('../approval-bridge');
 const { WorkRouter } = require('../work-router');
 const { AgentGateway } = require('../agent-gateway');
 const { CapsuleRegistry } = require('../capsule-registry');
+const { ToolGateway } = require('../tool-gateway');
+const { IdempotencyStore } = require('../idempotency-store');
+const { MemoryWeaver } = require('../memory-weaver');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -397,7 +400,7 @@ test('unauthenticated remote gateway request returns 401', async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 8: Trapper export/import round trip preserves allowed data and provenance
+// Test 8: CapsuleRegistry data round trip preserves capsule_id and provenance
 // ---------------------------------------------------------------------------
 
 test('CapsuleRegistry install → get round trip preserves capsule_id and provenance', async () => {
@@ -602,4 +605,305 @@ test('stale lease auto-expiry: expired lease allows a new worker to acquire', as
   } finally {
     rmDir(dir);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Test 12: Trapper export/import round trip preserves bundleType, targetArtifactId,
+//          and sanitized content across a clean store (hardening-pass requirement).
+// ---------------------------------------------------------------------------
+
+test('Trapper export/import round trip preserves bundleType, targetArtifactId, and sanitized content', async () => {
+  const dir1 = makeTmpDir('t12-src');
+  const dir2 = makeTmpDir('t12-import');
+  try {
+    // ── Stage 1: build a source artifact, then bundle it ────────────────────
+    const store1 = await freshStore(dir1);
+    const pipeline1 = new ArtifactPipeline(store1, null);
+
+    const source = await pipeline1.plan({
+      type: 'brief',
+      title: 'Trapper Round-Trip Source',
+      description: 'Real-backend fixture for Trapper export/import round trip',
+      permissions: 'shared',
+    });
+    await pipeline1.build(source.artifactId, { body: 'round-trip fixture', notes: 'test' });
+
+    const bundle = await pipeline1.createTrapperBundle(source.artifactId);
+    assert.equal(bundle.type, 'trapper', 'bundle type must be "trapper"');
+
+    // ── Stage 2: export the bundle ──────────────────────────────────────────
+    const exported = await pipeline1.export(bundle.artifactId);
+    assert.ok(exported, 'export() must return the bundle artifact');
+    assert.ok(exported.content, 'exported bundle must have content');
+    assert.equal(exported.content.bundleType, 'trapper', 'bundleType must be "trapper"');
+    assert.equal(exported.content.targetArtifactId, source.artifactId, 'targetArtifactId must match source');
+
+    // ── Stage 3: import into a fresh environment via HTTP ────────────────────
+    const store2 = await freshStore(dir2);
+    const pipeline2 = new ArtifactPipeline(store2, null);
+    const router2 = new WorkRouter(store2);
+    const journal2 = new ReceiptJournal(store2);
+
+    const gw = new AgentGateway({
+      artifactPipeline: pipeline2,
+      workRouter: router2,
+      receiptJournal: journal2,
+      port: 0,
+      bindAddress: '127.0.0.1',
+    });
+
+    const { port } = await gw.start();
+    try {
+      const resp = await fetch(`http://127.0.0.1:${port}/trappers/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bundle: exported }),
+      });
+
+      assert.equal(resp.status, 200, 'import must return 200');
+      const result = await resp.json();
+      assert.equal(result.ok, true, 'result.ok must be true');
+      assert.ok(result.artifactId, 'result must include artifactId');
+      assert.equal(result.imported, true, 'result.imported must be true');
+
+      // ── Stage 4: verify the imported artifact preserves provenance data ────
+      const imported = await pipeline2.get(result.artifactId);
+      assert.ok(imported, 'imported artifact must be retrievable from the fresh store');
+      assert.equal(imported.type, 'trapper', 'type must be preserved through import');
+      assert.ok(
+        typeof imported.content === 'object' && imported.content !== null,
+        'content must be an object (not a string)'
+      );
+      assert.equal(
+        imported.content.targetArtifactId,
+        source.artifactId,
+        'targetArtifactId must be preserved through the export → import round trip'
+      );
+      assert.equal(
+        imported.content.bundleType,
+        'trapper',
+        'bundleType must be preserved through the export → import round trip'
+      );
+    } finally {
+      await gw.stop();
+    }
+  } finally {
+    rmDir(dir1);
+    rmDir(dir2);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Test 13: run_loop MCP tool returns 'validated' not 'queued' (hardening-pass rule)
+// ---------------------------------------------------------------------------
+
+test('run_loop MCP tool returns status=validated for known loop, unknown-loop for missing', async () => {
+  const dir = makeTmpDir('t13-runloop');
+  try {
+    const store = await freshStore(dir);
+    const pipeline = new ArtifactPipeline(store, null);
+    const router = new WorkRouter(store);
+    const journal = new ReceiptJournal(store, { agentId: 'test-agent' });
+
+    // Stub DreamLoopRegistry with one known loop
+    const stubLoopRegistry = {
+      get: (loopId) => loopId === 'heartbeat'
+        ? { loop_id: 'heartbeat', title: 'Heartbeat' }
+        : null,
+    };
+
+    const gw = new AgentGateway({
+      artifactPipeline: pipeline, workRouter: router, receiptJournal: journal,
+      dreamloopRegistry: stubLoopRegistry,
+      port: 0, bindAddress: '127.0.0.1',
+    });
+    const { port } = await gw.start();
+    try {
+      // Known loop: must return validated, not queued
+      const r1 = await fetch(`http://127.0.0.1:${port}/mcp/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool: 'run_loop', input: { loopId: 'heartbeat' } }),
+      });
+      assert.equal(r1.status, 200);
+      const b1 = await r1.json();
+      assert.equal(b1.ok, true);
+      assert.equal(b1.result.status, 'validated',
+        'run_loop must return validated, not queued - hardening-pass rule');
+      assert.notEqual(b1.result.status, 'queued',
+        'queued is forbidden: nothing was actually enqueued');
+      assert.equal(b1.result.loop.loop_id, 'heartbeat');
+
+      // Unknown loop: must return unknown-loop
+      const r2 = await fetch(`http://127.0.0.1:${port}/mcp/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool: 'run_loop', input: { loopId: 'does-not-exist' } }),
+      });
+      assert.equal(r2.status, 200);
+      const b2 = await r2.json();
+      assert.equal(b2.ok, true);
+      assert.equal(b2.result.status, 'unknown-loop');
+      assert.equal(b2.result.loop, null);
+    } finally {
+      await gw.stop();
+    }
+  } finally {
+    rmDir(dir);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Test 14: duplicate execution - same idempotencyKey runs handler exactly once
+// ---------------------------------------------------------------------------
+
+test('Test 14: ToolGateway + IdempotencyStore - duplicate call with same idempotencyKey runs handler once', async (t) => {
+  const dir = makeTmpDir('idem');
+  try {
+    const store = await freshStore(dir);
+    const idem = new IdempotencyStore({ dir });
+    await idem.init();
+
+    let callCount = 0;
+    const tg = new ToolGateway(store, null, { idempotencyStore: idem });
+    tg.register({
+      toolId: 'state.local.write',
+      name: 'state.local.write',
+      requiredPermission: 'state.local.write',
+      isConsequential: true,
+      handler: async () => {
+        callCount++;
+        return { written: true };
+      },
+    });
+
+    const opts = {
+      grantedPermissions: ['state.local.write'],
+      executionMode: 'mock',
+      idempotencyKey: 'test-idem-key-14',
+    };
+    // execute() wraps handler result as { output, receiptId }
+    const r1 = await tg.execute('state.local.write', {}, opts);
+    const r2 = await tg.execute('state.local.write', {}, opts);
+
+    assert.equal(callCount, 1, 'handler must run exactly once despite two calls');
+    assert.equal(r2.idempotent, true, 'second call must be marked idempotent');
+    assert.equal(r1.output.written, true, 'first call output must contain handler result');
+  } finally {
+    rmDir(dir);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Test 15: supervisor restart - AgentGateway artifact survives stop + new instance
+// ---------------------------------------------------------------------------
+
+test('Test 15: AgentGateway stop + restart on same dir - artifact survives', async (t) => {
+  const dir = makeTmpDir('restart');
+  try {
+    const store1 = await freshStore(dir);
+    const pipeline1 = new ArtifactPipeline(store1, null);
+    const router1 = new WorkRouter(store1);
+    const journal1 = new ReceiptJournal(store1, { agentId: 'test-agent' });
+    const stubLoops = { get: () => null };
+
+    // Build an artifact directly via pipeline1 (no HTTP POST route exists)
+    const planned = await pipeline1.plan({ type: 'test', title: 'restart test', description: 'supervisor restart test' });
+    const built = await pipeline1.build(planned.artifactId, { hello: 'world' });
+    const artifactId = built.artifactId;
+    assert.ok(artifactId, 'must have an artifactId after build');
+
+    const gw1 = new AgentGateway({
+      artifactPipeline: pipeline1, workRouter: router1, receiptJournal: journal1,
+      dreamloopRegistry: stubLoops, port: 0, bindAddress: '127.0.0.1',
+    });
+    await gw1.start();
+    await gw1.stop();
+
+    // Boot a second gateway on the same directory
+    const store2 = await freshStore(dir);
+    const pipeline2 = new ArtifactPipeline(store2, null);
+    const router2 = new WorkRouter(store2);
+    const journal2 = new ReceiptJournal(store2, { agentId: 'test-agent' });
+
+    const gw2 = new AgentGateway({
+      artifactPipeline: pipeline2, workRouter: router2, receiptJournal: journal2,
+      dreamloopRegistry: stubLoops, port: 0, bindAddress: '127.0.0.1',
+    });
+    const { port: port2 } = await gw2.start();
+
+    try {
+      // Verify the artifact appears in the list from the restarted gateway
+      const listRes = await fetch(`http://127.0.0.1:${port2}/artifacts`);
+      assert.equal(listRes.status, 200, 'GET /artifacts must succeed on restarted gateway');
+      const body = await listRes.json();
+      assert.ok(body.ok, 'response must be ok');
+      const found = body.artifacts.find(a => a.artifactId === artifactId);
+      assert.ok(found, 'artifact must survive supervisor restart - found in list');
+    } finally {
+      await gw2.stop();
+    }
+  } finally {
+    rmDir(dir);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Test 16: memory outage - MemoryWeaver.write() with broken store propagates typed error
+// ---------------------------------------------------------------------------
+
+test('Test 16: MemoryWeaver.write() with broken store propagates typed error (fail-closed)', async (t) => {
+  const brokenStore = {
+    async get() { return undefined; },
+    async put() { throw new Error('disk full'); },
+  };
+
+  const mw = new MemoryWeaver(brokenStore);
+  await assert.rejects(
+    () => mw.write({
+      type: 'working',
+      content: 'test memory entry',
+      tags: ['test'],
+      provenance: { sourceType: 'operator', confidence: 0.9 },
+      freshness: {},
+      visibility: 'private',
+      contradictions: [],
+    }),
+    (err) => {
+      assert.ok(err instanceof Error, 'must propagate as a typed Error');
+      assert.ok(err.message.length > 0, 'error must have a message');
+      return true;
+    },
+    'MemoryWeaver.write() must throw on store failure, not swallow it'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Test 17: receipt-write failure - ReceiptJournal.append() with broken store propagates
+// ---------------------------------------------------------------------------
+
+test('Test 17: ReceiptJournal.append() with broken store propagates typed error (fail-closed)', async (t) => {
+  const brokenStore = {
+    async get() { return undefined; },
+    async put() { throw new Error('storage unavailable'); },
+  };
+
+  const journal = new ReceiptJournal(brokenStore, { agentId: 'test-agent' });
+  await assert.rejects(
+    () => journal.append({
+      loopId: 'test-loop',
+      runId: 'run-001',
+      stepId: 'step-1',
+      capsuleId: 'cap-001',
+      action: 'state.local.write',
+      status: 'success',
+      evidence: { key: 'test' },
+    }),
+    (err) => {
+      assert.ok(err instanceof Error, 'must propagate as a typed Error');
+      assert.ok(err.message.length > 0, 'error must have a message');
+      return true;
+    },
+    'ReceiptJournal.append() must throw on store failure, not swallow it'
+  );
 });
