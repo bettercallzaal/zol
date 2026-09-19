@@ -57,9 +57,31 @@ async function fetchNeynarWithTimeout(endpoint, options = {}, timeoutMs = 15000)
   }
 }
 
+// FIELD DRIFT GUIDE — Neynar API (api.neynar.com)
+// If any handler that uses Neynar starts returning empty/broken results, check these:
+//
+// getNeynarMentions → GET /v2/farcaster/reactions/user_reactions
+//   Response shape: { reactions: Array<{ cast: CastObject }> }
+//   CastObject fields read: .hash, .author.fid, .author.username, .text, .timestamp
+//   DRIFT RISK: Neynar has historically renamed .text → .body.text in some beta versions.
+//   NOTE: This endpoint queries LIKES (reaction_type=likes), not @-mentions. For true
+//   @-mentions, use GET /v2/farcaster/notifications?type=mentions&fid=... (same shape).
+//   UPGRADE PATH (Phase 5): switch to /v2/farcaster/notifications for genuine mention inbox.
+//
+// searchNeynarCasts → GET /v1/search_casts (v1 LEGACY — may be deprecated)
+//   Response shape: { casts: Array<CastObject> }
+//   CastObject fields read: .hash, .author.fid, .author.username, .text, .timestamp
+//   DRIFT RISK: v1 endpoint may be removed; v2 equivalent is /v2/farcaster/cast/search?q=...
+//   UPGRADE PATH (Phase 5): migrate to /v2/farcaster/cast/search, same shape.
+//
+// farcaster.connectivity.check → GET /v2/farcaster/user/bulk?fids=...
+//   Only checks response.error presence; no field parsing — low drift risk.
+//
+// Neynar API changelog: https://docs.neynar.com/changelog (check on any breakage)
+// Last verified: 2026-07-17
+
 async function getNeynarMentions(fid, limit = 10) {
-  // Fetch mentions for a given Farcaster ID
-  // Returns structured mentions for inbox.read / farcaster.read handlers
+  // Neynar: GET /v2/farcaster/reactions/user_reactions (currently queries likes, see drift guide above)
   const result = await fetchNeynarWithTimeout(
     `/v2/farcaster/reactions/user_reactions?fid=${fid}&reaction_type=likes&limit=${limit}`,
     { method: 'GET' }
@@ -69,13 +91,13 @@ async function getNeynarMentions(fid, limit = 10) {
     return { mentions: [], count: 0, error: result.error };
   }
 
-  // Parse Neynar's response into structured mentions
+  // Fields: result.reactions[].cast.{hash, author.fid, author.username, text, timestamp}
   const reactions = result.reactions || [];
   const mentions = reactions.map(r => ({
-    castHash: r.cast?.hash || '',
-    authorFid: r.cast?.author?.fid || 0,
+    castHash: r.cast?.hash || '',           // drift: may become .cast.castHash
+    authorFid: r.cast?.author?.fid || 0,   // drift: may become .cast.author.farcaster_id
     authorUsername: r.cast?.author?.username || '',
-    text: r.cast?.text || '',
+    text: r.cast?.text || '',              // drift: may become .cast.body.text
     timestamp: r.cast?.timestamp || new Date().toISOString(),
     reactionType: 'mention'
   }));
@@ -84,7 +106,7 @@ async function getNeynarMentions(fid, limit = 10) {
 }
 
 async function searchNeynarCasts(query, limit = 10) {
-  // Search casts by query (e.g., mentions)
+  // Neynar: GET /v1/search_casts (LEGACY v1 — upgrade to /v2/farcaster/cast/search in Phase 5)
   const result = await fetchNeynarWithTimeout(
     `/v1/search_casts?q=${encodeURIComponent(query)}&limit=${limit}`,
     { method: 'GET' }
@@ -94,11 +116,12 @@ async function searchNeynarCasts(query, limit = 10) {
     return { casts: [], count: 0, error: result.error };
   }
 
+  // Fields: result.casts[].{hash, author.fid, author.username, text, timestamp}
   const casts = (result.casts || []).map(c => ({
-    castHash: c.hash || '',
-    authorFid: c.author?.fid || 0,
+    castHash: c.hash || '',               // drift: may become .castHash in v2
+    authorFid: c.author?.fid || 0,       // drift: may become .author.farcaster_id
     authorUsername: c.author?.username || '',
-    text: c.text || '',
+    text: c.text || '',                  // drift: may become .body.text
     timestamp: c.timestamp || new Date().toISOString(),
     reactionType: 'search_result'
   }));

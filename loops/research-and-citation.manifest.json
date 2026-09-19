@@ -120,5 +120,23 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "research_request_received",
+    "knowledge_sources_accessible"
+  ],
+  "exit_conditions": [
+    "research_artifact_written",
+    "citations_validated"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

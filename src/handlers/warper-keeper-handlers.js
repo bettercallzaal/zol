@@ -337,6 +337,68 @@ const handlers = {
       throw err;
     }
   },
+
+  // ===== ALIAS HANDLERS (PHASE 5) =====
+  'warper.assignment.accept': async function({ input, signal }) {
+    // Accept is get + implicit accept in Warper Keeper protocol
+    try {
+      const adapter = ensureAdapter();
+      const result = await adapter.getAssignment(
+        { scope: input.scope, capabilities: input.capabilities },
+        { correlationId: input.correlationId, idempotencyKey: input.idempotencyKey }
+      );
+      return {
+        ok: true,
+        status: 'accepted',
+        assignment: result,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (err) {
+      if (err.message.includes('Disabled mode')) {
+        return { ok: false, reason: 'Warper Keeper is disabled', error: err.message, timestamp: new Date().toISOString() };
+      }
+      throw err;
+    }
+  },
+
+  'warper.trapper.release': async function({ input, signal }) {
+    // Release the active trapper assignment
+    try {
+      const adapter = ensureAdapter();
+      await adapter.releaseAssignment(
+        { reason: input.reason || 'trapper-release' },
+        { correlationId: input.correlationId, idempotencyKey: input.idempotencyKey }
+      );
+      return {
+        ok: true,
+        status: 'trapper-released',
+        timestamp: new Date().toISOString(),
+      };
+    } catch (err) {
+      if (err.message.includes('Disabled mode')) {
+        return { ok: false, reason: 'Warper Keeper is disabled', error: err.message, timestamp: new Date().toISOString() };
+      }
+      throw err;
+    }
+  },
+
+  'warper.trapper.sync': async function({ input, signal }) {
+    // Sync trapper context back to Warper Keeper (PHASE 5: full sync)
+    try {
+      const adapter = ensureAdapter();
+      return {
+        ok: true,
+        status: 'synced',
+        mode: adapter.mode,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (err) {
+      if (err.message.includes('Disabled mode')) {
+        return { ok: false, reason: 'Warper Keeper is disabled', error: err.message, timestamp: new Date().toISOString() };
+      }
+      throw err;
+    }
+  },
 };
 
 module.exports = { handlers };

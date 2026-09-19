@@ -18,8 +18,7 @@ fi
 
 FOUND=0
 PATTERNS=(
-  '[0-9a-fA-F]{64}'              # raw 32-byte hex (private keys, signer keys)
-  '0x[0-9a-fA-F]{64}'            # 0x-prefixed hex private key
+  '0x[0-9a-fA-F]{64}'            # 0x-prefixed hex private key (Ethereum/EVM)
   'sk-[A-Za-z0-9]{20,}'          # OpenAI-style key
   'sk-or-[A-Za-z0-9-]{20,}'      # OpenRouter key
   'gho_[A-Za-z0-9]{20,}'         # GitHub OAuth token
@@ -32,7 +31,13 @@ PATTERNS=(
 for f in $FILES; do
   [ -f "$f" ] || continue
   case "$f" in
+    # Skip generated, upstream, and intentional-fake-data files
     *.md|*.example|scripts/secret-scan.sh) continue ;;
+    vendor/*|node_modules/*) continue ;;
+    # capsules/ holds provenance.content_hash SHA-256 values — not secrets
+    capsules/*) continue ;;
+    # test files contain intentional fake credentials for redaction tests
+    *__tests__/*|test/*|scripts/dl-dry-run*.js) continue ;;
   esac
   for p in "${PATTERNS[@]}"; do
     if grep -nEo "$p" "$f" >/dev/null 2>&1; then

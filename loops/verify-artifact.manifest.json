@@ -1,0 +1,143 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "verify-artifact-v1",
+  "title": "Verify Artifact",
+  "version": "1.0.0",
+  "status": "rehearsed",
+  "owner": "zolbot",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "after artifact built",
+  "inputs": [
+    "built artifact reference",
+    "evidence from build step",
+    "verification criteria"
+  ],
+  "context_sources": [
+    "artifact state store",
+    "evidence store",
+    "verification rules"
+  ],
+  "allowed_actions": [
+    "artifact.local.write",
+    "receipt.local.write",
+    "state.local.read"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "artifact exists and is readable",
+    "evidence present and valid",
+    "verification criteria met",
+    "verification artifact written successfully"
+  ],
+  "evidence_outputs": [
+    "verification result artifact",
+    "evidence summary",
+    "pass/fail determination"
+  ],
+  "receipt_outputs": [
+    "verify-artifact receipt"
+  ],
+  "knowledge_state_outputs": [
+    "artifact verification status recorded",
+    "evidence linked to artifact"
+  ],
+  "execution_trace_outputs": [
+    "verify-artifact execution trace"
+  ],
+  "memory_routes": [
+    "episodic: verification outcomes",
+    "durable: verified artifacts log"
+  ],
+  "cooldown": "300s",
+  "failure_modes": [
+    "budget exceeded",
+    "timeout",
+    "state corruption",
+    "handler error"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-16",
+  "limits": {
+    "max_wall_time_ms": 60000,
+    "max_steps": 6,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "read-artifact",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {
+        "stateKey": "built-artifact"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "check-evidence",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {
+        "stateKey": "artifact-evidence"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "write-verification",
+      "handler": "artifact.local.write",
+      "permission": "artifact.local.write",
+      "with": {
+        "artifactType": "verification-result",
+        "draftOnly": false
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-receipt",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {
+        "receiptType": "verify-artifact"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "artifact_available",
+    "verification_spec_defined"
+  ],
+  "exit_conditions": [
+    "artifact_verified_or_rejected",
+    "verify_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
+  ]
+}

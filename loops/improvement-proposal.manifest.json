@@ -1,0 +1,180 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "improvement-proposal-v1",
+  "title": "Improvement Proposal",
+  "version": "1.0.0",
+  "status": "rehearsed",
+  "owner": "zolbot",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "after capability-gap-analysis or component-watch produces actionable findings",
+  "cooldown": "86400s",
+  "description": "Draft a structured improvement proposal from gap analysis or component watch findings. Submit for human approval. Never self-modify production.",
+  "allowed_actions": [
+    "approval.request",
+    "memory.read",
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "failure_modes": [
+    "budget exceeded",
+    "timeout",
+    "state corruption",
+    "handler error"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-17",
+  "limits": {
+    "max_wall_time_ms": 60000,
+    "max_steps": 6,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "load-findings",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "draft-proposal",
+      "handler": "memory.read",
+      "permission": "memory.read",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "validate-proposal",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "submit-for-approval",
+      "handler": "approval.request",
+      "permission": "approval.request",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-proposal",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "gap_analysis_available",
+    "proposal_template_ready"
+  ],
+  "exit_conditions": [
+    "proposal_drafted",
+    "proposal_submitted_for_approval"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
+  ],
+  "inputs": [
+    "gap_analysis_findings",
+    "component_watch_alerts"
+  ],
+  "context_sources": [
+    "capability-gap-analysis output (state store)",
+    "component-watch alert queue",
+    "proposal template (state store)",
+    "pending proposals store"
+  ],
+  "checks": [
+    "findings_loaded",
+    "proposal_validated",
+    "approval_request_submitted"
+  ],
+  "evidence_outputs": [
+    "improvement_proposal_draft"
+  ],
+  "receipt_outputs": [
+    "improvement-proposal-receipt"
+  ],
+  "knowledge_state_outputs": [
+    "pending_proposals"
+  ],
+  "execution_trace_outputs": [],
+  "memory_routes": [],
+  "last_checked": "2026-07-17",
+  "proposals": [
+    {
+      "id": "artifact-draft-write-storage-design",
+      "status": "resolved",
+      "date": "2026-07-17",
+      "resolved_date": "2026-07-17",
+      "resolved_by": "Brandon directive 2026-07-17 — keep advancing, do not wait idle",
+      "resolution": "Option A: AtomicFileStore (conservative default). Capped at 50 drafts; oldest evicted on overflow. Accepts input.type or input.artifactType; stores content/body. Graceful fallback if store unavailable. Retention/read-back remain future work (no artifact.draft.read handler in v2).",
+      "triggered_by": "capability-gap-analysis-v1 cycle 3",
+      "title": "Artifact Draft Write — Storage Backend Design",
+      "summary": "artifact.draft.write currently returns a draft ID without persisting any content. Three candidate backends: (1) AtomicFileStore keyed by artifactId — simple, already available, no disk-flood protection; (2) capped local FS directory (e.g. ~/.zao/private/artifacts/, rolling 50-file cap) — matches artifact metaphor, human-readable; (3) Zocuments — proper version history, structured, but adds a dependency. Questions for Zaal: preferred backend? max artifact size? retention policy? approval required to read back artifacts?",
+      "gaps_addressed": ["artifact-draft-write-persistence"],
+      "design_questions": [
+        "Which storage backend? (AtomicFileStore / local FS directory / Zocuments)",
+        "Max artifact size per write (bytes)?",
+        "Retention cap (max number of drafts, or TTL)?",
+        "Should artifact.draft.read be a paired handler, or is read-back out of scope for v2?"
+      ],
+      "blocked_on": "resolved",
+      "security_note": "Drafts must never be published without the approval gate. artifact.draft.write stays draft-only regardless of backend."
+    },
+    {
+      "id": "toolgym-workout-run-input-shape",
+      "status": "resolved",
+      "date": "2026-07-17",
+      "resolved_date": "2026-07-17",
+      "resolved_by": "Brandon directive 2026-07-17 — keep advancing, do not wait idle",
+      "resolution": "Option A: Named-preset lookup in handler. WORKOUT_PRESETS table maps workoutScope/workout string → {toolId, inputs, maxRounds}. Presets: scheduled-session (memory.read, 2 rounds), field-test (state.local.read, 3 rounds), tool-workout (receipt.local.query, 3 rounds), mastery-check (cowork.fetch-projects, 1 round). Unknown scope defaults to scheduled-session. Output: {completed, workout, toolId, passed, rounds, timestamp}.",
+      "triggered_by": "capability-gap-analysis-v1 cycle 4 (missing_tools_catalogued: toolgym-workout-run-input-mismatch)",
+      "title": "ToolGym Workout Run — Input Shape Decision",
+      "summary": "toolgym.workout.run is a stub because loop manifests pass {workout:'field-test'} (a named preset string) while ToolGymAdapter.runWorkout() expects {toolId, inputs, maxRounds}. Three options: (A) named-preset lookup table in handler maps workout name → {toolId, inputs, maxRounds} — keeps simple string in manifests, adds a maintenance table; (B) update loop manifests to pass structured {toolId, inputs, maxRounds} directly — cleaner contract, requires editing tool-workout.manifest.json + mastery-receipt.manifest.json + field-test.manifest.json; (C) accept both shapes — most flexible, doubles handler complexity. All options are safe local-only changes with no external calls or Pi credentials needed.",
+      "gaps_addressed": ["toolgym-workout-run-input-mismatch"],
+      "design_questions": [
+        "Which input shape? (A: named-preset lookup in handler / B: structured inputs in manifests / C: accept both)",
+        "If Option A: should the preset table live in the handler file or a separate config JSON (e.g. loops/toolgym-presets.json)?",
+        "Which named workout presets are needed for v2? (e.g. field-test, tool-workout, mastery-check)",
+        "Should workout output include per-round results, or only a final pass/fail summary?"
+      ],
+      "blocked_on": "resolved",
+      "security_note": "toolgym.workout.run must never auto-install packages or modify handler files. All workout steps are bounded, local, read/invoke only."
+    }
+  ]
+}

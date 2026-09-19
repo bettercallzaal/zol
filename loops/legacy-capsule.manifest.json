@@ -1,0 +1,145 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "legacy-capsule-v1",
+  "title": "Legacy Capsule Migration",
+  "version": "1.0.0",
+  "status": "rehearsed",
+  "owner": "zolbot",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "operator request to migrate pre-v2 capsule state",
+  "inputs": [
+    "legacy capsule state reference",
+    "migration schema definition",
+    "target state store key"
+  ],
+  "context_sources": [
+    "legacy state store",
+    "migration schema config",
+    "current state store"
+  ],
+  "allowed_actions": [
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "legacy state readable and parseable",
+    "migration schema valid",
+    "target state key not already populated",
+    "migrated state written without data loss"
+  ],
+  "evidence_outputs": [
+    "migrated state snapshot",
+    "migration diff summary",
+    "migration timestamp"
+  ],
+  "receipt_outputs": [
+    "legacy-capsule receipt"
+  ],
+  "knowledge_state_outputs": [
+    "legacy capsule migrated to v2 state format",
+    "migration event recorded"
+  ],
+  "execution_trace_outputs": [
+    "legacy-capsule execution trace"
+  ],
+  "memory_routes": [
+    "episodic: migration events",
+    "durable: migration audit log"
+  ],
+  "cooldown": "86400s",
+  "failure_modes": [
+    "budget exceeded",
+    "timeout",
+    "state corruption",
+    "handler error"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-16",
+  "limits": {
+    "max_wall_time_ms": 60000,
+    "max_steps": 6,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "read-legacy-state",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {
+        "stateKey": "legacy-capsule-state",
+        "schemaVersion": "pre-v2"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "validate-legacy",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {
+        "stateKey": "migration-schema",
+        "validateAgainst": "legacy-capsule-state"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "migrate-state",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {
+        "stateKey": "capsule-state-v2",
+        "migrationSource": "legacy-capsule-state"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-receipt",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {
+        "receiptType": "legacy-capsule-migration"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "legacy_capsule_detected",
+    "migration_target_defined"
+  ],
+  "exit_conditions": [
+    "capsule_migrated_or_archived",
+    "migration_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
+  ]
+}

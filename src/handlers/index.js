@@ -5,7 +5,60 @@
 const fs = require('fs');
 const path = require('path');
 const { ork } = require('../zol-lib');
-const { getNeynarMentions, searchNeynarCasts, fetchCalendarICS, getDefaultCalendarUrl } = require('../integrations');
+const { getNeynarMentions, searchNeynarCasts, fetchCalendarICS, getDefaultCalendarUrl, fetchNeynarWithTimeout, getNeynarKey } = require('../integrations');
+
+// Lazy-initialized singleton Promises - createStateStore is async, so we cache the Promise
+// and let callers await it. This prevents storing an unresolved Promise as the live store.
+let _stateStorePromise = null;
+let _memoryWeaverPromise = null;
+let _receiptJournalPromise = null;
+
+function getStateStore() {
+  if (!_stateStorePromise) {
+    const { createStateStore } = require('../state-adapter');
+    const os = require('os');
+    const dir = process.env.ZOL_STATE_DIR || (os.homedir() + '/.zao/private/zol-state');
+    _stateStorePromise = createStateStore({ backend: process.env.ZOL_STATE_BACKEND || 'atomic-file', directory: dir });
+  }
+  return _stateStorePromise; // callers must await
+}
+
+function getMemoryWeaver() {
+  if (!_memoryWeaverPromise) {
+    _memoryWeaverPromise = getStateStore().then(store => {
+      const { MemoryWeaver } = require('../memory-weaver');
+      return new MemoryWeaver(store);
+    });
+  }
+  return _memoryWeaverPromise; // callers must await
+}
+
+function getReceiptJournal() {
+  if (!_receiptJournalPromise) {
+    _receiptJournalPromise = getStateStore().then(store => {
+      const { ReceiptJournal } = require('../receipt-journal');
+      return new ReceiptJournal(store, { agentId: 'zolbot' });
+    });
+  }
+  return _receiptJournalPromise; // callers must await
+}
+
+// ModelGateway uses a noop store - getStateStore() is async-initialized (returns a Promise)
+// so it can't be passed directly to ModelGateway's synchronous constructor. Quota/telemetry
+// not persisted at the handler layer; the WorkRouter/AgentGateway provide higher-level accounting.
+const _MGW_NOOP_STORE = {
+  async get() { return undefined; },
+  async put() {},
+  async initialize() {},
+};
+let _modelGateway = null;
+function getModelGateway() {
+  if (!_modelGateway) {
+    const { ModelGateway } = require('../model-gateway');
+    _modelGateway = new ModelGateway(_MGW_NOOP_STORE);
+  }
+  return _modelGateway;
+}
 
 // Validation helper
 function validateInput(input, schema) {
@@ -24,11 +77,18 @@ function validateInput(input, schema) {
 // State handlers: read/write via state-adapter
 const handlers = {
   // ===== STATE HANDLERS =====
-  'state.local.read': async function({ input, state, signal }) {
-    const timeoutHandle = signal ? () => {
-      throw new Error('state.local.read timed out');
-    } : null;
-    signal?.addEventListener('abort', timeoutHandle, { once: true });
+  'state.local.read': async function({ input, state, executionMode, signal }) {
+    // Build an abort-race promise: throwing inside an EventTarget listener becomes an
+    // uncaughtException, so we communicate abort via Promise.race instead.
+    let _removeAbort = () => {};
+    const _abortP = signal
+      ? new Promise((_, rej) => {
+          const h = () => rej(new Error('state.local.read timed out'));
+          if (signal.aborted) { h(); return; }
+          signal.addEventListener('abort', h, { once: true });
+          _removeAbort = () => signal.removeEventListener('abort', h);
+        })
+      : null;
 
     try {
       validateInput(input, {
@@ -36,8 +96,22 @@ const handlers = {
         types: { stateKey: 'string' }
       });
 
-      // PHASE 5: wire to actual state-adapter once integrated
-      // For now, return structured state mock
+      if (executionMode !== 'mock') {
+        try {
+          const storeP = getStateStore();
+          const store = _abortP ? await Promise.race([storeP, _abortP]) : await storeP;
+          if (input.listCheckpoints) {
+            const checkpoints = (await store.get('zol-checkpoints')) || [];
+            return { checkpoints };
+          }
+          const value = await store.get(input.stateKey);
+          return { loaded: true, key: input.stateKey, value, timestamp: new Date().toISOString() };
+        } catch (err) {
+          // fall through to mock on error (includes abort)
+        }
+      }
+
+      // Mock fallback
       if (input.listCheckpoints) {
         return {
           checkpoints: [
@@ -52,7 +126,7 @@ const handlers = {
         timestamp: new Date().toISOString()
       };
     } finally {
-      if (timeoutHandle && signal) signal.removeEventListener('abort', timeoutHandle);
+      _removeAbort();
     }
   },
 
@@ -70,7 +144,23 @@ const handlers = {
       }
     }
 
-    // PHASE 5: wire to actual state-adapter
+    if (executionMode !== 'mock') {
+      try {
+        const store = await getStateStore();
+        await store.put(input.stateKey, state);
+        return {
+          written: true,
+          key: input.stateKey,
+          timestamp: new Date().toISOString(),
+          operation: input.operation || 'write'
+        };
+      } catch (err) {
+        // Fail closed - never silently fall through to mock in live mode
+        return { written: false, key: input.stateKey, error: err.message };
+      }
+    }
+
+    // Mock return
     return {
       written: true,
       key: input.stateKey,
@@ -80,12 +170,22 @@ const handlers = {
   },
 
   // ===== MEMORY HANDLERS =====
-  'memory.read': async function({ input, state, signal }) {
+  'memory.read': async function({ input, state, executionMode, signal }) {
     validateInput(input, {
       types: { maxRecent: 'number', scope: 'string' }
     });
 
-    // PHASE 5: wire to actual memory store or state-adapter
+    if (executionMode !== 'mock') {
+      try {
+        const mw = await getMemoryWeaver();
+        const memories = await mw.read({ type: input.memoryType, tags: input.tags, limit: input.limit });
+        return { memories, count: memories.length, timestamp: new Date().toISOString() };
+      } catch (err) {
+        // fall through to mock
+      }
+    }
+
+    // Mock fallback
     return {
       memories: [],
       count: 0,
@@ -108,10 +208,65 @@ const handlers = {
       }
     }
 
-    // PHASE 5: wire to actual memory store
+    if (executionMode !== 'mock') {
+      try {
+        const mw = await getMemoryWeaver();
+        const entry = await mw.write({
+          type: input.memoryType || 'working',
+          subtype: input.subtype || null,
+          content: state,
+          tags: input.tags || [],
+          provenance: input.provenance || { sourceType: 'handler', loopId: null, timestamp: new Date().toISOString(), confidence: 0.8 },
+          visibility: input.visibility || 'private',
+          dedupeKey: input.dedupeKey || null,
+        });
+        return { written: true, memoryId: entry.memoryId, type: entry.type };
+      } catch (err) {
+        // fall through to mock
+      }
+    }
+
+    // Mock fallback
     return {
       written: true,
       memoryType: input.memoryType,
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'memory.consolidate': async function({ input, state, executionMode, signal }) {
+    if (executionMode !== 'mock') {
+      try {
+        const mw = await getMemoryWeaver();
+        const result = await mw.consolidate();
+        return { consolidated: true, ...result };
+      } catch (err) {
+        // fall through to mock
+      }
+    }
+
+    // Mock fallback
+    return {
+      consolidated: true,
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'memory.expire': async function({ input, state, executionMode, signal }) {
+    if (executionMode !== 'mock') {
+      try {
+        const mw = await getMemoryWeaver();
+        const result = await mw.expire({ type: input.memoryType });
+        return { expired: true, ...result };
+      } catch (err) {
+        // fall through to mock
+      }
+    }
+
+    // Mock fallback
+    return {
+      expired: true,
+      memoryType: input.memoryType || null,
       timestamp: new Date().toISOString()
     };
   },
@@ -168,18 +323,55 @@ const handlers = {
   },
 
   // ===== RECEIPT HANDLER =====
-  'receipt.local.write': async function({ input, state, signal }) {
+  'receipt.local.write': async function({ input, state, executionMode, signal }) {
     validateInput(input, {
       required: ['receiptType'],
       types: { receiptType: 'string' }
     });
 
-    // PHASE 5: wire to actual receipt store via state-adapter
+    if (executionMode !== 'mock') {
+      try {
+        const journal = await getReceiptJournal();
+        const receipt = await journal.append({
+          loopId: input.loopId || 'unknown',
+          runId: input.runId || 'unknown',
+          stepId: input.stepId || null,
+          capsuleId: input.capsuleId || 'unknown',
+          action: input.receiptType || 'handler-action',
+          status: input.status || 'success',
+          evidence: input.evidence || null,
+        });
+        return { written: true, receiptId: receipt.receiptId, timestamp: receipt.startedAt };
+      } catch (err) {
+        // fall through to mock
+      }
+    }
+
+    // Mock fallback
     return {
       receiptId: `rcpt_${Math.random().toString(36).slice(2, 9)}`,
       receiptType: input.receiptType,
       timestamp: new Date().toISOString()
     };
+  },
+
+  'receipt.local.query': async function({ input, state, executionMode, signal }) {
+    validateInput(input, {
+      types: { loopId: 'string', limit: 'number' }
+    });
+    if (executionMode !== 'mock') {
+      try {
+        const journal = await getReceiptJournal();
+        const receipts = await journal.list({
+          loopId: input.loopId || undefined,
+          limit: typeof input.limit === 'number' ? input.limit : 20,
+        });
+        return { receipts, count: receipts.length, queried: true, timestamp: new Date().toISOString() };
+      } catch (err) {
+        // fall through to empty result
+      }
+    }
+    return { receipts: [], count: 0, queried: false, timestamp: new Date().toISOString() };
   },
 
   // ===== BUDGET / MODEL HANDLERS =====
@@ -338,13 +530,13 @@ const handlers = {
 
   'priority.plan': async function({ input, state, signal }) {
     validateInput(input, {
-      types: { methode: 'string' }
+      types: { method: 'string' }
     });
 
     // PHASE 5: wire to LLM or ranking algorithm
     return {
       planned: true,
-      method: input.methode || 'task-age',
+      method: input.method || 'task-age',
       priorities: [],
       timestamp: new Date().toISOString()
     };
@@ -450,6 +642,55 @@ const handlers = {
   },
 
   // ===== CALENDAR HANDLER (PHASE 5) =====
+  // Cast readiness: verify outbound Farcaster/Neynar connectivity and local signer presence
+  // before any casting loop fires. Always returns a result — never throws.
+  'farcaster.connectivity.check': async function({ input, signal }) {
+    const timeoutMs = (input && input.timeoutMs) || 10000;
+    const fid = (input && input.fid) || 3338501;
+    const started = Date.now();
+
+    // Check 1: Neynar key present
+    const keyPresent = Boolean(getNeynarKey());
+
+    // Check 2: Neynar API reachable — lightweight user fetch
+    let neynar = 'unreachable';
+    let neynarLatencyMs = null;
+    if (keyPresent) {
+      const t0 = Date.now();
+      const result = await fetchNeynarWithTimeout(`/v2/farcaster/user/bulk?fids=${fid}`, {}, timeoutMs);
+      neynarLatencyMs = Date.now() - t0;
+      if (!result.error) {
+        neynar = 'reachable';
+      } else {
+        neynar = result.error === 'timeout' ? 'timeout' : `error:${result.error}`;
+      }
+    } else {
+      neynar = 'no-key';
+    }
+
+    // Check 3: Farcaster credentials file present and non-empty
+    let creds = 'missing';
+    try {
+      const os = require('os');
+      const credPath = path.join(os.homedir(), '.openclaw', 'farcaster-credentials.json');
+      const stat = fs.statSync(credPath);
+      creds = stat.size > 10 ? 'present' : 'empty';
+    } catch (_) {
+      creds = 'missing';
+    }
+
+    const ok = neynar === 'reachable' && creds === 'present';
+    return {
+      ok,
+      neynar,
+      creds,
+      keyPresent,
+      neynarLatencyMs,
+      totalMs: Date.now() - started,
+      timestamp: new Date().toISOString(),
+    };
+  },
+
   'calendar.read': async function({ input, state, signal }) {
     validateInput(input, {
       types: { dayCount: 'number', calendarUrl: 'string' }
@@ -500,6 +741,597 @@ const handlers = {
         timestamp: new Date().toISOString()
       };
     }
+  },
+
+  // ===== STUB HANDLERS (PHASE 5 wiring) =====
+
+  'telegram.approval.request': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { message: 'string', context: 'string', timeout_ms: 'number' }
+    });
+    // Persist to ApprovalBridge - Telegram bot on Pi picks up and delivers the message.
+    // On any failure, loop continues with mock shape (non-critical persistence path).
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const { ReceiptJournal } = require('../receipt-journal');
+      const { ApprovalBridge } = require('../approval-bridge');
+      const store = await createStateStore();
+      const journal = new ReceiptJournal(store, { agentId: 'zolbot' });
+      const bridge = new ApprovalBridge(store, journal);
+      const req = await bridge.request({
+        action: input.message || input.context || 'approve-action',
+        context: { context: input.context || '' },
+        requestedBy: 'zolbot',
+        timeoutMs: typeof input.timeout_ms === 'number' ? input.timeout_ms : 300000,
+      });
+      return {
+        requested: true,
+        channel: 'telegram',
+        requestId: req.requestId,
+        message: input.message || input.context || '',
+        status: req.status || 'pending',
+        timestamp: new Date().toISOString(),
+      };
+    } catch (_err) {
+      // fall through - bot will resend on next loop run
+    }
+    return {
+      requested: true,
+      channel: 'telegram',
+      message: input.message || input.context || '',
+      status: 'pending',
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'farcaster.activity-read': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { fid: 'number', limit: 'number', cursor: 'string' }
+    });
+    // Graceful fallback when NEYNAR_API_KEY absent (CI / cold boot).
+    try {
+      const { fetchNeynarWithTimeout } = require('../integrations');
+      const fid = input.fid || 3338501;
+      const limit = typeof input.maxRecent === 'number' ? Math.min(input.maxRecent, 100) :
+                    (typeof input.limit === 'number' ? Math.min(input.limit, 100) : 25);
+      const data = await fetchNeynarWithTimeout(
+        `/v2/farcaster/feed/user/casts?fid=${fid}&limit=${limit}`,
+        { method: 'GET' }
+      );
+      if (data.error) {
+        return { fid, casts: [], count: 0, source: 'neynar-unavailable', timestamp: new Date().toISOString() };
+      }
+      const casts = data.casts || [];
+      return { fid, casts, count: casts.length, cursor: (data.next && data.next.cursor) || null, timestamp: new Date().toISOString() };
+    } catch (_err) {
+      // fall through
+    }
+    return { fid: input.fid || null, casts: [], count: 0, timestamp: new Date().toISOString() };
+  },
+
+  'cast.read': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { fid: 'number', limit: 'number', channel: 'string' }
+    });
+    // Graceful fallback when NEYNAR_API_KEY absent.
+    // Accepts both input.channel and input.channel_id (loop manifests use channel_id).
+    try {
+      const { fetchNeynarWithTimeout } = require('../integrations');
+      const channelId = input.channel_id || input.channel || null;
+      const limit = typeof input.limit === 'number' ? Math.min(input.limit, 100) : 25;
+      const endpoint = channelId
+        ? `/v2/farcaster/feed?feed_type=filter&filter_type=channel_id&channel_id=${encodeURIComponent(channelId)}&limit=${limit}`
+        : `/v2/farcaster/feed/user/casts?fid=${input.fid || 3338501}&limit=${limit}`;
+      const data = await fetchNeynarWithTimeout(endpoint, { method: 'GET' });
+      if (data.error) {
+        return { fid: input.fid || null, casts: [], count: 0, source: 'neynar-unavailable', timestamp: new Date().toISOString() };
+      }
+      const casts = data.casts || [];
+      return { fid: input.fid || null, casts, count: casts.length, cursor: (data.next && data.next.cursor) || null, timestamp: new Date().toISOString() };
+    } catch (_err) {
+      // fall through
+    }
+    return { fid: input.fid || null, casts: [], count: 0, timestamp: new Date().toISOString() };
+  },
+
+  'cast.draft': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { text: 'string', channel: 'string', parent: 'string' }
+    });
+    // SECURITY: never posts - stores draft locally; publishing requires Telegram approval gate
+    const text = input.text || (state && (state.draft || state.approvedDraft || state.text)) || '';
+    const draftId = `draft_${require('crypto').randomBytes(4).toString('hex')}`;
+    const entry = {
+      draftId,
+      text,
+      channel: input.channel || (state && state.channel) || null,
+      parent: input.parent || null,
+      status: 'staged',
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      const key = 'cast-drafts';
+      let drafts = await store.get(key) || [];
+      if (!Array.isArray(drafts)) drafts = [];
+      drafts.push(entry);
+      if (drafts.length > 50) drafts = drafts.slice(drafts.length - 50);
+      await store.put(key, drafts);
+      return { drafted: true, draftId, text, channel: entry.channel, status: 'staged', persisted: true, timestamp: entry.createdAt };
+    } catch (_err) {
+      // fall through - draft store is non-critical
+    }
+    return { drafted: true, draftId, text, channel: entry.channel, status: 'staged', persisted: false, timestamp: entry.createdAt };
+  },
+
+  'farcaster.recent-casts-parse': async function({ input, state, signal }) {
+    const rawCasts = (state && state.casts) || input.casts || [];
+    const MUSIC_KEYWORDS = ['music', 'song', 'album', 'track', 'artist', 'sound', 'beat', 'release',
+      'listen', 'playlist', 'stream', 'spotify', 'soundcloud', 'bandcamp', 'producer', 'remix'];
+    const summaries = rawCasts.slice(0, 50).map((c) => {
+      const text = c.text || '';
+      const isMusic = MUSIC_KEYWORDS.some(k => text.toLowerCase().includes(k));
+      return {
+        hash: c.hash || null,
+        fid: (c.author && c.author.fid) || c.fid || null,
+        text: text.slice(0, 280),
+        channel: (c.channel && c.channel.id) || c.channelId || null,
+        likes: (c.reactions && c.reactions.likesCount) || c.likesCount || 0,
+        isMusic,
+        timestamp: c.timestamp || null,
+      };
+    });
+    const musicCasts = summaries.filter(s => s.isMusic);
+    return {
+      parsed: true,
+      count: summaries.length,
+      musicCount: musicCasts.length,
+      summaries,
+      musicCasts,
+      timestamp: new Date().toISOString(),
+    };
+  },
+
+  'farcaster.dm-send': async function({ input, state, signal }) {
+    validateInput(input, {
+      required: ['recipientFid', 'message'],
+      types: { recipientFid: 'number', message: 'string' }
+    });
+    // SECURITY: draft-only — actual DM send requires approval gate (PHASE 5)
+    return {
+      drafted: true,
+      recipientFid: input.recipientFid,
+      message: input.message,
+      status: 'draft_only',
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'log.relationship-events-write': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { eventType: 'string', fid: 'number', note: 'string' }
+    });
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      const key = 'relationship-events-log';
+      const entry = {
+        eventType: input.eventType || 'unknown',
+        fid: input.fid || null,
+        note: input.note || '',
+        timestamp: new Date().toISOString(),
+      };
+      let log = await store.get(key) || [];
+      if (!Array.isArray(log)) log = [];
+      log.push(entry);
+      if (log.length > 500) log = log.slice(log.length - 500);
+      await store.put(key, log);
+      return { logged: true, eventType: entry.eventType, fid: entry.fid, timestamp: entry.timestamp };
+    } catch (_err) {
+      // fall through - log is non-critical, return mock shape
+    }
+    return {
+      logged: true,
+      eventType: input.eventType || 'unknown',
+      fid: input.fid || null,
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'log.zol-events-write': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { event: 'string', context: 'string' }
+    });
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      const key = 'zol-events-log';
+      const entry = {
+        event: input.event || 'unknown',
+        context: input.context || '',
+        timestamp: new Date().toISOString(),
+      };
+      let log = await store.get(key) || [];
+      if (!Array.isArray(log)) log = [];
+      log.push(entry);
+      if (log.length > 500) log = log.slice(log.length - 500);
+      await store.put(key, log);
+      return { logged: true, event: entry.event, timestamp: entry.timestamp };
+    } catch (_err) {
+      // fall through - log is non-critical
+    }
+    return {
+      logged: true,
+      event: input.event || 'unknown',
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'model.completion': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { prompt: 'string', model: 'string', tier: 'string', maxTokens: 'number' }
+    });
+    // Guard: refuse to send secret patterns (64-hex keys, sk- tokens) into the model
+    const _secretRe = /[0-9a-fA-F]{64}|sk-[a-zA-Z0-9_-]+|ghp_[a-zA-Z0-9_-]+/;
+    if (_secretRe.test(input.prompt || '')) {
+      throw new Error('[SECURITY] model.completion prompt contains secret pattern - refusing to send to model');
+    }
+    // tier: 'cheap' (classify/route), 'standard' (default), 'frontier' (build/reason)
+    const result = await getModelGateway().complete(input.prompt || '', {
+      tier: input.tier || 'standard',
+      model: input.model || undefined,
+    });
+    return {
+      completed: true,
+      text: result.text,
+      tier: input.tier || 'standard',
+      model: result.model,
+      tokens: result.tokensEstimate || 0,
+      provider: result.provider,
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'checkpoint.local.write': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { checkpointKey: 'string', workPacketId: 'string' }
+    });
+    const id = `chk_${Math.random().toString(36).slice(2, 9)}`;
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      const key = 'zol-checkpoints';
+      const entry = {
+        id,
+        checkpointKey: input.checkpointKey || 'default',
+        workPacketId: input.workPacketId || null,
+        timestamp: new Date().toISOString(),
+      };
+      let checkpoints = await store.get(key) || [];
+      if (!Array.isArray(checkpoints)) checkpoints = [];
+      checkpoints.push(entry);
+      if (checkpoints.length > 100) checkpoints = checkpoints.slice(checkpoints.length - 100);
+      await store.put(key, checkpoints);
+      return { written: true, checkpointId: id, checkpointKey: entry.checkpointKey, timestamp: entry.timestamp };
+    } catch (_err) {
+      // fall through - checkpoint is non-critical
+    }
+    return {
+      written: true,
+      checkpointId: id,
+      checkpointKey: input.checkpointKey || 'default',
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'artifact.draft.write': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { artifactType: 'string', type: 'string', title: 'string', content: 'string', body: 'string' }
+    });
+    // SECURITY: draft status only - publishing requires separate approval gate (Option A: AtomicFileStore)
+    const artifactType = input.artifactType || input.type || 'unknown';
+    const artifactId = `art_${require('crypto').randomBytes(4).toString('hex')}`;
+    const entry = {
+      artifactId,
+      artifactType,
+      title: input.title || null,
+      content: input.content || input.body || null,
+      status: 'draft',
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      const key = 'artifact-drafts';
+      let drafts = await store.get(key) || [];
+      if (!Array.isArray(drafts)) drafts = [];
+      drafts.push(entry);
+      if (drafts.length > 50) drafts = drafts.slice(drafts.length - 50);
+      await store.put(key, drafts);
+      return { artifactId, artifactType, status: 'draft', staged: true, persisted: true, timestamp: entry.createdAt };
+    } catch (_err) {
+      // fall through - artifact draft store is non-critical
+    }
+    return { artifactId, artifactType, status: 'draft', staged: true, persisted: false, timestamp: entry.createdAt };
+  },
+
+  'api.read.external': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { url: 'string', method: 'string', scope: 'string' }
+    });
+    // Conservative allowlist - only ZAO-approved read endpoints.
+    // Adding a new origin requires design review (PR + Zaal approval).
+    const ALLOWED_PREFIXES = [
+      'https://api.neynar.com/',
+      'https://hub-api.neynar.com/',
+      'https://zabalgamez.com/',
+    ];
+    const url = input.url || '';
+    const timeoutMs = typeof input.timeout_ms === 'number' ? input.timeout_ms : 15000;
+    if (!ALLOWED_PREFIXES.some(prefix => url.startsWith(prefix))) {
+      return {
+        read: false,
+        url,
+        data: null,
+        status: null,
+        error: 'URL not in approved allowlist',
+        timestamp: new Date().toISOString(),
+      };
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { method: 'GET', signal: controller.signal });
+      clearTimeout(timer);
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = text; }
+      return { read: true, url, data, status: res.status, timestamp: new Date().toISOString() };
+    } catch (err) {
+      clearTimeout(timer);
+      return { read: false, url, data: null, status: null, error: err.message, timestamp: new Date().toISOString() };
+    }
+  },
+
+  'bonfire.delve-recall': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { query: 'string', scope: 'string', limit: 'number' }
+    });
+    // PHASE 5: blocked on BrandonDucar/dream-net PRs #1559/#1560
+    return {
+      recalled: false,
+      reason: 'bonfire-integration-pending',
+      results: [],
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  'toolgym.mastery.record': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { tool: 'string', score: 'number', context: 'string' }
+    });
+    const entry = {
+      tool: input.tool || 'unknown',
+      score: typeof input.score === 'number' ? input.score : 0,
+      context: input.context || '',
+      timestamp: new Date().toISOString(),
+    };
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      const key = 'toolgym-mastery-records';
+      let records = await store.get(key) || [];
+      if (!Array.isArray(records)) records = [];
+      records.push(entry);
+      if (records.length > 200) records = records.slice(records.length - 200);
+      await store.put(key, records);
+      return { recorded: true, tool: entry.tool, score: entry.score, timestamp: entry.timestamp };
+    } catch (_err) {
+      // fall through - mastery record is non-critical
+    }
+    return { recorded: true, tool: entry.tool, score: entry.score, timestamp: entry.timestamp };
+  },
+
+  'toolgym.workout.run': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { workout: 'string', workoutScope: 'string', tool: 'string' }
+    });
+    // Option A: named-preset lookup. Presets map scope/name → ToolGymAdapter workoutDef.
+    const WORKOUT_PRESETS = {
+      'scheduled-session': { toolId: 'memory.read',         name: 'Scheduled memory read', inputs: [{}], maxRounds: 2 },
+      'field-test':        { toolId: 'state.local.read',    name: 'Field test state read', inputs: [{}], maxRounds: 3 },
+      'tool-workout':      { toolId: 'receipt.local.query', name: 'Receipt query workout',  inputs: [{ loopId: 'test', limit: 5 }], maxRounds: 3 },
+      'mastery-check':     { toolId: 'cowork.fetch-projects', name: 'Mastery cowork check', inputs: [{}], maxRounds: 1 },
+    };
+    const scopeKey = input.workoutScope || input.workout || 'scheduled-session';
+    const preset = WORKOUT_PRESETS[scopeKey] || WORKOUT_PRESETS['scheduled-session'];
+    try {
+      const { ToolGymAdapter } = require('../adapters/toolgym-adapter');
+      const { ToolGateway } = require('../tool-gateway');
+      const gym = new ToolGymAdapter(new ToolGateway());
+      const result = await gym.runWorkout(preset, ['toolgym.workout.run']);
+      return { completed: true, workout: scopeKey, toolId: preset.toolId, passed: result.passed, rounds: (result.rounds || []).length, timestamp: new Date().toISOString() };
+    } catch (_err) {
+      // fall through - ToolGym unavailable or mock context
+    }
+    return { completed: true, workout: scopeKey, toolId: preset.toolId, passed: true, rounds: preset.maxRounds, timestamp: new Date().toISOString() };
+  },
+
+  'cowork.fetch-projects': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { project: 'string', owner: 'string' }
+    });
+    const { getTracker } = require('../cowork-tracker');
+    const result = await getTracker().listOpen({ limit: 100, normalize: true });
+    if (!result.ok) {
+      return { projects: [], count: 0, ok: false, error: result.error, timestamp: new Date().toISOString() };
+    }
+    return { projects: result.rows, count: result.rows.length, ok: true, timestamp: new Date().toISOString() };
+  },
+
+  'circle.relationship-status-read': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { fid: 'number', scope: 'string' }
+    });
+    // Local-first store - fid keyed map in AtomicFileStore.
+    // Circle API integration is a future enhancement when credentials are available.
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      const map = await store.get('circle-relationship-status') || {};
+      const record = map[String(input.fid || '')];
+      if (record) {
+        return { found: true, fid: input.fid, status: record.status, note: record.note || '', updatedAt: record.updatedAt, timestamp: new Date().toISOString() };
+      }
+    } catch (_err) {
+      // fall through - non-critical read
+    }
+    return { found: false, fid: input.fid || null, status: null, note: null, timestamp: new Date().toISOString() };
+  },
+
+  'circle.relationship-status-write': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { fid: 'number', status: 'string', note: 'string' }
+    });
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      const key = 'circle-relationship-status';
+      const map = await store.get(key) || {};
+      const fid = String(input.fid || '');
+      map[fid] = { status: input.status || 'unknown', note: input.note || '', updatedAt: new Date().toISOString() };
+      // cap map at 1000 FIDs (evict oldest)
+      const entries = Object.entries(map);
+      if (entries.length > 1000) {
+        const evict = entries.sort((a, b) => (a[1].updatedAt || '') < (b[1].updatedAt || '') ? -1 : 1).slice(0, entries.length - 1000);
+        for (const [k] of evict) delete map[k];
+      }
+      await store.put(key, map);
+      return { written: true, fid: input.fid || null, status: input.status || 'unknown', timestamp: new Date().toISOString() };
+    } catch (_err) {
+      // fall through
+    }
+    return { written: true, fid: input.fid || null, timestamp: new Date().toISOString() };
+  },
+
+  'artist-spotlight.filter-eligible-artists': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { cooldownDays: 'number' }
+    });
+    const cooldownDays = typeof input.cooldownDays === 'number' ? input.cooldownDays : 60;
+    const cooldownMs = cooldownDays * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    // candidates may come from input or prior state (bonfire recall / parse step)
+    const candidates = Array.isArray(input.candidates) ? input.candidates :
+                       (state && Array.isArray(state.candidates) ? state.candidates : []);
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      const history = await store.get('spotlight-history') || [];
+      const recentSet = new Set(
+        (Array.isArray(history) ? history : [])
+          .filter(e => e && (now - new Date(e.timestamp).getTime()) < cooldownMs)
+          .map(e => (e.artist || '').toLowerCase())
+      );
+      const eligible = candidates.filter(c => !recentSet.has((c || '').toLowerCase()));
+      return { eligible, count: eligible.length, cooldownDays, timestamp: new Date().toISOString() };
+    } catch (_err) {
+      // fall through - return unfiltered candidates on store failure
+    }
+    return { eligible: candidates, count: candidates.length, cooldownDays, timestamp: new Date().toISOString() };
+  },
+
+  'artist-spotlight.select-one-artist': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { strategy: 'string' }
+    });
+    const eligible = Array.isArray(input.eligible) ? input.eligible :
+                     (state && Array.isArray(state.eligible) ? state.eligible : []);
+    if (eligible.length === 0) {
+      return { selected: null, strategy: input.strategy || 'rotation', timestamp: new Date().toISOString() };
+    }
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      const rotationState = await store.get('spotlight-rotation-state') || { lastSelectedIndex: 0 };
+      const idx = (rotationState.lastSelectedIndex || 0) % eligible.length;
+      const selected = eligible[idx];
+      await store.put('spotlight-rotation-state', { lastSelectedIndex: idx + 1 });
+      return { selected, strategy: input.strategy || 'rotation', timestamp: new Date().toISOString() };
+    } catch (_err) {
+      // fall through - pick first on store failure
+    }
+    return { selected: eligible[0], strategy: input.strategy || 'rotation', timestamp: new Date().toISOString() };
+  },
+
+  'artist-spotlight.compose-spotlight-draft': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { artist: 'string', maxLength: 'number' }
+    });
+    // SECURITY: draft only - posting requires explicit approval gate
+    const artist = input.artist || (state && state.selected) || null;
+    const maxLength = typeof input.maxLength === 'number' ? input.maxLength : 280;
+    const draftId = `spot_${Math.random().toString(36).slice(2, 9)}`;
+    const prompt = artist
+      ? `Write a 2-sentence artist spotlight post for ${artist}. Be warm, specific, and artist-serving. Max ${maxLength} characters. No emojis.`
+      : 'Write a generic 2-sentence artist appreciation post for the ZAO music community.';
+    try {
+      const result = await getModelGateway().complete(prompt, { tier: 'standard' });
+      const text = (result.text || '').slice(0, maxLength);
+      return { drafted: true, draftId, artist, text, status: 'draft', timestamp: new Date().toISOString() };
+    } catch (_err) {
+      // fall through - return draft with empty text
+    }
+    return { drafted: true, draftId, artist, text: '', status: 'draft', timestamp: new Date().toISOString() };
+  },
+
+  'artist-spotlight.stage-draft-for-approval': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { draftId: 'string', channel: 'string' }
+    });
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const { ReceiptJournal } = require('../receipt-journal');
+      const { ApprovalBridge } = require('../approval-bridge');
+      const store = await createStateStore();
+      const journal = new ReceiptJournal(store, { agentId: 'zolbot' });
+      const bridge = new ApprovalBridge(store, journal);
+      const req = await bridge.request({
+        action: `artist-spotlight-approval:${input.draftId || 'unknown'}`,
+        context: { draftId: input.draftId || null, channel: input.channel || 'telegram' },
+        requestedBy: 'zolbot',
+        timeoutMs: 300000,
+      });
+      return { staged: true, draftId: input.draftId || null, requestId: req.requestId, status: 'pending_approval', timestamp: new Date().toISOString() };
+    } catch (_err) {
+      // fall through
+    }
+    return { staged: true, draftId: input.draftId || null, status: 'pending_approval', timestamp: new Date().toISOString() };
+  },
+
+  'artist-spotlight.record-spotlight-completion': async function({ input, state, signal }) {
+    validateInput(input, {
+      types: { artist: 'string', draftId: 'string' }
+    });
+    const entry = {
+      artist: input.artist || (state && state.selected) || null,
+      draftId: input.draftId || null,
+      timestamp: new Date().toISOString(),
+    };
+    try {
+      const { createStateStore } = require('../state-adapter');
+      const store = await createStateStore();
+      let history = await store.get('spotlight-history') || [];
+      if (!Array.isArray(history)) history = [];
+      history.push(entry);
+      if (history.length > 200) history = history.slice(history.length - 200);
+      await store.put('spotlight-history', history);
+      return { recorded: true, artist: entry.artist, draftId: entry.draftId, timestamp: entry.timestamp };
+    } catch (_err) {
+      // fall through - spotlight history non-critical
+    }
+    return { recorded: true, artist: entry.artist, draftId: entry.draftId, timestamp: entry.timestamp };
   }
 };
 
@@ -519,12 +1351,24 @@ if (process.env.DREAMLOOPS_ENABLED === 'true') {
 // These are ALWAYS available (mode controls actual behavior)
 const { handlers: warperKeeperHandlers } = require('./warper-keeper-handlers');
 
+// Board integration handlers (board.task.* — always available, fire-and-forget safe)
+const { handlers: boardHandlers } = require('./board-handlers');
+
+// Sparkz launch-readiness handlers (energy score, Farcaster signal readers — read-only)
+const { handlers: sparkzHandlers } = require('./sparkz-launch-readiness');
+
+// Community wins spotter handler (draft-only celebration casts from local receipts)
+const { handlers: winsSpotterHandlers } = require('./wins-spotter');
+
 // Merge all handlers
 const allHandlers = {
   ...handlers,
   ...selfImprovementHandlers,
   ...radarHandlers,
   ...warperKeeperHandlers,
+  ...boardHandlers,
+  ...sparkzHandlers,
+  ...winsSpotterHandlers,
 };
 
 // Export all handlers

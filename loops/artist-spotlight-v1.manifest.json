@@ -185,5 +185,23 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "experimental",
+  "entry_conditions": [
+    "schedule:weekly",
+    "artist_roster_available"
+  ],
+  "exit_conditions": [
+    "spotlight_cast_published OR queued",
+    "spotlight_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

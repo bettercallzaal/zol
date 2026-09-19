@@ -117,5 +117,23 @@
         "max_attempts": 1
       }
     }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "schedule:periodic",
+    "budget_log_accessible"
+  ],
+  "exit_conditions": [
+    "review_artifact_written",
+    "review_receipt_logged"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
   ]
 }

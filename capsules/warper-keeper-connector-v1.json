@@ -34,6 +34,33 @@
       "self.modify.live",
       "signer.change",
       "wallet.sign"
+    ],
+    "allowed_loops": [
+      "warper-assignment-accept",
+      "trapper-open",
+      "trapper-sync",
+      "trapper-close"
+    ],
+    "allowed_tools": [
+      "state.read",
+      "state.write",
+      "receipt.write",
+      "artifact.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "receipt.local",
+      "artifact.local",
+      "warper.assignment"
+    ],
+    "disallowed_wallets": [
+      "*"
+    ],
+    "disallowed_signers": [
+      "*"
+    ],
+    "disallowed_environments": [
+      "production"
     ]
   },
   "resource_limits": {
@@ -47,6 +74,6 @@
   },
   "provenance": {
     "source": "https://github.com/BrandonDucar/dreamloops",
-    "content_hash": "sha256:276c48e5d9b0be100be0c3970ff49a6c114db0e42ec91026b275ad8afa2478c4"
+    "content_hash": "sha256:676f304186471e4e9aa2c6311f9d027841e9e19da05ffc61df65eb815fb2989f"
   }
 }

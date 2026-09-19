@@ -1,0 +1,132 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "resume-work-v1",
+  "title": "Resume Work",
+  "version": "1.0.0",
+  "status": "rehearsed",
+  "owner": "zolbot",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "after restart or when checkpoint detected for in-progress work packet",
+  "cooldown": "30s",
+  "description": "Load a suspended work packet from its last checkpoint, restore context, and re-enter the work lifecycle.",
+  "allowed_actions": [
+    "memory.read",
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "failure_modes": [
+    "budget exceeded",
+    "timeout",
+    "state corruption",
+    "handler error"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-17",
+  "limits": {
+    "max_wall_time_ms": 60000,
+    "max_steps": 6,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "load-checkpoint",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "restore-context",
+      "handler": "memory.read",
+      "permission": "memory.read",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "re-enter-lifecycle",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "notify-resumed",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-resume",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {},
+      "retry": {
+        "max_attempts": 2
+      }
+    }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "suspended_work_packet_exists",
+    "checkpoint_readable"
+  ],
+  "exit_conditions": [
+    "work_context_restored",
+    "work_resumed"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
+  ],
+  "inputs": [
+    "suspended_work_packet_id"
+  ],
+  "context_sources": [
+    "work packet store",
+    "checkpoint store",
+    "task context memory"
+  ],
+  "checks": [
+    "work_packet_loaded",
+    "checkpoint_restored",
+    "context_reinstated"
+  ],
+  "evidence_outputs": [
+    "resumed_work_packet"
+  ],
+  "receipt_outputs": [
+    "resume-work-receipt"
+  ],
+  "knowledge_state_outputs": [],
+  "execution_trace_outputs": [],
+  "memory_routes": []
+}

@@ -69,7 +69,44 @@
       "self.modify.live",
       "signer.change",
       "wallet.sign"
-    ]
+    ],
+    "allowed_loops": [
+      "heartbeat",
+      "health-check",
+      "restart-recovery",
+      "bootstrap-state",
+      "daily-private-brief",
+      "inbox-triage",
+      "task-capture",
+      "evening-review"
+    ],
+    "allowed_tools": [
+      "state.read",
+      "state.write",
+      "receipt.read",
+      "receipt.write",
+      "memory.write",
+      "artifact.write"
+    ],
+    "allowed_data": [
+      "state.local",
+      "receipt.local",
+      "memory.local",
+      "artifact.local",
+      "calendar.local",
+      "inbox.local",
+      "task.local",
+      "project.local",
+      "relationship.local",
+      "runtime.health"
+    ],
+    "disallowed_wallets": [
+      "*"
+    ],
+    "disallowed_signers": [
+      "*"
+    ],
+    "disallowed_environments": []
   },
   "resource_limits": {
     "max_wall_time_ms": 600000,
@@ -82,6 +119,6 @@
   },
   "provenance": {
     "source": "https://github.com/BrandonDucar/dreamloops",
-    "content_hash": "sha256:4c9282dad341d597b010734b9242f4a99e9469212c021d194c314dbc68e18ef4"
+    "content_hash": "sha256:cd93a57c5a3d2745cd585204c7272fd7f9e17183e2a9b56afad8ced6cce3d424"
   }
 }

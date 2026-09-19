@@ -1,0 +1,148 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "delegate-builder-v1",
+  "title": "Delegate Builder",
+  "version": "1.0.0",
+  "status": "rehearsed",
+  "owner": "zolbot",
+  "stewards": [
+    "zaal"
+  ],
+  "permission_tier": "local_draft_write",
+  "trigger": "after artifact-plan is approved",
+  "inputs": [
+    "approved artifact plan",
+    "available builder assignments",
+    "task queue state"
+  ],
+  "context_sources": [
+    "artifact plan state store",
+    "builder registry",
+    "task queue"
+  ],
+  "allowed_actions": [
+    "artifact.local.write",
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write",
+    "task.capture",
+    "task.read"
+  ],
+  "blocked_actions": [
+    "cloud.mutate",
+    "deployment.production.write",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign"
+  ],
+  "checks": [
+    "artifact plan approved and readable",
+    "builder available for assignment",
+    "task not already delegated",
+    "state write succeeded"
+  ],
+  "evidence_outputs": [
+    "builder assignment record",
+    "task capture confirmation",
+    "delegation timestamp"
+  ],
+  "receipt_outputs": [
+    "delegate-builder receipt"
+  ],
+  "knowledge_state_outputs": [
+    "builder assigned to artifact plan",
+    "task captured in queue"
+  ],
+  "execution_trace_outputs": [
+    "delegate-builder execution trace"
+  ],
+  "memory_routes": [
+    "episodic: delegation decisions",
+    "durable: builder assignment log"
+  ],
+  "cooldown": "300s",
+  "failure_modes": [
+    "budget exceeded",
+    "timeout",
+    "state corruption",
+    "handler error"
+  ],
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-16",
+  "limits": {
+    "max_wall_time_ms": 60000,
+    "max_steps": 6,
+    "max_retries_per_step": 2
+  },
+  "steps": [
+    {
+      "id": "read-plan",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": {
+        "stateKey": "artifact-plan",
+        "requireStatus": "approved"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "assign-builder",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": {
+        "stateKey": "builder-assignment",
+        "assignmentType": "artifact-builder"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "write-task",
+      "handler": "task.capture",
+      "permission": "task.capture",
+      "with": {
+        "taskType": "artifact-build",
+        "linkedPlan": "artifact-plan"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": "record-receipt",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {
+        "receiptType": "delegate-builder"
+      },
+      "retry": {
+        "max_attempts": 2
+      }
+    }
+  ],
+  "lifecycle_state": "dry-run",
+  "entry_conditions": [
+    "delegation_request_received",
+    "delegate_spec_defined"
+  ],
+  "exit_conditions": [
+    "delegate_artifact_built",
+    "build_receipt_written"
+  ],
+  "retry_limits": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "halt"
+  ]
+}

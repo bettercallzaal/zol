@@ -1,0 +1,163 @@
+{
+  "schema": "dreamnet.dreamloop.v1",
+  "loop_id": "zabal-submissions-watch-v1",
+  "title": "ZABAL Gamez Submissions Watch (QR coin tracker)",
+  "version": "1.0.0",
+  "status": "active",
+  "owner": "zolbot",
+  "stewards": ["zaal"],
+  "permission_tier": "local_draft_write",
+  "trigger": "every 4 hours",
+  "cooldown": "14400s",
+  "description": "Polls the ZABAL Gamez submissions API (zabalgamez.com/submissions) for new entries. Identifies submissions that qualify for a QR coin reward (per Zaal's standing criteria: active participant, first submission of the season, or milestone entry). Drafts a Farcaster notification cast tagging the submitter and pointing at their submission. All posts are Telegram-gated. Gives ZOL a standing watch on submissions so Zaal doesn't have to monitor manually.",
+  "allowed_actions": [
+    "api.read.external",
+    "cast.draft",
+    "model.completion",
+    "receipt.local.write",
+    "state.local.read",
+    "state.local.write",
+    "telegram.approval.request"
+  ],
+  "blocked_actions": [
+    "cast.post.without_approval",
+    "cloud.mutate",
+    "deployment.production.write",
+    "farcaster.post",
+    "fund.transfer",
+    "package.install",
+    "public.publish.without_approval",
+    "secret.value.read",
+    "self.modify.live",
+    "signer.change",
+    "wallet.sign",
+    "qr.coin.mint",
+    "qr.coin.transfer"
+  ],
+  "entry_conditions": [
+    "agent_running",
+    "submissions_api_reachable",
+    "state_readable"
+  ],
+  "exit_conditions": [
+    "submissions_polled",
+    "receipt_recorded"
+  ],
+  "retry_limits": {
+    "max_retries": 2,
+    "backoff_ms": 10000
+  },
+  "escalation_rules": [
+    "notify:owner",
+    "log:error",
+    "skip_cycle"
+  ],
+  "limits": {
+    "max_wall_time_ms": 120000,
+    "max_steps": 7,
+    "max_retries_per_step": 2,
+    "max_notifications_per_cycle": 3,
+    "submission_cooldown_per_author_ms": 86400000
+  },
+  "promotion_path": "rehearsed -> active_local -> live_guarded",
+  "last_reviewed": "2026-07-17",
+  "steps": [
+    {
+      "id": "read-submissions-state",
+      "handler": "state.local.read",
+      "permission": "state.local.read",
+      "with": { "key": "zabal-submissions-watch.state" },
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "poll-submissions-api",
+      "handler": "api.read.external",
+      "permission": "api.read.external",
+      "with": {
+        "url": "https://zabalgamez.com/api/submissions",
+        "method": "GET",
+        "timeout_ms": 15000
+      },
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "identify-qr-candidates",
+      "handler": "model.completion",
+      "permission": "model.completion",
+      "with": {
+        "role": "zabal-submissions-reviewer",
+        "task": "identify new submissions qualifying for QR coin mention: first-time submitter OR milestone entry OR exceptionally active participant. Output: list of {submission_id, author_fid, author_username, reason}. Max 3 per cycle.",
+        "max_tokens": 200
+      },
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "draft-notification-casts",
+      "handler": "cast.draft",
+      "permission": "cast.draft",
+      "with": {
+        "template": "zabal-submission-notification",
+        "max_chars": 280,
+        "apply_filters": ["no_emojis", "no_hashtags", "no_em_dashes"]
+      },
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "request-approval",
+      "handler": "telegram.approval.request",
+      "permission": "telegram.approval.request",
+      "with": {
+        "action_type": "cast.notify",
+        "context": "ZABAL Gamez submission QR coin notification",
+        "timeout_ms": 7200000
+      },
+      "retry": { "max_attempts": 1 }
+    },
+    {
+      "id": "write-submissions-state",
+      "handler": "state.local.write",
+      "permission": "state.local.write",
+      "with": { "key": "zabal-submissions-watch.state" },
+      "retry": { "max_attempts": 2 }
+    },
+    {
+      "id": "record-receipt",
+      "handler": "receipt.local.write",
+      "permission": "receipt.local.write",
+      "with": {},
+      "retry": { "max_attempts": 2 }
+    }
+  ],
+  "lifecycle_state": "production-ready",
+  "failure_modes": [
+    "Submissions API unreachable (cycle skipped, state unchanged)",
+    "No new qualifying submissions (cycle exits cleanly with receipt)",
+    "Model completion timeout (no candidates identified this cycle)",
+    "Telegram approval timeout (draft discarded, not sent)",
+    "Max notifications/cycle hit (remaining candidates deferred to next cycle)"
+  ],
+  "inputs": ["current date", "qr_criteria override (optional)"],
+  "context_sources": ["local_state", "zabalgamez_submissions_api"],
+  "checks": [
+    "state_readable",
+    "submissions_api_reachable",
+    "notifications_cap_not_exceeded"
+  ],
+  "evidence_outputs": [
+    "submissions_seen",
+    "qr_candidates_identified",
+    "notification_drafts_created",
+    "approvals_requested"
+  ],
+  "receipt_outputs": ["zabal-submissions-watch.receipt.json"],
+  "knowledge_state_outputs": [
+    "zabal-submissions-watch.state",
+    "zabal.last_submission_check"
+  ],
+  "execution_trace_outputs": ["zabal-submissions-watch.trace.json"],
+  "memory_routes": [
+    "seenSubmissions -> state.local",
+    "notifiedAuthors -> state.local",
+    "lastPolled -> state.local"
+  ]
+}
