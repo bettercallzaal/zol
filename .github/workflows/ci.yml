@@ -1,9 +1,9 @@
 name: CI
 
 on:
+  # main included since 2026-09-20: excluding it meant a red merge was never
+  # seen on main. Public repo, so the extra runs cost nothing.
   push:
-    branches-ignore:
-      - main
   pull_request:
     branches:
       - main
