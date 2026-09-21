@@ -20,7 +20,7 @@
     "dl:dry-run:board": "node scripts/dl-dry-run-board-triage.js"
   },
   "dependencies": {
-    "@farcaster/hub-nodejs": "^0.15.9",
+    "@farcaster/hub-nodejs": "^0.12.3",
     "ethers": "^6.16.0"
   },
   "optionalDependencies": {
