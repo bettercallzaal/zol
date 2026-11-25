@@ -1,0 +1,25 @@
+ZOL
+Copyright (c) 2026 Zaal Panthaki / BCZ Strategies LLC / The ZAO
+
+This product includes third-party software.
+
+Third-party component: DreamLoops
+  Location: vendor/dreamloops/ (runtime, cli, warper-keeper)
+  Upstream: https://github.com/BrandonDucar/dreamloops
+  Pinned commit: 1c6d3b1910f5b83639e0735634740902e2caacff (release v0.1.0)
+  License: Apache License, Version 2.0 (full text: vendor/dreamloops/LICENSE)
+  Provenance: vendor/dreamloops/PROVENANCE.md
+  Graft: merged to main via PR #19 (feat(zol): persistent-agent graft), 2026-07-15.
+
+Related upstream: BrandonDucar/Dreamnet (Apache-2.0). Its NOTICE file is carried over below verbatim.
+Dreamnet's NOTICE is recorded here at the request of the ORD-545 order; PROVENANCE.md names
+BrandonDucar/dreamloops, not Dreamnet, as the source of the vendored code.
+
+----- BEGIN upstream NOTICE (BrandonDucar/Dreamnet) -----
+DreamNet Public Core
+Copyright 2026 Brandon Ducar and DreamNet contributors
+
+DreamNet names and logos are not licensed for endorsement or branding use by
+the Apache License. The license permits reasonable attribution and description
+of the origin of this software.
+----- END upstream NOTICE -----
