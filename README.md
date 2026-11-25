@@ -311,6 +311,8 @@ A fresh Claude reading only this README should be able to:
 
 Private repo (not open source). Owned by BetterCallZaal Strategies LLC / The ZAO.
 
+Vendored third-party code in `vendor/dreamloops/` is Apache-2.0; see `NOTICE` and `vendor/dreamloops/LICENSE`.
+
 ## Questions?
 
 Open an issue on this repo or reach out to Zaal (@zaal on Farcaster, @bettercallzaal on X).
